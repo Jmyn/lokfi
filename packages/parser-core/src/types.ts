@@ -49,3 +49,33 @@ export interface DebitStatement extends Statement {
 export interface CreditStatement extends Statement {
   statementType: 'credit'
 }
+
+/** Column reference: either a 0-based index or a header string. */
+export type ColumnRef = number | string
+
+export interface CustomParserProfile {
+  id: string
+  name: string
+  /** Fingerprint from computeHeaderFingerprint — used to auto-match future files. */
+  headerFingerprint: string
+  createdAt: string
+  updatedAt: string
+
+  columnMap: {
+    date: ColumnRef
+    description: ColumnRef
+    /** Single combined amount column. Use this OR debit+credit. */
+    amount?: ColumnRef
+    /** Split columns: debit = outflow (stored negative), credit = inflow (stored positive). */
+    debit?: ColumnRef
+    credit?: ColumnRef
+    balance?: ColumnRef
+  }
+
+  skipRows: number               // rows to skip before the header row (0-based)
+  dateFormat?: string            // hint for non-standard date formats
+  statementType: 'debit' | 'credit'
+  accountNo?: string             // manual override
+  negateAmount: boolean          // flip the sign of all parsed amounts
+  source: StatementSource        // bank label shown on transactions
+}
