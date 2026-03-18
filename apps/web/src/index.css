@@ -1,3 +1,40 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #fafaf8;
+    --bg-sidebar: #f5f4f0;
+    --border: #e5e3dc;
+    --accent: #d97706;
+    --accent-hover: #b45309;
+    --accent-subtle: #fef3c7;
+    --accent-text: #92400e;
+  }
+
+  .dark {
+    --bg: #0e0e0d;
+    --bg-sidebar: #141412;
+    --border: #262521;
+    --accent: #f59e0b;
+    --accent-hover: #d97706;
+    --accent-subtle: #1c1a14;
+    --accent-text: #fbbf24;
+  }
+
+  html {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background-color: var(--bg);
+  }
+
+  body {
+    background-color: var(--bg);
+  }
+
+  /* Tabular numbers for financial data */
+  .tabular {
+    font-family: 'DM Mono', 'Courier New', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}

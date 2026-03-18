@@ -6,6 +6,7 @@ import { ImportPage } from './pages/import/ImportPage'
 import { TransactionsPage } from './pages/transactions/TransactionsPage'
 import { StatsPage } from './pages/stats/StatsPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
+import { RulesPage } from './pages/rules/RulesPage'
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -60,7 +61,7 @@ const profileRoute = createRoute({
 const rulesRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/rules',
-  component: () => <div className="p-6 text-gray-500 dark:text-gray-400">Rules — coming soon</div>,
+  component: RulesPage,
 })
 
 const routeTree = rootRoute.addChildren([
