@@ -16,5 +16,6 @@ export { generateTransactionHash } from './hashUtils'
 export { ParserRegistry } from './ParserRegistry'
 export { CdcDebitParser } from './parsers/cdc/CdcDebitParser'
 export { GenericCsvParser } from './parsers/generic/GenericCsvParser'
+export { CustomCsvParser } from './parsers/generic/CustomCsvParser'
 export { computeHeaderFingerprint } from './parsers/generic/csvUtils'
 
