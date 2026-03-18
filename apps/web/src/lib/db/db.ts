@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { StatementSource } from '@lokfi/parser-core'
+import type { StatementSource, CustomParserProfile } from '@lokfi/parser-core'
 import { defaultCategories, type DbCategory } from './seedCategories'
 
 export interface DbTransaction {
@@ -36,11 +36,14 @@ export interface DbSetting {
   value: string
 }
 
+export type DbCustomParserProfile = CustomParserProfile
+
 export class LokfiDatabase extends Dexie {
   transactions!: Table<DbTransaction>
   rules!: Table<DbRule>
   categories!: Table<DbCategory>
   settings!: Table<DbSetting>
+  customParsers!: Table<DbCustomParserProfile>
 
   constructor() {
     super('lokfi')
@@ -56,6 +59,11 @@ export class LokfiDatabase extends Dexie {
     // v2 schema (adds manualCategory index)
     this.version(2).stores({
       transactions: 'id, hash, source, accountNo, date, category, manualCategory, importedAt',
+    })
+
+    // v3 schema (adds customParsers table)
+    this.version(3).stores({
+      customParsers: 'id, headerFingerprint, name, createdAt',
     })
 
     // Seed default categories on initial DB creation
