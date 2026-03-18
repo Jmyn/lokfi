@@ -26,10 +26,10 @@
   
 ### 1D. Database Layer (Dexie.js)
 
-- [ ] 1D-1: Implement Dexie database class
-- [ ] 1D-2: Implement default categories seed
-- [ ] 1D-3: Implement StorageManager persistence
-- [ ] 1D-4: Implement backup warning system
+- [x] 1D-1: Implement Dexie database class
+- [x] 1D-2: Implement default categories seed
+- [x] 1D-3: Implement StorageManager persistence
+- [x] 1D-4: Implement backup warning system
 
 ### 1E. PDF Parsing Pipeline (skip PDF for now)
 
