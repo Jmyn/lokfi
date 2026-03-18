@@ -16,14 +16,14 @@
 - [x] 1B-3: Implement parser registry/auto-detect
 - [x] 1B-4: Verify with `card_transactions_record_...csv` sample
 
+### 1C. Parser Implementation (skip PDF for now)
 
-### 1C. Parser Migration (skip PDF for now)
-
-- [ ] 1C-1: Migrate OCBC Credit parser
-- [ ] 1C-2: Migrate OCBC Debit parser
-- [ ] 1C-3: Migrate Citibank Credit parser
-- [ ] 1C-4: Migrate UOB Credit parser
-
+- [ ] 1C-1: Implement OCBC Credit parser
+- [ ] 1C-2: Implement OCBC Debit parser
+- [ ] 1C-3: Implement Citibank Credit parser
+- [ ] 1C-4: Implement UOB Credit parser
+- [x] 1C-5: Implement CDC Debit parser
+  
 ### 1D. Database Layer (Dexie.js)
 
 - [ ] 1D-1: Implement Dexie database class
@@ -31,7 +31,7 @@
 - [ ] 1D-3: Implement StorageManager persistence
 - [ ] 1D-4: Implement backup warning system
 
-### 1E. PDF Parsing Pipeline
+### 1E. PDF Parsing Pipeline (skip PDF for now)
 
 - [ ] 1E-1: Create PDF Web Worker
 - [ ] 1E-2: Create `usePdfWorker` hook
