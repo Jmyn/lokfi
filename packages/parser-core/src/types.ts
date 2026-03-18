@@ -6,7 +6,7 @@ export class ParseError extends Error {
   }
 }
 
-export type StatementSource = 'ocbc' | 'dbs' | 'uob' | 'citibank' | 'cdc' | 'maybank'
+export type StatementSource = 'ocbc' | 'dbs' | 'uob' | 'citibank' | 'cdc' | 'maybank' | 'generic'
 
 export type StatementType = 'credit' | 'debit'
 

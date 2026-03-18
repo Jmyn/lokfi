@@ -18,6 +18,7 @@ export function parseAmount(raw: string): number | null {
 // Date normalisation: → ISO 8601 YYYY-MM-DD
 // ---------------------------------------------------------------------------
 
+/** Month abbreviation map used by normalizeDate and CustomCsvParser. */
 export const MONTH_ABBR: Record<string, string> = {
   jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
   jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
