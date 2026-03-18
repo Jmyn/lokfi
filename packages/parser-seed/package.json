@@ -1,0 +1,23 @@
+{
+  "name": "@lokfi/parser-seed",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "parser-seed": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "seed": "node ./dist/index.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.15",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
