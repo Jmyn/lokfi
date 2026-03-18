@@ -1,4 +1,13 @@
+/** Thrown when a parser fails to process statement text. */
+export class ParseError extends Error {
+  constructor(message: string, public readonly source?: string) {
+    super(message)
+    this.name = 'ParseError'
+  }
+}
+
 export type StatementSource = 'ocbc' | 'dbs' | 'uob' | 'citibank' | 'cdc' | 'maybank'
+
 export type StatementType = 'credit' | 'debit'
 
 /** A single transaction from a bank statement. transactionValue is always in native (home) currency. */
