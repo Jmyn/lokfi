@@ -26,8 +26,13 @@ export function TransactionTable({
       if (filters.dateTo && t.date > filters.dateTo) return false
       if (filters.sources.length > 0 && !filters.sources.includes(t.source)) return false
       if (filters.categoryId) {
-        const resolved = t.manualCategory ?? t.category
-        if (resolved !== filters.categoryId) return false
+        if (filters.categoryId === '__uncategorised__') {
+          const resolved = t.manualCategory ?? t.category
+          if (resolved) return false
+        } else {
+          const resolved = t.manualCategory ?? t.category
+          if (resolved !== filters.categoryId) return false
+        }
       }
       return true
     })
@@ -48,68 +53,93 @@ export function TransactionTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-            <th className="w-10 px-3 py-2 text-left">
+          <tr
+            className="border-b"
+            style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+          >
+            <th className="w-10 px-3 py-2.5 text-left">
               <input
                 type="checkbox"
                 checked={allSelected}
                 onChange={() => onToggleAll(allIds)}
-                className="rounded"
+                className="rounded accent-amber-600"
               />
             </th>
-            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Date</th>
-            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Description</th>
-            <th className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Amount</th>
-            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Category</th>
-            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Source</th>
-            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Account</th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Date
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Description
+            </th>
+            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Amount
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Category
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Source
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Account
+            </th>
           </tr>
         </thead>
         <tbody>
-          {transactions.map((t) => {
+          {transactions.map((t, i) => {
             const isNeg = t.transactionValue < 0
             const amountStr =
               (isNeg ? '−' : '+') + fmt.format(Math.abs(t.transactionValue))
+            const isSelected = selectedIds.has(t.id)
+            const isEven = i % 2 === 0
 
             return (
               <tr
                 key={t.id}
-                className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 ${
-                  selectedIds.has(t.id) ? 'bg-blue-50 dark:bg-blue-950' : ''
-                }`}
+                className="border-b transition-colors"
+                style={{
+                  borderColor: 'var(--border)',
+                  backgroundColor: isSelected
+                    ? 'var(--accent-subtle)'
+                    : isEven
+                    ? 'var(--bg)'
+                    : 'var(--bg-sidebar)',
+                }}
               >
-                <td className="px-3 py-2">
+                <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
-                    checked={selectedIds.has(t.id)}
+                    checked={isSelected}
                     onChange={() => onToggleSelect(t.id)}
-                    className="rounded"
+                    className="rounded accent-amber-600"
                   />
                 </td>
-                <td className="px-3 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono text-xs">
                   {t.date}
                 </td>
-                <td className="px-3 py-2 text-gray-900 dark:text-white max-w-xs truncate">
+                <td className="px-3 py-2.5 text-gray-900 dark:text-white max-w-xs truncate">
                   {t.description}
                 </td>
                 <td
-                  className={`px-3 py-2 text-right font-mono whitespace-nowrap ${
+                  className={`px-3 py-2.5 text-right font-mono whitespace-nowrap text-xs font-medium ${
                     isNeg
                       ? 'text-red-600 dark:text-red-400'
-                      : 'text-green-600 dark:text-green-400'
+                      : 'text-emerald-600 dark:text-emerald-400'
                   }`}
                 >
                   {amountStr}
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2.5">
                   <CategoryBadge
                     transactionId={t.id}
                     category={t.category}
                     manualCategory={t.manualCategory}
                   />
                 </td>
-                <td className="px-3 py-2 text-gray-500 dark:text-gray-400 text-xs">{t.source}</td>
-                <td className="px-3 py-2 text-gray-500 dark:text-gray-400 text-xs font-mono">
+                <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide">
+                  {t.source}
+                </td>
+                <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs font-mono">
                   {t.accountNo}
                 </td>
               </tr>

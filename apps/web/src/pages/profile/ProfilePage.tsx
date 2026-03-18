@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Download, AlertTriangle } from 'lucide-react'
 import { db } from '../../lib/db/db'
 import { StorageManager } from '../../lib/db/StorageManager'
 import { useBackupWarning } from '../../hooks/useBackupWarning'
@@ -7,6 +8,9 @@ export function ProfilePage() {
   const showWarning = useBackupWarning()
   const count = useLiveQuery(() => db.transactions.count(), [])
   const oldest = useLiveQuery(() => db.transactions.orderBy('date').first(), [])
+  const newest = useLiveQuery(() => db.transactions.orderBy('date').last(), [])
+  const rulesCount = useLiveQuery(() => db.rules.count(), [])
+  const categoriesCount = useLiveQuery(() => db.categories.count(), [])
 
   async function handleExport() {
     const [transactions, rules, categories] = await Promise.all([
@@ -41,51 +45,106 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="p-6 max-w-lg space-y-8">
-      <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Profile</h1>
+    <div className="p-6 max-w-xl space-y-6">
+      <h1 className="font-serif text-2xl text-gray-900 dark:text-white">Profile</h1>
 
-      {/* Backup warning */}
-      {showWarning && (
-        <div className="rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-700 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300">
-          You haven't exported in 30 days. Back up your data.
+      {/* Data & Backup card */}
+      <div
+        className="rounded-xl border overflow-hidden"
+        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+      >
+        <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Data & Backup</h2>
         </div>
-      )}
 
-      {/* Export */}
-      <section className="space-y-2">
-        <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">Export</h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Downloads a JSON backup of all transactions, rules, and categories.
-        </p>
-        <button
-          onClick={handleExport}
-          className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors"
+        <div className="px-5 py-4 space-y-4">
+          {/* Backup warning inline */}
+          {showWarning && (
+            <div
+              className="flex items-start gap-3 rounded-lg px-4 py-3 text-sm border"
+              style={{
+                borderColor: 'var(--accent)',
+                backgroundColor: 'var(--accent-subtle)',
+                color: 'var(--accent-text)',
+              }}
+            >
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--accent)' }} />
+              <span>You haven't exported in 30 days. Back up your data.</span>
+            </div>
+          )}
+
+          {/* Data summary */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'Transactions', value: count !== undefined ? count : '…' },
+              { label: 'Rules', value: rulesCount !== undefined ? rulesCount : '…' },
+              { label: 'Categories', value: categoriesCount !== undefined ? categoriesCount : '…' },
+              {
+                label: 'Date range',
+                value:
+                  oldest && newest
+                    ? `${oldest.date.slice(0, 7)} → ${newest.date.slice(0, 7)}`
+                    : '—',
+              },
+            ].map(({ label, value }) => (
+              <div
+                key={label}
+                className="rounded-lg border px-4 py-3"
+                style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}
+              >
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">{label}</p>
+                <p className="font-mono text-base font-medium text-gray-900 dark:text-white">
+                  {value}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Export button */}
+          <div className="pt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Downloads a JSON backup of all transactions, rules, and categories.
+            </p>
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg transition-colors hover:opacity-90"
+              style={{
+                borderColor: 'var(--accent)',
+                color: 'var(--accent)',
+                backgroundColor: 'var(--accent-subtle)',
+              }}
+            >
+              <Download className="w-4 h-4" />
+              Export backup (JSON)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Danger zone card */}
+      <div
+        className="rounded-xl border overflow-hidden"
+        style={{ borderColor: '#fca5a5', backgroundColor: 'var(--bg-sidebar)' }}
+      >
+        <div
+          className="px-5 py-4 border-b"
+          style={{ borderColor: '#fca5a5' }}
         >
-          Export backup (JSON)
-        </button>
-      </section>
-
-      {/* Stats */}
-      <section className="space-y-1">
-        <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">Summary</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {count !== undefined ? `${count} transactions imported` : 'Loading…'}
-        </p>
-        {oldest && (
-          <p className="text-sm text-gray-600 dark:text-gray-400">Oldest: {oldest.date}</p>
-        )}
-      </section>
-
-      {/* Danger zone */}
-      <section className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-800">
-        <h2 className="text-sm font-medium text-red-600 dark:text-red-400">Danger zone</h2>
-        <button
-          onClick={handleClearData}
-          className="px-4 py-2 text-sm border border-red-300 dark:border-red-700 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-        >
-          Clear all data
-        </button>
-      </section>
+          <h2 className="text-sm font-semibold text-red-600 dark:text-red-400">Danger Zone</h2>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Permanently deletes all transactions, rules, and categories. This cannot be undone.
+          </p>
+          <button
+            onClick={handleClearData}
+            className="px-4 py-2 text-sm font-medium border rounded-lg transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+            style={{ borderColor: '#ef4444', color: '#ef4444' }}
+          >
+            Clear all data
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

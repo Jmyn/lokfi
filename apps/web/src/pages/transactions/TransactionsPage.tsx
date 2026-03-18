@@ -12,6 +12,10 @@ export function TransactionsPage() {
 
   const categories = useLiveQuery(() => db.categories.toArray(), [])
   const totalCount = useLiveQuery(() => db.transactions.count(), [])
+  const uncategorisedCount = useLiveQuery(async () => {
+    const all = await db.transactions.toArray()
+    return all.filter((t) => !t.manualCategory && !t.category).length
+  }, [])
 
   const hasFilters =
     filters.dateFrom !== '' ||
@@ -51,13 +55,14 @@ export function TransactionsPage() {
   if (totalCount === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-center p-8 rounded-xl border border-gray-200 dark:border-gray-800 max-w-sm">
+        <div className="text-center p-8 rounded-xl border max-w-sm" style={{ borderColor: 'var(--border)' }}>
           <p className="text-gray-600 dark:text-gray-400 mb-4">No transactions yet</p>
           <Link
             to="/import"
-            className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+            className="text-sm font-medium hover:underline"
+            style={{ color: 'var(--accent)' }}
           >
-            Import a statement
+            Import a statement →
           </Link>
         </div>
       </div>
@@ -66,10 +71,36 @@ export function TransactionsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Transactions</h1>
-        {totalCount !== undefined && (
-          <span className="text-sm text-gray-500 dark:text-gray-400">{totalCount} total</span>
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-5 py-3.5 border-b"
+        style={{ borderColor: 'var(--border)' }}
+      >
+        <div className="flex items-baseline gap-3">
+          <h1 className="font-serif text-xl text-gray-900 dark:text-white">Transactions</h1>
+          {totalCount !== undefined && (
+            <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">{totalCount} total</span>
+          )}
+        </div>
+        {/* Uncategorised nudge */}
+        {uncategorisedCount !== undefined && uncategorisedCount > 0 && (
+          <button
+            onClick={() =>
+              setFilters((f) => ({
+                ...f,
+                categoryId: f.categoryId === '__uncategorised__' ? '' : '__uncategorised__',
+              }))
+            }
+            className="text-xs font-medium px-3 py-1.5 rounded-full border transition-colors"
+            style={{
+              color: 'var(--accent)',
+              borderColor: 'var(--accent)',
+              backgroundColor:
+                filters.categoryId === '__uncategorised__' ? 'var(--accent-subtle)' : 'transparent',
+            }}
+          >
+            {uncategorisedCount} uncategorised
+          </button>
         )}
       </div>
 
@@ -94,14 +125,18 @@ export function TransactionsPage() {
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="sticky bottom-0 flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 shadow-lg">
+        <div
+          className="sticky bottom-0 flex items-center gap-3 px-5 py-3 border-t shadow-lg"
+          style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}
+        >
           <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">
             {selectedIds.size} selected · Categorise as:
           </span>
           <select
             value={bulkCategoryId}
             onChange={(e) => setBulkCategoryId(e.target.value)}
-            className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            className="text-sm border rounded-full px-3 py-1.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none"
+            style={{ borderColor: 'var(--border)' }}
           >
             <option value="">Pick a category…</option>
             {categories?.map((c) => (
@@ -113,7 +148,8 @@ export function TransactionsPage() {
           <button
             onClick={handleBulkApply}
             disabled={!bulkCategoryId}
-            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="px-4 py-1.5 text-white text-sm rounded-full font-medium disabled:opacity-40 transition-colors"
+            style={{ backgroundColor: 'var(--accent)' }}
           >
             Apply
           </button>

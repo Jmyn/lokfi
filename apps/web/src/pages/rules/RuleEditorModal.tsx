@@ -40,7 +40,7 @@ const NUMERIC_OPERATIONS = [
 export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
   const categories = useLiveQuery(() => db.categories.toArray()) ?? []
 
-  const { register, control, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
+  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
       name: rule?.name ?? '',
       priority: rule?.priority ?? 100,
@@ -154,7 +154,8 @@ export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
                 <button
                   type="button"
                   onClick={() => append({ field: 'description', operation: 'contains', value: '' })}
-                  className="text-sm flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-sm flex items-center gap-1 hover:underline font-medium"
+                  style={{ color: 'var(--accent)' }}
                 >
                   <Plus className="w-4 h-4" /> Add Condition
                 </button>
@@ -170,6 +171,12 @@ export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
                   <div key={field.id} className="flex gap-2 items-start bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border dark:border-gray-800">
                     <select
                       {...register(`conditions.${index}.field`)}
+                      onChange={(e) => {
+                        const newField = e.target.value as RuleCondition['field']
+                        setValue(`conditions.${index}.field`, newField)
+                        setValue(`conditions.${index}.operation`, newField === 'transactionValue' ? 'gt' : 'contains')
+                        setValue(`conditions.${index}.value`, '')
+                      }}
                       className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
                     >
                       {FIELD_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -222,7 +229,8 @@ export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
           <button
             type="submit"
             form="rule-form"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white rounded-md transition-opacity hover:opacity-90"
+            style={{ backgroundColor: 'var(--accent)' }}
           >
             Save Rule
           </button>

@@ -13,7 +13,6 @@ export function CategoryBadge({ transactionId, category, manualCategory }: Categ
   const categories = useLiveQuery(() => db.categories.toArray(), [])
 
   const resolvedId = manualCategory ?? category ?? null
-
   const resolvedCategory = categories?.find((c) => c.id === resolvedId) ?? null
 
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -29,7 +28,8 @@ export function CategoryBadge({ transactionId, category, manualCategory }: Categ
         defaultValue={resolvedId ?? ''}
         onChange={handleChange}
         onBlur={() => setEditing(false)}
-        className="text-xs border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+        className="text-xs border rounded-md px-2 py-1 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2"
+        style={{ borderColor: 'var(--border)', '--tw-ring-color': 'var(--accent)' } as React.CSSProperties}
       >
         <option value="">Uncategorised</option>
         {categories?.map((c) => (
@@ -44,18 +44,28 @@ export function CategoryBadge({ transactionId, category, manualCategory }: Categ
   return (
     <button
       onClick={() => setEditing(true)}
-      className="flex items-center gap-1.5 text-xs rounded px-1.5 py-0.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      className="flex items-center gap-1.5 text-xs rounded-full px-2 py-0.5 transition-colors"
+      style={
+        resolvedCategory
+          ? { backgroundColor: 'color-mix(in srgb, ' + resolvedCategory.color + ' 15%, transparent)' }
+          : { backgroundColor: 'transparent' }
+      }
     >
       {resolvedCategory ? (
         <>
           <span
-            className="w-2 h-2 rounded-full shrink-0"
+            className="w-1.5 h-1.5 rounded-full shrink-0"
             style={{ backgroundColor: resolvedCategory.color }}
           />
-          <span className="text-gray-700 dark:text-gray-300">{resolvedCategory.name}</span>
+          <span className="text-gray-700 dark:text-gray-300 font-medium">{resolvedCategory.name}</span>
         </>
       ) : (
-        <span className="text-gray-400 dark:text-gray-500">Uncategorised</span>
+        <span
+          className="font-medium tracking-tight"
+          style={{ color: 'var(--accent)' }}
+        >
+          + Categorise
+        </span>
       )}
     </button>
   )

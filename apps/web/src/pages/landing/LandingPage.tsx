@@ -13,27 +13,41 @@ export function LandingPage() {
     }
   }, [count, navigate])
 
-  // Loading
   if (count === undefined) return null
-
-  // Has data — redirect handled by effect
   if (count > 0) return null
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-950 px-4">
+    <div
+      className="flex min-h-screen items-center justify-center px-4"
+      style={{ backgroundColor: 'var(--bg)' }}
+    >
       <div className="text-center max-w-md">
-        <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-3">Lokfi</h1>
-        <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">
-          Your finances, privately tracked.
+        {/* Brand mark */}
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <span
+            className="flex items-center justify-center w-10 h-10 rounded-xl text-white text-base font-bold"
+            style={{ backgroundColor: 'var(--accent)' }}
+          >
+            ◆
+          </span>
+          <span className="font-serif text-2xl text-gray-900 dark:text-white tracking-tight">Lokfi</span>
+        </div>
+
+        <h1 className="font-serif text-4xl text-gray-900 dark:text-white mb-3 leading-tight">
+          Your finances,<br />privately tracked.
+        </h1>
+        <p className="text-base text-gray-500 dark:text-gray-400 mb-8">
+          Import bank statements, categorise spending, and understand your money — all on your device.
         </p>
         <button
           onClick={() => navigate({ to: '/import' })}
-          className="inline-flex items-center px-6 py-3 bg-blue-600 text-white text-base font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center px-6 py-3 text-white text-sm font-semibold rounded-xl transition-opacity hover:opacity-90"
+          style={{ backgroundColor: 'var(--accent)' }}
         >
-          Import your first statement
+          Import your first statement →
         </button>
-        <p className="mt-6 text-sm text-gray-400 dark:text-gray-500">
-          All data stays on your device — no accounts, no cloud.
+        <p className="mt-6 text-xs text-gray-400 dark:text-gray-500">
+          No accounts, no cloud. Everything stays on your device.
         </p>
       </div>
     </div>

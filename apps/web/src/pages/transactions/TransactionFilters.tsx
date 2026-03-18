@@ -21,6 +21,11 @@ interface TransactionFiltersProps {
   onChange: (f: Filters) => void
 }
 
+const inputCls =
+  'text-xs border rounded-full px-3 py-1.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-0'
+
+const inputStyle = { borderColor: 'var(--border)' }
+
 export function TransactionFilters({ filters, onChange }: TransactionFiltersProps) {
   const sources = useLiveQuery(
     () => db.transactions.orderBy('source').uniqueKeys() as Promise<StatementSource[]>,
@@ -35,55 +40,90 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
     onChange({ ...filters, sources: next })
   }
 
+  const hasActiveFilters =
+    filters.dateFrom !== '' ||
+    filters.dateTo !== '' ||
+    filters.sources.length > 0 ||
+    filters.categoryId !== ''
+
   return (
-    <div className="flex flex-wrap gap-4 p-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+    <div
+      className="flex flex-wrap items-center gap-2 px-4 py-3 border-b"
+      style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+    >
       {/* Date range */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">From</label>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">From</span>
         <input
           type="date"
           value={filters.dateFrom}
           onChange={(e) => onChange({ ...filters, dateFrom: e.target.value })}
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          className={inputCls}
+          style={inputStyle}
         />
       </div>
-      <div className="flex items-center gap-2">
-        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">To</label>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">To</span>
         <input
           type="date"
           value={filters.dateTo}
           onChange={(e) => onChange({ ...filters, dateTo: e.target.value })}
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          className={inputCls}
+          style={inputStyle}
         />
       </div>
 
-      {/* Source checkboxes */}
+      {/* Separator */}
       {sources && sources.length > 0 && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Source</span>
-          {sources.map((source) => (
-            <label key={source} className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={filters.sources.includes(source)}
-                onChange={() => toggleSource(source)}
-                className="rounded"
-              />
-              <span className="text-xs text-gray-700 dark:text-gray-300">{source}</span>
-            </label>
-          ))}
+        <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
+      )}
+
+      {/* Source pills */}
+      {sources && sources.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Source</span>
+          {sources.map((source) => {
+            const active = filters.sources.includes(source)
+            return (
+              <button
+                key={source}
+                onClick={() => toggleSource(source)}
+                className="text-xs rounded-full px-3 py-1.5 border font-medium transition-colors"
+                style={
+                  active
+                    ? {
+                        backgroundColor: 'var(--accent)',
+                        borderColor: 'var(--accent)',
+                        color: '#fff',
+                      }
+                    : {
+                        backgroundColor: 'var(--bg)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--tw-text-opacity, currentColor)',
+                      }
+                }
+              >
+                {source}
+              </button>
+            )
+          })}
         </div>
       )}
 
+      {/* Separator */}
+      <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
+
       {/* Category */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Category</label>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Category</span>
         <select
           value={filters.categoryId}
           onChange={(e) => onChange({ ...filters, categoryId: e.target.value })}
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          className={inputCls}
+          style={inputStyle}
         >
           <option value="">All</option>
+          <option value="__uncategorised__">Uncategorised</option>
           {categories?.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -93,12 +133,18 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
       </div>
 
       {/* Reset */}
-      <button
-        onClick={() => onChange(defaultFilters)}
-        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-      >
-        Reset
-      </button>
+      {hasActiveFilters && (
+        <>
+          <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
+          <button
+            onClick={() => onChange(defaultFilters)}
+            className="text-xs font-medium transition-colors hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            Clear filters
+          </button>
+        </>
+      )}
     </div>
   )
 }
