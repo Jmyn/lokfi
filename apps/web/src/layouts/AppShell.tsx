@@ -10,6 +10,9 @@ import {
   User,
   Sun,
   Moon,
+  Home,
+  PanelLeftClose,
+  PanelLeftOpen,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -34,11 +37,13 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const [expanded, setExpanded] = useState(false)
+  const [pinned, setPinned] = useState(() => localStorage.getItem('sidebar-pinned') === 'true')
+  const [hovered, setHovered] = useState(false)
   const routerState = useRouterState()
   const { theme, setTheme } = useTheme()
 
   const pathname = routerState.location.pathname
+  const expanded = pinned || hovered
 
   function toggleTheme() {
     setTheme(theme === 'dark' ? 'light' : 'dark')
@@ -51,16 +56,32 @@ export function AppShell({ children }: AppShellProps) {
         className={`flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 transition-all duration-200 ${
           expanded ? 'w-56' : 'w-16'
         }`}
-        onMouseEnter={() => setExpanded(true)}
-        onMouseLeave={() => setExpanded(false)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         {/* Logo area */}
-        <div className="flex h-14 items-center px-4 border-b border-gray-200 dark:border-gray-800 overflow-hidden">
-          <span className="text-lg font-bold text-gray-900 dark:text-white shrink-0">L</span>
+        <div className="flex h-14 items-center justify-between px-3 border-b border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="flex items-center gap-2 min-w-0">
+            <Home size={18} className="shrink-0 text-gray-900 dark:text-white" />
+            {expanded && (
+              <span className="text-base font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                Lokfi
+              </span>
+            )}
+          </div>
           {expanded && (
-            <span className="ml-1 text-lg font-bold text-gray-900 dark:text-white whitespace-nowrap">
-              okfi
-            </span>
+            <button
+              onClick={() => {
+                const next = !pinned
+                localStorage.setItem('sidebar-pinned', String(next))
+                setPinned(next)
+                if (!next) setHovered(false)
+              }}
+              title={pinned ? 'Collapse sidebar' : 'Keep sidebar open'}
+              className="shrink-0 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            >
+              {pinned ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+            </button>
           )}
         </div>
 
