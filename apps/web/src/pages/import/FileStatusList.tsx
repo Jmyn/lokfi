@@ -15,6 +15,7 @@ export interface FileParseResult {
 
 interface FileStatusListProps {
   items: FileParseResult[]
+  onConfigure: (item: FileParseResult) => void
 }
 
 function formatBytes(bytes: number) {
@@ -56,7 +57,7 @@ function StatusBadge({ status }: { status: FileParseStatus }) {
   )
 }
 
-export function FileStatusList({ items }: FileStatusListProps) {
+export function FileStatusList({ items, onConfigure }: FileStatusListProps) {
   if (items.length === 0) return null
 
   return (
@@ -81,16 +82,37 @@ export function FileStatusList({ items }: FileStatusListProps) {
                 {item.transactionCount} transactions found
               </span>
             )}
-            {item.status === 'success' && item.statement?.source === 'generic' && (
+            {item.status === 'success' && item.profileName && (
+              <span className="text-xs text-blue-600 dark:text-blue-400">
+                Profile: {item.profileName}
+              </span>
+            )}
+            {item.status === 'success' && item.statement?.source === 'generic' && !item.profileName && (
               <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500 max-w-[200px] text-right">
                 <AlertTriangle className="h-3 w-3 shrink-0" />
-                Parsed using generic fallback. Please check data for mistakes.
+                Generic fallback — verify data
               </span>
+            )}
+            {item.status === 'success' && item.rawText && (
+              <button
+                onClick={() => onConfigure(item)}
+                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline"
+              >
+                Wrong mapping? Configure
+              </button>
             )}
             {item.status === 'error' && item.error && (
               <span className="text-xs text-red-500 dark:text-red-400 max-w-[200px] text-right">
                 {item.error}
               </span>
+            )}
+            {item.status === 'error' && item.rawText && (
+              <button
+                onClick={() => onConfigure(item)}
+                className="text-xs font-medium px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                Configure parser
+              </button>
             )}
           </div>
         </li>

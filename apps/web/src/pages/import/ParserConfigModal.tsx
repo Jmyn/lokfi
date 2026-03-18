@@ -539,12 +539,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, onClose, onA
           {/* Parse error */}
           {parseError && (
             <div
-              className="rounded-md px-4 py-3 text-sm"
-              style={{
-                backgroundColor: '#fee2e2',
-                border: '1px solid #fca5a5',
-                color: '#b91c1c',
-              }}
+              className="rounded-md px-4 py-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800"
             >
               {parseError}
             </div>

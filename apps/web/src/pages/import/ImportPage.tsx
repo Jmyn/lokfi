@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Papa from 'papaparse'
 import { ParserRegistry, CdcDebitParser, GenericCsvParser, ParseError, generateTransactionHash, CustomCsvParser, computeHeaderFingerprint } from '@lokfi/parser-core'
+import type { Statement, CustomParserProfile } from '@lokfi/parser-core'
 import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
 import { StorageManager } from '../../lib/db/StorageManager'
@@ -9,10 +10,12 @@ import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
 import { UploadZone } from './UploadZone'
 import { FileStatusList, type FileParseResult } from './FileStatusList'
 import { ImportSummary } from './ImportSummary'
+import { ParserConfigModal } from './ParserConfigModal'
 
 export function ImportPage() {
   const [items, setItems] = useState<FileParseResult[]>([])
   const [importError, setImportError] = useState<string | null>(null)
+  const [configuringItem, setConfiguringItem] = useState<FileParseResult | null>(null)
 
   useEffect(() => {
     StorageManager.initPersistence()
@@ -113,6 +116,18 @@ export function ImportPage() {
     }
   }
 
+  function handleConfigureApply(statement: Statement, profile: CustomParserProfile) {
+    if (!configuringItem) return
+    updateItem(configuringItem.file, {
+      status: 'success',
+      transactionCount: statement.transactions.length,
+      statement,
+      rawText: configuringItem.rawText,
+      profileName: profile.name,
+    })
+    setConfiguringItem(null)
+  }
+
   function handleClear() {
     setItems([])
     setImportError(null)
@@ -128,12 +143,20 @@ export function ImportPage() {
           </p>
         </div>
         <UploadZone onFilesAdded={handleFilesAdded} />
-        <FileStatusList items={items} />
+        <FileStatusList items={items} onConfigure={setConfiguringItem} />
         {importError && (
           <p className="text-sm text-red-600 dark:text-red-400 px-1">{importError}</p>
         )}
         <ImportSummary results={items} onImport={handleImport} onClear={handleClear} />
       </div>
+      {configuringItem?.rawText && (
+        <ParserConfigModal
+          file={configuringItem.file}
+          rawText={configuringItem.rawText}
+          onClose={() => setConfiguringItem(null)}
+          onApply={handleConfigureApply}
+        />
+      )}
     </div>
   )
 }
