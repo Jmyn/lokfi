@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import { ParserRegistry, CdcDebitParser, ParseError } from '@lokfi/parser-core'
+import { useState, useEffect } from 'react'
+import { ParserRegistry, CdcDebitParser, ParseError, generateTransactionHash } from '@lokfi/parser-core'
+import { db } from '../../lib/db/db'
+import type { DbTransaction } from '../../lib/db/db'
+import { StorageManager } from '../../lib/db/StorageManager'
 import { UploadZone } from './UploadZone'
 import { FileStatusList, type FileParseResult } from './FileStatusList'
 import { ImportSummary } from './ImportSummary'
@@ -9,6 +12,11 @@ registry.register(new CdcDebitParser())
 
 export function ImportPage() {
   const [items, setItems] = useState<FileParseResult[]>([])
+  const [importError, setImportError] = useState<string | null>(null)
+
+  useEffect(() => {
+    StorageManager.initPersistence()
+  }, [])
 
   function updateItem(file: File, patch: Partial<FileParseResult>) {
     setItems((prev) =>
@@ -30,7 +38,11 @@ export function ImportPage() {
           const parser = registry.getParser(text)
           if (!parser) throw new ParseError('No parser found for this file')
           const statement = parser.parse(text)
-          updateItem(file, { status: 'success', transactionCount: statement.transactions.length })
+          updateItem(file, {
+            status: 'success',
+            transactionCount: statement.transactions.length,
+            statement,
+          })
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Unknown error'
           updateItem(file, { status: 'error', error: message })
@@ -41,12 +53,49 @@ export function ImportPage() {
     })
   }
 
-  function handleImport() {
-    // stub — persistence wired in Phase 1D
+  async function handleImport() {
+    setImportError(null)
+    const successItems = items.filter((item) => item.status === 'success' && item.statement)
+    if (successItems.length === 0) return
+
+    const records: DbTransaction[] = []
+    const importedAt = new Date().toISOString()
+
+    for (const item of successItems) {
+      const stmt = item.statement!
+      // Track occurrence index per (date|description|value) key within this statement
+      const occurrenceCounts = new Map<string, number>()
+      for (const txn of stmt.transactions) {
+        const key = `${txn.date}|${txn.description}|${txn.transactionValue}`
+        const idx = occurrenceCounts.get(key) ?? 0
+        occurrenceCounts.set(key, idx + 1)
+        const hash = generateTransactionHash(txn, idx)
+        records.push({
+          id: hash,
+          hash,
+          source: stmt.source,
+          accountNo: stmt.accountNo,
+          date: txn.date,
+          description: txn.description,
+          transactionValue: txn.transactionValue,
+          balance: txn.balance,
+          importedAt,
+        })
+      }
+    }
+
+    try {
+      await db.transactions.bulkPut(records)
+      handleClear()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save transactions'
+      setImportError(message)
+    }
   }
 
   function handleClear() {
     setItems([])
+    setImportError(null)
   }
 
   return (
@@ -57,6 +106,9 @@ export function ImportPage() {
         </h1>
         <UploadZone onFilesAdded={handleFilesAdded} />
         <FileStatusList items={items} />
+        {importError && (
+          <p className="text-sm text-red-600 dark:text-red-400">{importError}</p>
+        )}
         <ImportSummary results={items} onImport={handleImport} onClear={handleClear} />
       </div>
     </div>

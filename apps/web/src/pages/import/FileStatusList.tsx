@@ -1,4 +1,5 @@
 import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import type { Statement } from '@lokfi/parser-core'
 
 export type FileParseStatus = 'pending' | 'parsing' | 'success' | 'error'
 
@@ -6,6 +7,7 @@ export interface FileParseResult {
   file: File
   status: FileParseStatus
   transactionCount?: number
+  statement?: Statement
   error?: string
 }
 
