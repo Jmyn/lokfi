@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { ParserRegistry, generateTransactionHash, CdcDebitParser } from '../src/index'
+import { ParserRegistry, generateTransactionHash, CdcDebitParser, GenericCsvParser } from '../src/index'
 
 const args = process.argv.slice(2)
 const filePath = args[0]
@@ -23,6 +23,7 @@ const text = fs.readFileSync(resolvedPath, 'utf-8')
 const registry = new ParserRegistry()
 // Register available parsers here
 registry.register(new CdcDebitParser())
+registry.register(new GenericCsvParser())
 
 console.log(`\nScanning file: ${path.basename(resolvedPath)}...`)
 const parser = registry.getParser(text)

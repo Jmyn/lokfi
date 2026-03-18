@@ -27,4 +27,20 @@ describe('ParserRegistry', () => {
 
     expect(result).toBeNull()
   })
+
+  it('returns fallback parser if registered and no other parser matches', () => {
+    const registry = new ParserRegistry()
+    registry.register(new CdcDebitParser())
+
+    const mockFallback = {
+      detect: () => true,
+      parse: () => ({} as any)
+    }
+    registry.registerFallback(mockFallback)
+
+    const uobText = 'Transaction Date,Transaction Description,Balance\n2025-12-22,Test,-10'
+    const result = registry.getParser(uobText)
+
+    expect(result).toBe(mockFallback)
+  })
 })
