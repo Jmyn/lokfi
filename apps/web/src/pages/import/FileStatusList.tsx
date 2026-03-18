@@ -9,6 +9,8 @@ export interface FileParseResult {
   transactionCount?: number
   statement?: Statement
   error?: string
+  rawText?: string
+  profileName?: string
 }
 
 interface FileStatusListProps {

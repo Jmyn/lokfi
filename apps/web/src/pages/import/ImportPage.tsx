@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
-import { ParserRegistry, CdcDebitParser, GenericCsvParser, ParseError, generateTransactionHash } from '@lokfi/parser-core'
+import { useState, useEffect, useMemo } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import Papa from 'papaparse'
+import { ParserRegistry, CdcDebitParser, GenericCsvParser, ParseError, generateTransactionHash, CustomCsvParser, computeHeaderFingerprint } from '@lokfi/parser-core'
 import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
 import { StorageManager } from '../../lib/db/StorageManager'
@@ -8,10 +10,6 @@ import { UploadZone } from './UploadZone'
 import { FileStatusList, type FileParseResult } from './FileStatusList'
 import { ImportSummary } from './ImportSummary'
 
-const registry = new ParserRegistry()
-registry.register(new CdcDebitParser())
-registry.registerFallback(new GenericCsvParser())
-
 export function ImportPage() {
   const [items, setItems] = useState<FileParseResult[]>([])
   const [importError, setImportError] = useState<string | null>(null)
@@ -19,6 +17,18 @@ export function ImportPage() {
   useEffect(() => {
     StorageManager.initPersistence()
   }, [])
+
+  const profiles = useLiveQuery(() => db.customParsers.toArray(), []) ?? []
+
+  const registry = useMemo(() => {
+    const r = new ParserRegistry()
+    for (const profile of profiles) {
+      r.register(new CustomCsvParser(profile))
+    }
+    r.register(new CdcDebitParser())
+    r.registerFallback(new GenericCsvParser())
+    return r
+  }, [profiles])
 
   function updateItem(file: File, patch: Partial<FileParseResult>) {
     setItems((prev) =>
@@ -40,14 +50,22 @@ export function ImportPage() {
           const parser = registry.getParser(text)
           if (!parser) throw new ParseError('No parser found for this file')
           const statement = parser.parse(text)
+
+          // Check if a custom profile was matched (for badge display)
+          const { data } = Papa.parse<string[]>(text, { skipEmptyLines: true })
+          const fingerprint = computeHeaderFingerprint(data as string[][])
+          const matchedProfile = profiles.find(p => p.headerFingerprint === fingerprint)
+
           updateItem(file, {
             status: 'success',
             transactionCount: statement.transactions.length,
             statement,
+            rawText: text,
+            profileName: matchedProfile?.name,
           })
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Unknown error'
-          updateItem(file, { status: 'error', error: message })
+          updateItem(file, { status: 'error', error: message, rawText: text })
         }
       }
       reader.onerror = () => updateItem(file, { status: 'error', error: 'Failed to read file' })
