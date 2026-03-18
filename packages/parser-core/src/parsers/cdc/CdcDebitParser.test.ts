@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { CdcDebitParser } from './CdcDebitParser'
-import { ParseError } from '../types'
+import { ParseError } from '../../types'
 
 describe('CdcDebitParser', () => {
   const parser = new CdcDebitParser()

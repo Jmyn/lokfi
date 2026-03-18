@@ -12,5 +12,5 @@ export type {
 export { ParseError } from './types'
 export { generateTransactionHash } from './hashUtils'
 export { ParserRegistry } from './ParserRegistry'
-export { CdcDebitParser } from './parsers/CdcDebitParser'
+export { CdcDebitParser } from './parsers/cdc/CdcDebitParser'
 

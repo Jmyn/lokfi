@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { ParserRegistry } from './ParserRegistry'
-import { CdcDebitParser } from './parsers/CdcDebitParser'
+import { CdcDebitParser } from './parsers/cdc/CdcDebitParser'
 
 describe('ParserRegistry', () => {
   it('returns null when no parser matches', () => {
@@ -12,7 +12,7 @@ describe('ParserRegistry', () => {
     const registry = new ParserRegistry()
     registry.register(new CdcDebitParser())
 
-    const cdcText = 'Timestamp (UTC),Transaction Description\n2025-12-22,Test,-10'
+    const cdcText = 'Timestamp (UTC),Transaction Description,Native Amount,Transaction Kind\n2025-12-22,Test,-10,vpos_purchase'
     const result = registry.getParser(cdcText)
 
     expect(result).toBeInstanceOf(CdcDebitParser)

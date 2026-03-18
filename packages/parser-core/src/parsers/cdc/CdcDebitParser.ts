@@ -1,11 +1,20 @@
 import Papa from 'papaparse'
-import { StatementParser, DebitStatement, Transaction, ParseError } from '../types'
+import { StatementParser, DebitStatement, Transaction, ParseError } from '../../types'
 
 export class CdcDebitParser implements StatementParser {
   detect(text: string): boolean {
     if (!text) return false
-    const firstLine = text.split('\n')[0]?.trim()
-    return firstLine?.startsWith('Timestamp (UTC),Transaction Description') ?? false
+    const firstLine = text.split('\n')[0]?.trim() || ''
+    
+    // Check for the presence of the most critical columns that identify a CDC statement
+    const requiredHeaders = [
+      'Timestamp (UTC)',
+      'Transaction Description',
+      'Native Amount',
+      'Transaction Kind'
+    ]
+    
+    return requiredHeaders.every(header => firstLine.includes(header))
   }
 
   parse(text: string): DebitStatement {
