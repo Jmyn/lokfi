@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react'
 import type { FileParseResult } from './FileStatusList'
 
 interface ImportSummaryProps {
@@ -13,9 +14,26 @@ export function ImportSummary({ results, onImport, onClear }: ImportSummaryProps
   const successful = results.filter((r) => r.status === 'success')
   const errors = results.filter((r) => r.status === 'error')
   const totalTransactions = successful.reduce((sum, r) => sum + (r.transactionCount ?? 0), 0)
-
+  const hasGenericFallback = successful.some((r) => r.statement?.source === 'generic')
+  
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-5 py-4">
+    <div className="flex flex-col gap-3">
+      {hasGenericFallback && (
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-900/50 dark:bg-yellow-900/20">
+          <div className="flex items-start">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                Generic Fallback Parser Used
+              </h3>
+              <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-400">
+                Some files could not be uniquely identified and were parsed using a generic fallback method. Please verify the imported amounts and dates carefully.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-5 py-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-4 text-sm text-gray-700 dark:text-gray-300">
           <span>
@@ -42,11 +60,13 @@ export function ImportSummary({ results, onImport, onClear }: ImportSummaryProps
           <button
             onClick={onImport}
             disabled={successful.length === 0}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
+            style={{ backgroundColor: 'var(--accent)' }}
           >
             Import All
           </button>
         </div>
+      </div>
       </div>
     </div>
   )

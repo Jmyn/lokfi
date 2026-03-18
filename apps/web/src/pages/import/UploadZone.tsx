@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react'
-import { Upload } from 'lucide-react'
+import { ArrowUpFromLine } from 'lucide-react'
 
 interface UploadZoneProps {
   onFilesAdded: (files: File[]) => void
 }
+
+const FORMATS = ['CDC', 'OCBC', 'UOB', 'Citibank']
 
 export function UploadZone({ onFilesAdded }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false)
@@ -14,8 +16,11 @@ export function UploadZone({ onFilesAdded }: UploadZoneProps) {
     setIsDragging(true)
   }
 
-  function handleDragLeave() {
-    setIsDragging(false)
+  function handleDragLeave(e: React.DragEvent) {
+    // Only leave if we actually left the zone
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false)
+    }
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -40,22 +45,58 @@ export function UploadZone({ onFilesAdded }: UploadZoneProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={[
-        'flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 cursor-pointer transition-colors',
-        isDragging
-          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
-          : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800/40',
-      ].join(' ')}
+      className="relative flex flex-col items-center justify-center gap-5 rounded-2xl cursor-pointer transition-all duration-200 select-none"
+      style={{
+        minHeight: '280px',
+        border: `2px dashed ${isDragging ? 'var(--accent)' : 'var(--border)'}`,
+        backgroundColor: isDragging ? 'var(--accent-subtle)' : 'var(--bg-sidebar)',
+        // Animate dash on drag
+        ...(isDragging
+          ? {
+              backgroundImage:
+                'repeating-linear-gradient(45deg, transparent, transparent 6px, color-mix(in srgb, var(--accent) 8%, transparent) 6px, color-mix(in srgb, var(--accent) 8%, transparent) 12px)',
+            }
+          : {}),
+      }}
     >
-      <Upload className="h-8 w-8 text-gray-400 dark:text-gray-500" />
-      <div className="text-center">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Drop files here or click to browse
-        </p>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          CSV or PDF — CDC, OCBC, UOB, Citibank
-        </p>
+      {/* Icon */}
+      <div
+        className="flex items-center justify-center w-16 h-16 rounded-2xl transition-colors"
+        style={{
+          backgroundColor: isDragging ? 'var(--accent)' : 'var(--border)',
+        }}
+      >
+        <ArrowUpFromLine
+          className="w-7 h-7 transition-colors"
+          style={{ color: isDragging ? '#fff' : 'var(--accent)' }}
+        />
       </div>
+
+      {/* Text */}
+      <div className="text-center space-y-1">
+        <p className="font-semibold text-gray-800 dark:text-gray-100">
+          {isDragging ? 'Drop to upload' : 'Drop files here or click to browse'}
+        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">CSV or PDF bank statements</p>
+      </div>
+
+      {/* Format chips */}
+      <div className="flex items-center gap-2 flex-wrap justify-center">
+        {FORMATS.map((f) => (
+          <span
+            key={f}
+            className="text-xs font-medium px-2.5 py-1 rounded-full border"
+            style={{
+              borderColor: 'var(--border)',
+              backgroundColor: 'var(--bg)',
+              color: 'inherit',
+            }}
+          >
+            {f}
+          </span>
+        ))}
+      </div>
+
       <input
         ref={inputRef}
         type="file"

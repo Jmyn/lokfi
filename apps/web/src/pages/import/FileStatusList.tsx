@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react'
 import type { Statement } from '@lokfi/parser-core'
 
 export type FileParseStatus = 'pending' | 'parsing' | 'success' | 'error'
@@ -77,6 +77,12 @@ export function FileStatusList({ items }: FileStatusListProps) {
             {item.status === 'success' && item.transactionCount !== undefined && (
               <span className="text-xs text-green-600 dark:text-green-400">
                 {item.transactionCount} transactions found
+              </span>
+            )}
+            {item.status === 'success' && item.statement?.source === 'generic' && (
+              <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500 max-w-[200px] text-right">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                Parsed using generic fallback. Please check data for mistakes.
               </span>
             )}
             {item.status === 'error' && item.error && (
