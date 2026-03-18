@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+.env
+.DS_Store
+.worktrees/
+coverage/
+statements/
