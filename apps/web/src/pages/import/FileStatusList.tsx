@@ -111,12 +111,21 @@ export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListP
                   </span>
                 )}
                 {item.status === 'success' && item.rawText && (
-                  <button
-                    onClick={() => onConfigure(item)}
-                    className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline"
-                  >
-                    Wrong mapping? Configure
-                  </button>
+                  item.statement?.source === 'generic' && !item.profileName ? (
+                    <button
+                      onClick={() => onConfigure(item)}
+                      className="text-xs font-medium px-2 py-1 rounded border border-yellow-400 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+                    >
+                      Configure mapping
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => onConfigure(item)}
+                      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline"
+                    >
+                      Wrong mapping? Configure
+                    </button>
+                  )
                 )}
                 {item.status === 'error' && item.error && (
                   <span className="text-xs text-red-500 dark:text-red-400 max-w-[200px] text-right">

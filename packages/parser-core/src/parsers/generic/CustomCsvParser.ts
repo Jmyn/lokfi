@@ -24,11 +24,7 @@ export class CustomCsvParser implements StatementParser {
   parse(text: string): Statement {
     const { skipRows, columnMap, negateAmount, source, statementType, accountNo } = this.profile
 
-    // Split raw text into lines, skip the leading non-CSV rows, then re-join for PapaParse
-    const lines = text.split(/\r?\n/)
-    const trimmedText = lines.slice(skipRows).join('\n')
-
-    const { data, errors } = Papa.parse<string[]>(trimmedText, { skipEmptyLines: false, delimiter: ',' })
+    const { data, errors } = Papa.parse<string[]>(text, { skipEmptyLines: false })
 
     // Filter out non-fatal delimiter detection warnings
     const fatalErrors = errors.filter(e => e.type !== 'Delimiter')
@@ -36,12 +32,11 @@ export class CustomCsvParser implements StatementParser {
       throw new ParseError(`CSV parse error: ${fatalErrors[0]?.message}`, 'generic')
     }
 
+    // Filter empty rows first, then apply skipRows — same logic as detect() and the modal preview
     const rows = (data as string[][]).filter(r => r.some(c => c.trim()))
-
-    // skipRows already applied by pre-slicing lines above
-    const headerRow = rows[0] ?? []
+    const headerRow = rows[skipRows] ?? []
     const headers = headerRow.map(h => h.trim().toLowerCase())
-    const dataRows = rows.slice(1)
+    const dataRows = rows.slice(skipRows + 1)
 
     const dateIdx = resolveIndex(headers, columnMap.date)
     const descIdx = resolveIndex(headers, columnMap.description)

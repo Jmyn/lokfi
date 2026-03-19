@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import Papa from 'papaparse'
 import { X } from 'lucide-react'
 import { CustomCsvParser, computeHeaderFingerprint } from '@lokfi/parser-core'
@@ -55,8 +55,9 @@ export function ParserConfigModal({ file, rawText, existingProfile, onClose, onA
   )
 
   const [parseError, setParseError] = useState<string | null>(null)
-  const [showNameInput, setShowNameInput] = useState<boolean>(false)
   const [profileName, setProfileName] = useState<string>(existingProfile?.name ?? '')
+  const [nameError, setNameError] = useState<boolean>(false)
+  const profileNameRef = useRef<HTMLInputElement>(null)
 
   // Parse raw CSV once
   const parsedRows = useMemo<string[][]>(() => {
@@ -78,6 +79,17 @@ export function ParserConfigModal({ file, rawText, existingProfile, onClose, onA
   const columnLabels = useMemo<string[]>(() => {
     return headerRow.map((h, i) => `[${i}] ${h}`)
   }, [headerRow])
+
+  // Issue 3: clamp column selections when headerRow shrinks due to skipRows change
+  useEffect(() => {
+    const max = Math.max(0, headerRow.length - 1)
+    setDateCol(prev => Math.min(prev, max))
+    setDescCol(prev => Math.min(prev, max))
+    setAmountCol(prev => Math.min(prev, max))
+    setDebitCol(prev => Math.min(prev, max))
+    setCreditCol(prev => Math.min(prev, max))
+    setBalanceCol(prev => prev === -1 ? -1 : Math.min(prev, max))
+  }, [headerRow.length])
 
   function buildProfile(name: string): CustomParserProfile {
     const now = new Date().toISOString()
@@ -124,9 +136,11 @@ export function ParserConfigModal({ file, rawText, existingProfile, onClose, onA
   async function handleSaveAndApply() {
     setParseError(null)
     if (!profileName.trim()) {
-      setShowNameInput(true)
+      setNameError(true)
+      profileNameRef.current?.focus()
       return
     }
+    setNameError(false)
     const profile = buildProfile(profileName.trim())
     try {
       const statement = parseWithProfile(profile)
@@ -437,7 +451,14 @@ export function ParserConfigModal({ file, rawText, existingProfile, onClose, onA
                       name="amount-mode"
                       value="split"
                       checked={amountMode === 'split'}
-                      onChange={() => setAmountMode('split')}
+                      onChange={() => {
+                        setAmountMode('split')
+                        // Issue 5: pick safe defaults based on available columns
+                        const last = Math.max(0, headerRow.length - 1)
+                        const secondLast = Math.max(0, headerRow.length - 2)
+                        setDebitCol(secondLast)
+                        setCreditCol(last)
+                      }}
                       style={{ accentColor: 'var(--accent)' }}
                     />
                     Split debit / credit columns
@@ -545,27 +566,30 @@ export function ParserConfigModal({ file, rawText, existingProfile, onClose, onA
             </div>
           )}
 
-          {/* Profile name input (revealed when saving) */}
-          {showNameInput && (
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--fg)' }}>
-                Profile name
-              </label>
-              <input
-                type="text"
-                value={profileName}
-                onChange={(e) => setProfileName(e.target.value)}
-                placeholder="e.g. DBS Savings 2024"
-                autoFocus
-                className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
-                style={{
-                  backgroundColor: 'var(--bg-sidebar)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--fg)',
-                }}
-              />
-            </div>
-          )}
+          {/* Profile name input (always visible) */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium" style={{ color: 'var(--fg)' }}>
+              Profile name <span style={{ color: 'var(--fg)', opacity: 0.5 }}>(required to save)</span>
+            </label>
+            <input
+              ref={profileNameRef}
+              type="text"
+              value={profileName}
+              onChange={(e) => { setProfileName(e.target.value); if (nameError) setNameError(false) }}
+              placeholder="e.g. DBS Savings 2024"
+              className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
+              style={{
+                backgroundColor: 'var(--bg-sidebar)',
+                border: nameError ? '1px solid var(--color-red-500, #ef4444)' : '1px solid var(--border)',
+                color: 'var(--fg)',
+              }}
+            />
+            {nameError && (
+              <span className="text-xs text-red-500 dark:text-red-400">
+                Please enter a profile name before saving.
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
