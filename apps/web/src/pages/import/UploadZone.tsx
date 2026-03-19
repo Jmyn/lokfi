@@ -77,7 +77,7 @@ export function UploadZone({ onFilesAdded }: UploadZoneProps) {
         <p className="font-semibold text-gray-800 dark:text-gray-100">
           {isDragging ? 'Drop to upload' : 'Drop files here or click to browse'}
         </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">CSV or PDF bank statements</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">CSV or PDF transaction history</p>
       </div>
 
       {/* Format chips */}

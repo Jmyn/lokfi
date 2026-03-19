@@ -188,7 +188,7 @@ export function ImportPage() {
         <div>
           <h1 className="font-serif text-2xl text-gray-900 dark:text-white">Import Statements</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Upload CSV or PDF bank statements to import transactions.
+            Upload CSV or PDF transaction history to import transactions.
           </p>
         </div>
         <UploadZone onFilesAdded={handleFilesAdded} />
