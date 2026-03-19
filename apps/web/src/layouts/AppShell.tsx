@@ -6,7 +6,6 @@ import {
   Upload,
   List,
   Wand2,
-  BarChart2,
   User,
   Sun,
   Moon,
@@ -23,11 +22,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home', path: '/', icon: LayoutDashboard },
+  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { label: 'Import', path: '/import', icon: Upload },
   { label: 'Transactions', path: '/transactions', icon: List },
   { label: 'Rules', path: '/rules', icon: Wand2 },
-  { label: 'Stats', path: '/stats', icon: BarChart2 },
 ]
 
 const BOTTOM_NAV: NavItem = { label: 'Profile', path: '/profile', icon: User }

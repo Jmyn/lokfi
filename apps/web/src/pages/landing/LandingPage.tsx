@@ -9,7 +9,7 @@ export function LandingPage() {
 
   useEffect(() => {
     if (count !== undefined && count > 0) {
-      navigate({ to: '/transactions' })
+      navigate({ to: '/dashboard' })
     }
   }, [count, navigate])
 

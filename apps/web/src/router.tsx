@@ -4,7 +4,7 @@ import { AppShell } from './layouts/AppShell'
 import { LandingPage } from './pages/landing/LandingPage'
 import { ImportPage } from './pages/import/ImportPage'
 import { TransactionsPage } from './pages/transactions/TransactionsPage'
-import { StatsPage } from './pages/stats/StatsPage'
+import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
 import { RulesPage } from './pages/rules/RulesPage'
 
@@ -46,10 +46,10 @@ const transactionsRoute = createRoute({
   component: TransactionsPage,
 })
 
-const statsRoute = createRoute({
+const dashboardRoute = createRoute({
   getParentRoute: () => shellRoute,
-  path: '/stats',
-  component: StatsPage,
+  path: '/dashboard',
+  component: DashboardPage,
 })
 
 const profileRoute = createRoute({
@@ -66,7 +66,7 @@ const rulesRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   landingRoute,
-  shellRoute.addChildren([importRoute, transactionsRoute, statsRoute, profileRoute, rulesRoute]),
+  shellRoute.addChildren([importRoute, transactionsRoute, dashboardRoute, profileRoute, rulesRoute]),
 ])
 
 export const router = createRouter({ routeTree })
