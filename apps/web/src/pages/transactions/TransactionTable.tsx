@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db/db'
 import { CategoryBadge } from './CategoryBadge'
-import type { Filters } from './TransactionFilters'
+import type { Filters } from './filterTypes'
 
 const fmt = new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD' })
 
@@ -28,6 +28,7 @@ export function TransactionTable({
       if (filters.dateFrom && t.date < filters.dateFrom) return false
       if (filters.dateTo && t.date > filters.dateTo) return false
       if (filters.sources.length > 0 && !filters.sources.includes(t.source)) return false
+      if (filters.accounts?.length > 0 && !filters.accounts.includes(t.accountNo)) return false
       if (filters.categoryId) {
         if (filters.categoryId === '__uncategorised__') {
           const resolved = t.manualCategory ?? t.category

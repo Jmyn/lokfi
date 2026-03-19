@@ -2,19 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db/db'
 import type { StatementSource } from '@lokfi/parser-core'
 
-export interface Filters {
-  dateFrom: string
-  dateTo: string
-  sources: StatementSource[]
-  categoryId: string
-}
-
-export const defaultFilters: Filters = {
-  dateFrom: '',
-  dateTo: '',
-  sources: [],
-  categoryId: '',
-}
+import { type Filters, defaultFilters } from './filterTypes'
 
 interface TransactionFiltersProps {
   filters: Filters
@@ -31,6 +19,10 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
     () => db.transactions.orderBy('source').uniqueKeys() as Promise<StatementSource[]>,
     []
   )
+  const accounts = useLiveQuery(
+    () => db.transactions.orderBy('accountNo').uniqueKeys() as Promise<string[]>,
+    []
+  )
   const categories = useLiveQuery(() => db.categories.toArray(), [])
 
   function toggleSource(source: StatementSource) {
@@ -40,10 +32,18 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
     onChange({ ...filters, sources: next })
   }
 
+  function toggleAccount(account: string) {
+    const next = filters.accounts.includes(account)
+      ? filters.accounts.filter((a) => a !== account)
+      : [...filters.accounts, account]
+    onChange({ ...filters, accounts: next })
+  }
+
   const hasActiveFilters =
     filters.dateFrom !== '' ||
     filters.dateTo !== '' ||
     filters.sources.length > 0 ||
+    filters.accounts.length > 0 ||
     filters.categoryId !== ''
 
   return (
@@ -104,6 +104,43 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
                 }
               >
                 {source}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Separator */}
+      {(sources?.length || 0) > 0 || (accounts?.length || 0) > 0 ? (
+        <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
+      ) : null}
+
+      {/* Account pills */}
+      {accounts && accounts.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Account</span>
+          {accounts.map((account) => {
+            const active = filters.accounts.includes(account)
+            return (
+              <button
+                key={account}
+                onClick={() => toggleAccount(account)}
+                className="text-xs rounded-full px-3 py-1.5 border font-medium transition-colors"
+                style={
+                  active
+                    ? {
+                        backgroundColor: 'var(--accent)',
+                        borderColor: 'var(--accent)',
+                        color: '#fff',
+                      }
+                    : {
+                        backgroundColor: 'var(--bg)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--tw-text-opacity, currentColor)',
+                      }
+                }
+              >
+                {account}
               </button>
             )
           })}

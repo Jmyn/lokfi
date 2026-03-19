@@ -3,7 +3,8 @@ import { Link } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db/db'
 import { TransactionTable } from './TransactionTable'
-import { TransactionFilters, defaultFilters, type Filters } from './TransactionFilters'
+import { TransactionFilters } from './TransactionFilters'
+import { defaultFilters, type Filters } from './filterTypes'
 import { CategoryCombobox } from './CategoryCombobox'
 
 export function TransactionsPage() {
@@ -21,6 +22,7 @@ export function TransactionsPage() {
     filters.dateFrom !== '' ||
     filters.dateTo !== '' ||
     filters.sources.length > 0 ||
+    filters.accounts.length > 0 ||
     filters.categoryId !== ''
 
   function handleToggleSelect(id: string) {
