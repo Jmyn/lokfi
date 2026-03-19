@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Copy, Check } from 'lucide-react'
 import { db } from '../../lib/db/db'
+import type { DbTransaction } from '../../lib/db/db'
 import { CategoryBadge } from './CategoryBadge'
 import type { Filters } from './filterTypes'
 
@@ -11,6 +13,7 @@ interface TransactionTableProps {
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onToggleAll: (ids: string[]) => void
+  onCategoryChanged?: (txn: DbTransaction, categoryId: string | undefined) => void
 }
 
 export function TransactionTable({
@@ -18,8 +21,10 @@ export function TransactionTable({
   selectedIds,
   onToggleSelect,
   onToggleAll,
+  onCategoryChanged,
 }: TransactionTableProps) {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const transactions = useLiveQuery(async () => {
     const all = await db.transactions.orderBy('date').reverse().toArray()
@@ -130,8 +135,24 @@ export function TransactionTable({
                 <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono text-xs">
                   {t.date}
                 </td>
-                <td className={`px-3 py-2.5 text-gray-900 dark:text-white max-w-xs ${editingCategoryId === t.id ? 'whitespace-normal break-words' : 'truncate'}`}>
-                  {t.description}
+                <td className={`px-3 py-2.5 text-gray-900 dark:text-white max-w-xs ${editingCategoryId === t.id ? 'whitespace-normal break-words' : ''}`}>
+                  <div className="flex items-center gap-1 group">
+                    <span className={editingCategoryId === t.id ? '' : 'truncate'}>{t.description}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(t.description)
+                        setCopiedId(t.id)
+                        setTimeout(() => setCopiedId(null), 1500)
+                      }}
+                      className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                      title="Copy description"
+                    >
+                      {copiedId === t.id
+                        ? <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        : <Copy className="w-3.5 h-3.5 text-gray-400" />
+                      }
+                    </button>
+                  </div>
                 </td>
                 <td
                   className={`px-3 py-2.5 text-right font-mono whitespace-nowrap text-xs font-medium ${
@@ -150,6 +171,7 @@ export function TransactionTable({
                     isEditing={editingCategoryId === t.id}
                     onStartEdit={() => setEditingCategoryId(t.id)}
                     onStopEdit={() => setEditingCategoryId(null)}
+                    onCategoryChanged={onCategoryChanged}
                   />
                 </td>
                 <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide">

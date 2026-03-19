@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Bot, Pen } from 'lucide-react'
 import { db } from '../../lib/db/db'
+import type { DbTransaction } from '../../lib/db/db'
 import { CategoryCombobox } from './CategoryCombobox'
 
 interface CategoryBadgeProps {
@@ -10,15 +12,17 @@ interface CategoryBadgeProps {
   isEditing?: boolean
   onStartEdit?: () => void
   onStopEdit?: () => void
+  onCategoryChanged?: (txn: DbTransaction, categoryId: string | undefined) => void
 }
 
-export function CategoryBadge({ 
-  transactionId, 
-  category, 
+export function CategoryBadge({
+  transactionId,
+  category,
   manualCategory,
   isEditing,
   onStartEdit,
-  onStopEdit
+  onStopEdit,
+  onCategoryChanged,
 }: CategoryBadgeProps) {
   const [localEditing, setLocalEditing] = useState(false)
   const categories = useLiveQuery(() => db.categories.toArray(), [])
@@ -29,10 +33,17 @@ export function CategoryBadge({
 
   const resolvedId = manualCategory ?? category ?? null
   const resolvedCategory = categories?.find((c) => c.id === resolvedId) ?? null
+  const isManual = !!manualCategory
+  const isRule = !manualCategory && !!category
 
   async function handleChange(id: string) {
-    await db.transactions.update(transactionId, { manualCategory: id || undefined })
+    const categoryId = id || undefined
+    await db.transactions.update(transactionId, { manualCategory: categoryId })
     stopEdit()
+    if (onCategoryChanged) {
+      const txn = await db.transactions.get(transactionId)
+      if (txn) onCategoryChanged(txn, categoryId)
+    }
   }
 
   if (editing) {
@@ -52,6 +63,7 @@ export function CategoryBadge({
     <button
       onClick={startEdit}
       className="flex items-center gap-1.5 text-xs rounded-full px-2 py-0.5 transition-colors"
+      title={isRule ? 'Assigned by rule — click to override' : isManual ? 'Manually assigned — click to unassign and refresh to evaluate by rules' : undefined}
       style={
         resolvedCategory
           ? { backgroundColor: 'color-mix(in srgb, ' + resolvedCategory.color + ' 15%, transparent)' }
@@ -65,6 +77,12 @@ export function CategoryBadge({
             style={{ backgroundColor: resolvedCategory.color }}
           />
           <span className="text-gray-700 dark:text-gray-300 font-medium">{resolvedCategory.name}</span>
+          {isRule && (
+            <Bot className="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" />
+          )}
+          {isManual && (
+            <Pen className="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" />
+          )}
         </>
       ) : (
         <span
