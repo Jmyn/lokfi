@@ -8,8 +8,12 @@ import { RuleEditorModal } from './RuleEditorModal'
 
 export function RulesPage() {
   const [editorRule, setEditorRule] = useState<DbRule | 'CREATE' | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
-  const rules = useLiveQuery(() => db.rules.orderBy('priority').toArray()) ?? []
+  const rules = useLiveQuery(async () => {
+    const all = await db.rules.toArray()
+    return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }) ?? []
   const categories = useLiveQuery(() => db.categories.toArray()) ?? []
   const catMap = new Map(categories.map(c => [c.id, c]))
 
@@ -282,7 +286,20 @@ export function RulesPage() {
         <RuleEditorModal
           rule={editorRule === 'CREATE' ? undefined : editorRule}
           onClose={() => setEditorRule(null)}
+          onSaved={(count) => {
+            setToast(`Rule saved — ${count} transaction${count !== 1 ? 's' : ''} categorized`)
+            setTimeout(() => setToast(null), 3500)
+          }}
         />
+      )}
+
+      {toast && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full text-sm font-medium text-white shadow-lg z-50 animate-in fade-in slide-in-from-bottom-2 duration-200"
+          style={{ backgroundColor: 'var(--accent)' }}
+        >
+          {toast}
+        </div>
       )}
     </div>
   )

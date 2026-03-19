@@ -1,13 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Trash2, X } from 'lucide-react'
 import { db } from '../../lib/db/db'
 import type { DbRule, RuleCondition } from '../../lib/db/db'
+import { matchesCondition } from '../../lib/rules/evaluateRules'
+import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
 import { CategoryCombobox } from '../transactions/CategoryCombobox'
 
 type RuleEditorModalProps = {
   rule?: DbRule
   onClose: () => void
+  onSaved?: (matchCount: number) => void
 }
 
 type FormValues = {
@@ -37,7 +41,7 @@ const NUMERIC_OPERATIONS = [
   { value: 'between', label: 'Between' },
 ]
 
-export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
+export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps) {
   const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
       name: rule?.name ?? '',
@@ -54,6 +58,32 @@ export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
 
   const watchConditions = watch('conditions')
   const watchedCategory = watch('category')
+
+  const allTransactions = useLiveQuery(() => db.transactions.toArray(), [])
+
+  // Serialize conditions to a stable string so useMemo recomputes when
+  // any field/operation/value changes (watch may return the same array ref)
+  const conditionsKey = JSON.stringify(watchConditions)
+
+  const preview = useMemo(() => {
+    if (!allTransactions || watchConditions.length === 0) return null
+    // Only match if every condition has a non-empty value
+    const validConditions = watchConditions.filter(
+      (c) => c.value !== '' && c.value !== undefined,
+    )
+    if (validConditions.length === 0) return null
+
+    const matches: string[] = []
+    let count = 0
+    for (const t of allTransactions) {
+      if (validConditions.every((cond) => matchesCondition(t, cond))) {
+        count++
+        if (matches.length < 3) matches.push(t.description)
+      }
+    }
+    return { count, descriptions: matches }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allTransactions, conditionsKey])
 
   // Close on Escape key
   useEffect(() => {
@@ -93,7 +123,18 @@ export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
     }
 
     await db.rules.put(record)
+
+    // Re-evaluate all transactions against the updated rule set
+    const allTxns = await db.transactions.toArray()
+    await applyRulesToImport(allTxns.map((t) => t.id))
+
+    // Count how many transactions match this rule's conditions
+    const matchCount = allTxns.filter((t) =>
+      !t.manualCategory && cleanedConditions.every((cond) => matchesCondition(t, cond)),
+    ).length
+
     onClose()
+    onSaved?.(matchCount)
   }
 
   return (
@@ -210,6 +251,31 @@ export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
                  <p className="text-red-500 text-xs">At least one condition is required.</p>
               )}
             </div>
+
+            {/* Live preview */}
+            {preview && (
+              <div className="rounded-lg border dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 p-3 space-y-2">
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {preview.count === 0
+                    ? 'No matching transactions'
+                    : `${preview.count} matching transaction${preview.count !== 1 ? 's' : ''}`}
+                </p>
+                {preview.descriptions.length > 0 && (
+                  <ul className="space-y-1">
+                    {preview.descriptions.map((desc, i) => (
+                      <li key={i} className="text-xs text-gray-600 dark:text-gray-400 font-mono truncate">
+                        {desc}
+                      </li>
+                    ))}
+                    {preview.count > 3 && (
+                      <li className="text-xs text-gray-400 dark:text-gray-500">
+                        + {preview.count - 3} more
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            )}
 
           </form>
         </div>
