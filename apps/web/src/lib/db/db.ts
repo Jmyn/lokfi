@@ -38,12 +38,20 @@ export interface DbSetting {
 
 export type DbCustomParserProfile = CustomParserProfile
 
+export interface DbBudget {
+  id: string
+  categoryId: string
+  monthlyLimit: number
+  updatedAt: string
+}
+
 export class LokfiDatabase extends Dexie {
   transactions!: Table<DbTransaction>
   rules!: Table<DbRule>
   categories!: Table<DbCategory>
   settings!: Table<DbSetting>
   customParsers!: Table<DbCustomParserProfile>
+  budgets!: Table<DbBudget>
 
   constructor() {
     super('lokfi')
@@ -64,6 +72,11 @@ export class LokfiDatabase extends Dexie {
     // v3 schema (adds customParsers table)
     this.version(3).stores({
       customParsers: 'id, headerFingerprint, name, createdAt',
+    })
+
+    // v4 schema (adds budgets table for category spending limits)
+    this.version(4).stores({
+      budgets: 'id, categoryId',
     })
 
     // Seed default categories on initial DB creation

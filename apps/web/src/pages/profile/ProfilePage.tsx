@@ -15,11 +15,12 @@ export function ProfilePage() {
   const customParsers = useLiveQuery(() => db.customParsers.orderBy('createdAt').toArray(), []) ?? []
 
   async function handleExport() {
-    const [transactions, rules, categories, customParsers] = await Promise.all([
+    const [transactions, rules, categories, customParsers, budgets] = await Promise.all([
       db.transactions.toArray(),
       db.rules.toArray(),
       db.categories.toArray(),
       db.customParsers.toArray(),
+      db.budgets.toArray(),
     ])
     const data = {
       version: 1,
@@ -28,6 +29,7 @@ export function ProfilePage() {
       rules,
       categories,
       customParsers,
+      budgets,
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
