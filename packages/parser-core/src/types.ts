@@ -6,7 +6,8 @@ export class ParseError extends Error {
   }
 }
 
-export type StatementSource = 'ocbc' | 'dbs' | 'uob' | 'citibank' | 'cdc' | 'maybank' | 'generic'
+export const PREDEFINED_SOURCES = ['generic', 'ocbc', 'dbs', 'uob', 'citibank', 'cdc', 'maybank'] as const
+export type StatementSource = string
 
 export type StatementType = 'credit' | 'debit'
 

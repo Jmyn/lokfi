@@ -11,7 +11,7 @@ export type {
   ColumnRef,
 } from './types'
 
-export { ParseError } from './types'
+export { ParseError, PREDEFINED_SOURCES } from './types'
 export { generateTransactionHash } from './hashUtils'
 export { ParserRegistry } from './ParserRegistry'
 export { CdcDebitParser } from './parsers/cdc/CdcDebitParser'
