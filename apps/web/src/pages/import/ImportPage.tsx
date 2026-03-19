@@ -167,6 +167,10 @@ export function ImportPage() {
     setConfiguringItem(null)
   }
 
+  function handleRemoveItem(item: FileParseResult) {
+    setItems((prev) => prev.filter((i) => i.file !== item.file))
+  }
+
   function handleClear() {
     setItems([])
     setImportError(null)
@@ -183,7 +187,7 @@ export function ImportPage() {
           </p>
         </div>
         <UploadZone onFilesAdded={handleFilesAdded} />
-        <FileStatusList items={items} onConfigure={setConfiguringItem} />
+        <FileStatusList items={items} onConfigure={setConfiguringItem} onRemove={handleRemoveItem} />
         {importError && (
           <p className="text-sm text-red-600 dark:text-red-400 px-1">{importError}</p>
         )}

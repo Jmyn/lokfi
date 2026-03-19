@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle, X } from 'lucide-react'
 import type { Statement } from '@lokfi/parser-core'
 
 export type FileParseStatus = 'pending' | 'parsing' | 'success' | 'error'
@@ -16,6 +16,7 @@ export interface FileParseResult {
 interface FileStatusListProps {
   items: FileParseResult[]
   onConfigure: (item: FileParseResult) => void
+  onRemove: (item: FileParseResult) => void
 }
 
 function formatBytes(bytes: number) {
@@ -68,7 +69,7 @@ function StatusBadge({ status }: { status: FileParseStatus }) {
   )
 }
 
-export function FileStatusList({ items, onConfigure }: FileStatusListProps) {
+export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListProps) {
   if (items.length === 0) return null
 
   return (
@@ -80,7 +81,7 @@ export function FileStatusList({ items, onConfigure }: FileStatusListProps) {
             key={i}
             className="flex flex-col rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm overflow-hidden"
           >
-            {/* Main row: filename + status */}
+            {/* Main row: filename + status + remove */}
             <div className="flex items-center justify-between px-4 py-3">
               <div className="flex flex-col gap-0.5 min-w-0">
                 <span className="font-medium text-gray-800 dark:text-gray-100 truncate">
@@ -90,7 +91,8 @@ export function FileStatusList({ items, onConfigure }: FileStatusListProps) {
                   {formatBytes(item.file.size)}
                 </span>
               </div>
-              <div className="ml-4 flex flex-col items-end gap-0.5 shrink-0">
+              <div className="ml-4 flex items-start gap-2 shrink-0">
+              <div className="flex flex-col items-end gap-0.5">
                 <StatusBadge status={item.status} />
                 {item.status === 'success' && item.transactionCount !== undefined && (
                   <span className="text-xs text-green-600 dark:text-green-400">
@@ -129,6 +131,14 @@ export function FileStatusList({ items, onConfigure }: FileStatusListProps) {
                     Configure parser
                   </button>
                 )}
+              </div>
+              <button
+                onClick={() => onRemove(item)}
+                className="text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors mt-0.5"
+                aria-label="Remove file"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
               </div>
             </div>
 
