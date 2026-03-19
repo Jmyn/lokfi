@@ -153,6 +153,7 @@ export function ImportPage() {
         <ParserConfigModal
           file={configuringItem.file}
           rawText={configuringItem.rawText}
+          existingProfile={profiles.find(p => p.name === configuringItem.profileName)}
           onClose={() => setConfiguringItem(null)}
           onApply={handleConfigureApply}
         />

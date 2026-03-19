@@ -88,6 +88,29 @@ describe('CustomCsvParser', () => {
     })
   })
 
+  describe('detect() with skipRows', () => {
+    it('correctly matches a profile with skipRows > 0', () => {
+      // CSV_SKIP_ROWS has 2 preamble rows then the header
+      const profileWithSkip: CustomParserProfile = {
+        ...baseProfile,
+        headerFingerprint: 'amount|date|description', // same header as CSV_SKIP_ROWS row[2]
+        skipRows: 2,
+      }
+      const parser = new CustomCsvParser(profileWithSkip)
+      expect(parser.detect(CSV_SKIP_ROWS)).toBe(true)
+    })
+
+    it('does not match when skipRows points to a preamble row', () => {
+      const profileWrongSkip: CustomParserProfile = {
+        ...baseProfile,
+        headerFingerprint: 'amount|date|description',
+        skipRows: 0, // will fingerprint "Bank Export" row, not the header
+      }
+      const parser = new CustomCsvParser(profileWrongSkip)
+      expect(parser.detect(CSV_SKIP_ROWS)).toBe(false)
+    })
+  })
+
   describe('parse() - skipRows', () => {
     it('skips the specified number of rows before the header', () => {
       const parser = new CustomCsvParser({ ...baseProfile, skipRows: 2 })

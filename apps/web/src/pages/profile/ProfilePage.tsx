@@ -15,10 +15,11 @@ export function ProfilePage() {
   const customParsers = useLiveQuery(() => db.customParsers.orderBy('createdAt').toArray(), []) ?? []
 
   async function handleExport() {
-    const [transactions, rules, categories] = await Promise.all([
+    const [transactions, rules, categories, customParsers] = await Promise.all([
       db.transactions.toArray(),
       db.rules.toArray(),
       db.categories.toArray(),
+      db.customParsers.toArray(),
     ])
     const data = {
       version: 1,
@@ -26,6 +27,7 @@ export function ProfilePage() {
       transactions,
       rules,
       categories,
+      customParsers,
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -57,11 +59,25 @@ export function ProfilePage() {
     const text = await file.text()
     try {
       const profile = JSON.parse(text) as DbCustomParserProfile
+      // Minimal structural validation
+      if (
+        typeof profile.headerFingerprint !== 'string' ||
+        !profile.headerFingerprint ||
+        typeof profile.columnMap !== 'object' ||
+        profile.columnMap === null ||
+        (profile.columnMap.amount === undefined &&
+          profile.columnMap.debit === undefined &&
+          profile.columnMap.credit === undefined) ||
+        profile.columnMap.date === undefined
+      ) {
+        alert('Invalid profile: missing required fields (headerFingerprint, columnMap.date, amount/debit/credit)')
+        e.target.value = ''
+        return
+      }
       if (!profile.id) profile.id = crypto.randomUUID()
       await db.customParsers.put(profile)
     } catch {
-      // invalid JSON — silently ignore or show alert
-      alert('Invalid profile file')
+      alert('Invalid profile file — could not parse JSON')
     }
     e.target.value = ''
   }

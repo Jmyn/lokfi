@@ -14,8 +14,10 @@ export class CustomCsvParser implements StatementParser {
 
   detect(text: string): boolean {
     if (!text) return false
-    const { data } = Papa.parse<string[]>(text, { skipEmptyLines: true })
-    const fingerprint = computeHeaderFingerprint(data as string[][])
+    const { data } = Papa.parse<string[]>(text, { skipEmptyLines: false })
+    const rows = (data as string[][]).filter(r => r.some(c => c.trim()))
+    const headerRow = rows[this.profile.skipRows] ?? []
+    const fingerprint = computeHeaderFingerprint([headerRow])
     return fingerprint === this.profile.headerFingerprint
   }
 
