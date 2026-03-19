@@ -1,6 +1,6 @@
 import type { DbTransaction, DbRule, RuleCondition } from '../db/db'
 
-function matchesCondition(txn: DbTransaction, cond: RuleCondition): boolean {
+export function matchesCondition(txn: DbTransaction, cond: RuleCondition): boolean {
   const fieldValue = txn[cond.field]
 
   if (fieldValue === undefined || fieldValue === null) {
@@ -29,9 +29,9 @@ function matchesCondition(txn: DbTransaction, cond: RuleCondition): boolean {
     }
   }
 
-  // Handle string operations (case-insensitive)
-  const strValue = String(fieldValue).toLowerCase()
-  const condStrValue = String(cond.value).toLowerCase()
+  // Handle string operations (case-insensitive, whitespace-normalized)
+  const strValue = String(fieldValue).replace(/\s+/g, ' ').trim().toLowerCase()
+  const condStrValue = String(cond.value).replace(/\s+/g, ' ').trim().toLowerCase()
 
   switch (cond.operation) {
     case 'contains':

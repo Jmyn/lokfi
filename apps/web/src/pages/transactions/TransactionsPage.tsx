@@ -1,22 +1,48 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db/db'
+import type { DbTransaction } from '../../lib/db/db'
 import { TransactionTable } from './TransactionTable'
 import { TransactionFilters } from './TransactionFilters'
 import { defaultFilters, type Filters } from './filterTypes'
 import { CategoryCombobox } from './CategoryCombobox'
+import { RuleSuggestionBar } from './RuleSuggestionBar'
+import { RuleEditorModal } from '../rules/RuleEditorModal'
+import { suggestRules, type RuleSuggestion } from '../../lib/rules/suggestRules'
+import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
+
+type SuggestionState = {
+  txnId: string
+  suggestions: RuleSuggestion[]
+  categoryId: string
+  categoryName: string
+}
 
 export function TransactionsPage() {
   const [filters, setFilters] = useState<Filters>(defaultFilters)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkCategoryId, setBulkCategoryId] = useState('')
+  const [suggestionState, setSuggestionState] = useState<SuggestionState | null>(null)
+  const [customizeRule, setCustomizeRule] = useState<(SuggestionState & { suggestion: RuleSuggestion }) | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const dismissedTxIds = useRef<Set<string>>(new Set())
+
+  // Re-evaluate rules on mount (handles cleared manual overrides, new rules, etc.)
+  useEffect(() => {
+    db.transactions.toArray().then((txns) => {
+      if (txns.length > 0) {
+        applyRulesToImport(txns.map((t) => t.id))
+      }
+    })
+  }, [])
 
   const totalCount = useLiveQuery(() => db.transactions.count(), [])
   const uncategorisedCount = useLiveQuery(async () => {
     const all = await db.transactions.toArray()
     return all.filter((t) => !t.manualCategory && !t.category).length
   }, [])
+  const categories = useLiveQuery(() => db.categories.toArray(), [])
 
   const hasFilters =
     filters.dateFrom !== '' ||
@@ -52,6 +78,68 @@ export function TransactionsPage() {
     await db.transactions.bulkPut(updates)
     setSelectedIds(new Set())
     setBulkCategoryId('')
+  }
+
+  async function handleCategoryChanged(txn: DbTransaction, categoryId: string | undefined) {
+    // Skip if no category was set
+    if (!categoryId) return
+    // Skip if the transaction already had a rule-assigned category (user is overriding)
+    if (txn.category) return
+    // A new categorization clears any prior dismiss for this txn
+    dismissedTxIds.current.delete(txn.id)
+
+    const allTransactions = await db.transactions.toArray()
+    const suggestions = suggestRules(txn, categoryId, allTransactions)
+    if (suggestions.length === 0) return
+
+    const category = categories?.find((c) => c.id === categoryId)
+    const categoryName = category?.name ?? categoryId
+
+    setSuggestionState({ txnId: txn.id, suggestions, categoryId, categoryName })
+  }
+
+  function handleDismiss() {
+    if (suggestionState) dismissedTxIds.current.add(suggestionState.txnId)
+    setSuggestionState(null)
+  }
+
+  async function handleCreateRule(suggestion: RuleSuggestion) {
+    if (!suggestionState) return
+
+    const identifier = suggestion.conditions[0]?.value as string
+    const categoryName = suggestionState.categoryName
+    const ruleName = `${identifier} — ${categoryName}`
+
+    const rule = {
+      id: crypto.randomUUID(),
+      name: ruleName,
+      priority: 50,
+      conditions: suggestion.conditions,
+      category: suggestionState.categoryId,
+      createdAt: new Date().toISOString(),
+    }
+
+    await db.rules.put(rule)
+
+    const allIds = (await db.transactions.toArray()).map((t) => t.id)
+    await applyRulesToImport(allIds)
+
+    // Count how many got newly categorized (approximation via matchCount)
+    const matchCount = suggestion.matchCount
+
+    setSuggestionState(null)
+    showToast(`Rule created — ${matchCount} transaction${matchCount !== 1 ? 's' : ''} categorized`)
+  }
+
+  function handleCustomize(suggestion: RuleSuggestion) {
+    if (!suggestionState) return
+    setCustomizeRule({ ...suggestionState, suggestion })
+    setSuggestionState(null)
+  }
+
+  function showToast(message: string) {
+    setToast(message)
+    setTimeout(() => setToast(null), 3500)
   }
 
   if (totalCount === 0) {
@@ -121,12 +209,22 @@ export function TransactionsPage() {
             selectedIds={selectedIds}
             onToggleSelect={handleToggleSelect}
             onToggleAll={handleToggleAll}
+            onCategoryChanged={handleCategoryChanged}
           />
         )}
       </div>
 
-      {/* Bulk action bar */}
-      {selectedIds.size > 0 && (
+      {/* Bottom bar: suggestion bar takes priority over bulk bar */}
+      {suggestionState ? (
+        <RuleSuggestionBar
+          key={suggestionState.txnId}
+          suggestions={suggestionState.suggestions}
+          categoryName={suggestionState.categoryName}
+          onCreateRule={handleCreateRule}
+          onCustomize={handleCustomize}
+          onDismiss={handleDismiss}
+        />
+      ) : selectedIds.size > 0 ? (
         <div
           className="sticky bottom-0 flex items-center gap-3 px-5 py-3 border-t shadow-lg"
           style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}
@@ -154,6 +252,32 @@ export function TransactionsPage() {
             Clear
           </button>
         </div>
+      ) : null}
+
+      {/* Toast */}
+      {toast && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full text-sm font-medium text-white shadow-lg z-50 animate-in fade-in slide-in-from-bottom-2 duration-200"
+          style={{ backgroundColor: 'var(--accent)' }}
+        >
+          {toast}
+        </div>
+      )}
+
+      {/* Customize modal */}
+      {customizeRule && (
+        <RuleEditorModal
+          rule={{
+            id: '',
+            name: `${(customizeRule.suggestion.conditions[0]?.value as string) ?? ''} — ${customizeRule.categoryName}`,
+            priority: 50,
+            conditions: customizeRule.suggestion.conditions,
+            category: customizeRule.categoryId,
+            createdAt: '',
+          }}
+          onClose={() => setCustomizeRule(null)}
+          onSaved={(count) => showToast(`Rule created — ${count} transaction${count !== 1 ? 's' : ''} categorized`)}
+        />
       )}
     </div>
   )
