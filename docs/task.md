@@ -39,48 +39,42 @@
 
 ### 1F. Import Page UI
 
-- [ ] 1F-1: Build drag-and-drop upload zone
-- [ ] 1F-2: Build per-file status display
-- [ ] 1F-3: Build import summary banner
+- [x] 1F-1: Build drag-and-drop upload zone
+- [x] 1F-2: Build per-file status display
+- [x] 1F-3: Build import summary banner
 
 ## Phase 2 — Core Feature Polish
 
 ### 2A. Landing Page
 
-- [ ] 2A-1: Build landing/onboarding page
+- [x] 2A-1: Build landing/onboarding page
 
 ### 2B. Transaction Table
 
-- [ ] 2B-1: Build transaction table
-- [ ] 2B-2: Implement table filters
-- [ ] 2B-3: Implement bulk categorisation
-- [ ] 2B-4: Implement empty state
+- [x] 2B-1: Build transaction table
+- [x] 2B-2: Implement table filters
+- [x] 2B-3: Implement bulk categorisation
+- [x] 2B-4: Implement empty state
 
 ### 2C. Rule Engine
 
-- [ ] 2C-1: Implement rule evaluation function
-- [ ] 2C-2: Build rule management page
-- [ ] 2C-3: Build rule editor (modal)
-- [ ] 2C-4: Apply rules on import
-- [ ] 2C-5: Implement Rule Simulator
+- [x] 2C-1: Implement rule evaluation function
+- [x] 2C-2: Build rule management page
+- [x] 2C-3: Build rule editor (modal)
+- [x] 2C-4: Apply rules on import
+- [x] 2C-5: Implement Rule Simulator
 
 ### 2D. Stats Page
 
-- [ ] 2D-1: Build stats page with responsive charts
+- [x] 2D-1: Build stats page with responsive charts
 
 ### 2E. Profile Page
 
-- [ ] 2E-1: Build profile page
+- [x] 2E-1: Build profile page
 
-### 2F. New Bank Parsers
+### 2F. Navigation & Layout
 
-- [ ] 2F-1: Build DBS/POSB Credit parser
-- [ ] 2F-2: Build DBS/POSB Debit parser
-- [ ] 2F-3: Build UOB Debit parser
-
-### 2G. Navigation & Layout
-
-- [ ] 2G-1: Build app shell with sidebar navigation
+- [x] 2F-1: Build app shell with sidebar navigation
 
 ## Phase 3 — Analytics & Insights
 
@@ -96,10 +90,11 @@
 - [ ] 3B-2: Category drilldown
 - [ ] 3B-3: Export to CSV
 
-### 3C. New Parsers
+### 3C. Generic Fallback Parser
 
-- [ ] 3C-1: Build Maybank Credit parser
-- [ ] 3C-2: Build Maybank Debit parser
+- [x] 3C-1: Implement generic CSV parser
+- [x] 3C-2: Implement custom CSV parser
+- [ ] 3C-3: Implement generic PDF parser
 
 ## Phase 4 — Desktop & Launch
 

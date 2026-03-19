@@ -8,13 +8,13 @@
 
 > **"See where your money actually goes — without giving it to anyone."**
 
-Lokfi is the expense tracker for people who care about privacy. Your bank statements never leave your device. No account, no subscription, no cloud. Just drop your PDFs and get clarity on your spending.
+Lokfi is the expense tracker for people who care about privacy. Your bank statements never leave your device. No account, no subscription, no cloud. Just drop your statements and get clarity on your spending.
 
 **Target users:**
-- Singapore residents with bank accounts at DBS, OCBC, UOB, or Citibank
+
+- Optimise for Singapore residents and financial institutions
 - FIRE community members who track spending obsessively and value control
 - Privacy-conscious individuals who refuse to connect their bank accounts to third-party apps
-- Developers who want to understand or extend the underlying parser library
 
 ---
 
@@ -84,6 +84,7 @@ All future GRAB transactions auto-categorised on import
 **Purpose:** Convert a curious visitor to an active user. Establish trust. No fluff.
 
 **Sections:**
+
 1. **Hero** — tagline, one-sentence description, "Import your first statement" CTA, small privacy badge ("100% local — data never leaves your device")
 2. **How it works** — 3-step visual: (1) Drop PDF → (2) See transactions → (3) Understand your spending
 3. **Supported banks** — logo grid: OCBC, DBS, UOB, Citibank, CDC, Maybank + "More coming" badge
@@ -91,6 +92,7 @@ All future GRAB transactions auto-categorised on import
 5. **Footer** — GitHub link, Gumroad link (desktop app), version
 
 **Design notes:**
+
 - Clean, minimal — no dashboard screenshot overload
 - Monochrome with a single accent colour (to be decided)
 - No cookie banners, no analytics, no tracking pixels
@@ -102,6 +104,7 @@ All future GRAB transactions auto-categorised on import
 **Purpose:** The primary action. Must feel fast, confident, and clear.
 
 **Components:**
+
 - Large drag-and-drop zone (full-width) with dashed border, drop icon, helper text
 - "Or click to browse files" fallback
 - Accepts multiple files in one drop
@@ -110,10 +113,12 @@ All future GRAB transactions auto-categorised on import
 - "View transactions" CTA on completion
 
 **Error states:**
+
 - Unsupported format: "We couldn't recognise this statement. [Request support →]" (links to GitHub issue template)
 - Parse error: show bank + type + raw error message for debugging
 
 **Design notes:**
+
 - Optimistic UI — show each file being processed in real-time as the Web Worker completes each one
 - Never show a spinner blocking the whole page; files process in parallel
 
@@ -124,6 +129,7 @@ All future GRAB transactions auto-categorised on import
 **Purpose:** Browse, filter, search, and categorise all imported transactions.
 
 **Table columns:**
+
 - Date (sortable)
 - Description
 - Source (bank)
@@ -132,6 +138,7 @@ All future GRAB transactions auto-categorised on import
 - Category (editable inline — dropdown)
 
 **Filters / controls (top bar):**
+
 - Search: full-text across description + source + accountNo
 - Date range picker (presets: This month, Last month, Last 3 months, YTD, Custom)
 - Category filter (multi-select)
@@ -144,6 +151,7 @@ All future GRAB transactions auto-categorised on import
 - Optional follow-up: "Create Rule for Similar Transactions" → creates a general `contains` rule
 
 **Empty state:**
+
 - "No transactions yet" → "Import your first statement →"
 
 ---
@@ -153,11 +161,13 @@ All future GRAB transactions auto-categorised on import
 **Purpose:** Create and manage automatic categorisation rules.
 
 **Rule list:**
+
 - Ordered by priority (drag to reorder — P2)
 - Each rule shows: name, conditions summary, category, match count (lazy)
 - Toggle active/inactive per rule
 
 **Rule editor (modal or inline):**
+
 - Rule name (optional, auto-generated if blank)
 - One or more conditions (AND logic):
   - Field: description / source / accountNo / transactionValue
@@ -178,16 +188,19 @@ All future GRAB transactions auto-categorised on import
 **Purpose:** Understand spending patterns over time.
 
 **Chart types (phased):**
+
 - Phase 1: Stacked bar (existing, but responsive via Recharts)
 - Phase 2: Monthly trend line (spending over 12 months), category pie/donut
 - Phase 3: Top merchants bar chart, income vs expense waterfall
 
 **Controls:**
+
 - Date range (same presets as transactions)
 - Category visibility toggle (show/hide categories from charts)
 - Income / expense toggle (show both, only income, only expense)
 
 **Design notes:**
+
 - All charts must be fully responsive — no fixed pixel dimensions
 - Charts should respect dark/light theme
 - Tooltip on hover: date, category, amount
@@ -199,12 +212,14 @@ All future GRAB transactions auto-categorised on import
 **Purpose:** The "at a glance" view that replaces the user's mental model.
 
 **Summary cards:**
+
 - Total spend this month (vs last month: +12% / -8%)
 - Savings rate this month (income minus expense / income)
 - Top spending category (with % of total)
 - Uncategorised transactions count (CTA to review)
 
 **Insights (Phase 4 — AI powered):**
+
 - "Your dining spend is 40% higher than your 3-month average"
 - "You haven't categorised 23 transactions from last month"
 
@@ -215,12 +230,14 @@ All future GRAB transactions auto-categorised on import
 **Purpose:** Full ownership and portability of user data.
 
 **Sections:**
+
 - **Export profile** — download all data (transactions + rules + categories) as a single JSON file
 - **Import profile** — restore from a previously exported JSON
 - **Clear data** — delete all transactions / all rules / everything (with confirmation)
 - **Accounts summary** — list of linked bank accounts (source + accountNo), with transaction count and date range
 
 **Design notes:**
+
 - Replace all `alert()` calls with shadcn `<Toast>` notifications
 - Destructive actions require a confirmation dialog (not window.confirm)
 

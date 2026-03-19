@@ -8,3 +8,4 @@ dist/
 coverage/
 statements/
 *.local.*
+.ignore
