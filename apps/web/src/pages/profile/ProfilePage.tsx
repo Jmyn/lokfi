@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Download, AlertTriangle } from 'lucide-react'
+import { Download, AlertTriangle, Trash2, Upload } from 'lucide-react'
 import { db } from '../../lib/db/db'
+import type { DbCustomParserProfile } from '../../lib/db/db'
 import { StorageManager } from '../../lib/db/StorageManager'
 import { useBackupWarning } from '../../hooks/useBackupWarning'
 
@@ -11,6 +12,7 @@ export function ProfilePage() {
   const newest = useLiveQuery(() => db.transactions.orderBy('date').last(), [])
   const rulesCount = useLiveQuery(() => db.rules.count(), [])
   const categoriesCount = useLiveQuery(() => db.categories.count(), [])
+  const customParsers = useLiveQuery(() => db.customParsers.orderBy('createdAt').toArray(), []) ?? []
 
   async function handleExport() {
     const [transactions, rules, categories] = await Promise.all([
@@ -33,6 +35,35 @@ export function ProfilePage() {
     a.click()
     URL.revokeObjectURL(url)
     await StorageManager.recordExportEvent()
+  }
+
+  async function handleDeleteProfile(id: string) {
+    await db.customParsers.delete(id)
+  }
+
+  function handleExportProfile(profile: DbCustomParserProfile) {
+    const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `lokfi-parser-${profile.name.replace(/\s+/g, '-').toLowerCase()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleImportProfile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    try {
+      const profile = JSON.parse(text) as DbCustomParserProfile
+      if (!profile.id) profile.id = crypto.randomUUID()
+      await db.customParsers.put(profile)
+    } catch {
+      // invalid JSON — silently ignore or show alert
+      alert('Invalid profile file')
+    }
+    e.target.value = ''
   }
 
   async function handleClearData() {
@@ -117,6 +148,63 @@ export function ProfilePage() {
               <Download className="w-4 h-4" />
               Export backup (JSON)
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Parser Profiles card */}
+      <div
+        className="rounded-xl border overflow-hidden"
+        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+      >
+        <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Parser Profiles</h2>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          {customParsers.length === 0 ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              No saved profiles yet. Configure a CSV import and save it as a profile to see it here.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {customParsers.map(p => (
+                <li
+                  key={p.id}
+                  className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+                  style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 dark:text-gray-100 truncate">{p.name}</p>
+                    <p className="text-xs text-gray-400 font-mono truncate max-w-[260px]">{p.headerFingerprint}</p>
+                  </div>
+                  <div className="flex items-center gap-2 ml-3 shrink-0">
+                    <button
+                      onClick={() => handleExportProfile(p)}
+                      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline"
+                    >
+                      Export
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProfile(p.id)}
+                      className="text-gray-400 hover:text-red-500 transition-colors"
+                      aria-label="Delete profile"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="pt-1">
+            <label
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg cursor-pointer hover:opacity-80 transition-opacity w-fit"
+              style={{ borderColor: 'var(--accent)', color: 'var(--accent)', backgroundColor: 'var(--accent-subtle)' }}
+            >
+              <Upload className="w-4 h-4" />
+              Import profile (JSON)
+              <input type="file" accept=".json" className="hidden" onChange={handleImportProfile} />
+            </label>
           </div>
         </div>
       </div>
