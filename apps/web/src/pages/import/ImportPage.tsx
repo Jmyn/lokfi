@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Papa from 'papaparse'
 import { toast } from 'sonner'
-import { ParserRegistry, CdcDebitParser, GenericCsvParser, ParseError, generateTransactionHash, CustomCsvParser, computeHeaderFingerprint } from '@lokfi/parser-core'
+import { ParserRegistry, CdcDebitParser, GenericCsvParser, ParseError, generateTransactionHash, CustomCsvParser, computeHeaderFingerprint, PREDEFINED_SOURCES } from '@lokfi/parser-core'
 import type { Statement, CustomParserProfile } from '@lokfi/parser-core'
 import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
@@ -33,6 +33,11 @@ export function ImportPage() {
     r.register(new CdcDebitParser())
     r.registerFallback(new GenericCsvParser())
     return r
+  }, [profiles])
+
+  const customSources = useMemo(() => {
+    const predefined = new Set(PREDEFINED_SOURCES)
+    return [...new Set(profiles.map(p => p.source).filter(s => !predefined.has(s as never)))]
   }, [profiles])
 
   // Compute all transaction hashes for the given successful items (same logic as handleImport)
@@ -198,6 +203,7 @@ export function ImportPage() {
           file={configuringItem.file}
           rawText={configuringItem.rawText}
           existingProfile={profiles.find(p => p.name === configuringItem.profileName)}
+          customSources={customSources}
           onClose={() => setConfiguringItem(null)}
           onApply={handleConfigureApply}
         />

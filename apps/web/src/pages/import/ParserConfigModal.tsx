@@ -1,27 +1,26 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import Papa from 'papaparse'
 import { X } from 'lucide-react'
-import { CustomCsvParser, computeHeaderFingerprint } from '@lokfi/parser-core'
-import type { Statement, CustomParserProfile, StatementSource } from '@lokfi/parser-core'
+import { CustomCsvParser, computeHeaderFingerprint, PREDEFINED_SOURCES } from '@lokfi/parser-core'
+import type { Statement, CustomParserProfile } from '@lokfi/parser-core'
 import { db } from '../../lib/db/db'
 
 interface Props {
   file: File
   rawText: string
   existingProfile?: CustomParserProfile
+  customSources?: string[]
   onClose: () => void
   onApply: (statement: Statement, profile: CustomParserProfile) => void
 }
 
-const STATEMENT_SOURCES: StatementSource[] = [
-  'generic', 'ocbc', 'dbs', 'uob', 'citibank', 'cdc', 'maybank',
-]
-
 type AmountMode = 'single' | 'split'
 
-export function ParserConfigModal({ file, rawText, existingProfile, onClose, onApply }: Props) {
+export function ParserConfigModal({ file, rawText, existingProfile, customSources, onClose, onApply }: Props) {
   const [skipRows, setSkipRows] = useState<number>(existingProfile?.skipRows ?? 0)
-  const [source, setSource] = useState<StatementSource>(existingProfile?.source ?? 'generic')
+  const [source, setSource] = useState<string>(existingProfile?.source ?? 'generic')
+  const [sourceDropdownOpen, setSourceDropdownOpen] = useState<boolean>(false)
+  const sourceComboRef = useRef<HTMLDivElement>(null)
   const [statementType, setStatementType] = useState<'debit' | 'credit'>(
     existingProfile?.statementType ?? 'debit',
   )
@@ -54,10 +53,21 @@ export function ParserConfigModal({ file, rawText, existingProfile, onClose, onA
     typeof existingProfile?.columnMap.balance === 'number' ? existingProfile.columnMap.balance : -1,
   )
 
+  const [sourceError, setSourceError] = useState<string | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
   const [profileName, setProfileName] = useState<string>(existingProfile?.name ?? '')
   const [nameError, setNameError] = useState<boolean>(false)
   const profileNameRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (sourceComboRef.current && !sourceComboRef.current.contains(e.target as Node)) {
+        setSourceDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   // Parse raw CSV once
   const parsedRows = useMemo<string[][]>(() => {
@@ -217,20 +227,47 @@ export function ParserConfigModal({ file, rawText, existingProfile, onClose, onA
                 <label className="text-xs font-medium" style={{ color: 'var(--fg)' }}>
                   Bank / Source
                 </label>
-                <select
-                  value={source}
-                  onChange={(e) => setSource(e.target.value as StatementSource)}
-                  className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
-                  style={{
-                    backgroundColor: 'var(--bg-sidebar)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--fg)',
-                  }}
-                >
-                  {STATEMENT_SOURCES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                <div ref={sourceComboRef} className="relative">
+                  <input
+                    type="text"
+                    value={source}
+                    onChange={e => { setSource(e.target.value); setSourceError(null); setSourceDropdownOpen(true) }}
+                    onFocus={() => setSourceDropdownOpen(true)}
+                    className="w-full rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
+                    style={{ backgroundColor: 'var(--bg-sidebar)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+                    placeholder="e.g. ocbc, generic, my-bank"
+                  />
+                  {sourceDropdownOpen && (() => {
+                    const query = source.toLowerCase()
+                    const allOptions = [...PREDEFINED_SOURCES, ...(customSources ?? [])]
+                    const filtered = allOptions.filter(s => s.includes(query))
+                    if (!filtered.length) return null
+                    return (
+                      <ul className="absolute z-10 w-full mt-1 rounded-md shadow-md text-sm overflow-auto max-h-48"
+                          style={{ backgroundColor: 'var(--bg-sidebar)', border: '1px solid var(--border)' }}>
+                        {filtered.map(s => (
+                          <li key={s}
+                              className="px-3 py-1.5 cursor-pointer hover:bg-[var(--bg-hover)]"
+                              style={{ color: 'var(--fg)' }}
+                              onMouseDown={() => { setSource(s); setSourceError(null); setSourceDropdownOpen(false) }}>
+                            {s}
+                          </li>
+                        ))}
+                        <li className="px-3 py-1.5 cursor-pointer hover:bg-[var(--bg-hover)]"
+                            style={{ color: 'var(--fg-muted)' }}
+                            onMouseDown={() => {
+                              if (!source.trim()) { setSourceError('Please enter a source name.'); return }
+                              setSource(source.trim()); setSourceError(null); setSourceDropdownOpen(false)
+                            }}>
+                          {source.trim() ? `+ Add "${source.trim()}"` : '+ Add custom source'}
+                        </li>
+                      </ul>
+                    )
+                  })()}
+                </div>
+                {sourceError && (
+                  <span className="text-xs text-red-500 dark:text-red-400">{sourceError}</span>
+                )}
               </div>
 
               {/* Statement type */}
