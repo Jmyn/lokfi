@@ -144,6 +144,16 @@ export function ImportPage() {
     }
 
     try {
+      // Preserve category fields from existing records that would be overwritten
+      const existingRecords = await db.transactions.bulkGet(records.map((r) => r.id))
+      for (let i = 0; i < records.length; i++) {
+        const existing = existingRecords[i]
+        if (existing) {
+          if (existing.category) records[i].category = existing.category
+          if (existing.manualCategory) records[i].manualCategory = existing.manualCategory
+        }
+      }
+
       await db.transactions.bulkPut(records)
       await applyRulesToImport(records.map((r) => r.id))
       const newCount = dupStats?.newCount ?? records.length

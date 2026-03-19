@@ -9,9 +9,6 @@ import { evaluateRules } from './evaluateRules'
  * 
  * @param transactionIds Array of `DbTransaction.id`s that were just imported.
  * 
- * TODO: The call site for this should be inside `ImportPage.tsx` after
- * the `await db.transactions.bulkPut(records)` call in `handleImport()`.
- * E.g., `await applyRulesToImport(records.map(r => r.id))`
  */
 export async function applyRulesToImport(transactionIds: string[]): Promise<void> {
   if (!transactionIds.length) return
