@@ -76,12 +76,18 @@
 
 - [x] 2F-1: Build app shell with sidebar navigation
 
+### 2G. Magic Rule Creation
+
+- [/] 2G-1: Implement `suggestRules` logic
+- [/] 2G-2: Build `RuleSuggestionBar` UI
+- [/] 2G-3: Integrate rule selection/customization into `TransactionsPage`
+
 ## Phase 3 — Analytics & Insights
 
 ### 3A. Dashboard
 
-- [ ] 3A-1: Build dashboard page with summary cards
-- [ ] 3A-2: Add monthly trend line chart
+- [/] 3A-1: Build dashboard page with summary cards
+- [/] 3A-2: Add monthly trend line chart
 - [ ] 3A-3: Add category pie/donut chart
 
 ### 3B. Advanced Analytics
@@ -110,3 +116,9 @@
 - [ ] 4B-2: GitHub repo polish
 - [ ] 4B-3: Landing page final copy and SEO
 - [ ] 4B-4: Gumroad listing setup
+## Phase 5 — Sustainability & Monetisation
+
+### 5A. Monetisation Brainstorming
+- [/] 5A-1: Research and brainstorm monetization proposals
+- [ ] 5A-2: Present proposals to user for feedback
+- [ ] 5A-3: Refine chosen strategy in architecture/design docs

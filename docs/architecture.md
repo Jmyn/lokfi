@@ -442,33 +442,27 @@ The rule engine applies categories using a **three-tier priority order**:
 - "Bulk categorise" sets `manualCategory` directly on each selected `DbTransaction` row. No rules are created.
 - A "Create Rule for Similar Transactions" action is available as an explicit separate step in the bulk-categorise flow. It creates a general `contains` rule on the description — not a hash-pinned rule.
 
-### Supported Operations (v2)
+### 8.3 Magic Rule Suggestion (v2.1)
 
-```typescript
-type Operation =
-  | 'contains'        // description.toLowerCase().includes(value)
-  | 'equals'          // field === value (exact, case-insensitive)
-  | 'startsWith'      // field.startsWith(value)
-  | 'regex'           // new RegExp(value, 'i').test(field)
-  | 'gt'              // transactionValue > value (amount operations)
-  | 'lt'              // transactionValue < value
-  | 'between'         // value[0] <= transactionValue <= value[1]
-```
+To reduce the friction of manual rule creation, Lokfi implements a "Magic Rule" suggestion engine. When a user manually categorises a transaction (Tier 1), the app analyzes other uncategorised transactions to find patterns.
 
-Multiple conditions within one rule are evaluated as **AND** (all must match).
+**Trigger:**
+The logic is triggered in `TransactionsPage.tsx` immediately after a successful `manualCategory` update in the `CategoryBadge` or bulk action.
 
-### Rule Simulator (Phase 2)
+**Logic (`suggestRules.ts`):**
 
-Users with multiple rules at varying priority levels cannot intuitively tell which rule will fire for a given transaction, or why a transaction landed in an unexpected category.
+1. Take the newly categorised transaction and its assigned category.
+2. Generate potential rule conditions based on the description (e.g., `startsWith` or `contains` on the first few words).
+3. Scan the `transactions` table for other uncategorised records that would match these potential conditions.
+4. Rank suggestions by **Match Count** (how many transactions this rule would fix).
 
-The Rule Simulator is a text input on `/transactions/rules`:
+**User Flow:**
 
-- A field labelled "Simulate — paste a transaction description"
-- Optional secondary fields: Source, Amount (to test numeric conditions)
-- On submit, the engine runs full Tier 2 evaluation against the pasted input
-- Output: ordered list of all matching rules, in evaluation order, with the winning rule highlighted. If no rule matches, shows "No rule matches — transaction would be Uncategorised."
+1. User categorises "STARBUCKS #123" as "Food".
+2. Suggestion Bar appears: *"Found 12 other transactions like this. [Create Rule: 'STARBUCKS' → 'Food'] [Dismiss]"*.
+3. If the user clicks "Create Rule", a new `DbRule` is created and `applyRulesToImport()` is re-run on all uncategorised transactions.
 
-The simulator runs entirely client-side against the in-memory rule set from Dexie. It reuses the same `evaluateRules(transaction, rules)` function used in the import pipeline.
+This mechanism ensures high rule coverage with minimal manual configuration.
 
 ---
 
