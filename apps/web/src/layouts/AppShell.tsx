@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useTheme } from 'next-themes'
+import { Toaster } from 'sonner'
 import {
   Upload,
   List,
@@ -192,6 +193,7 @@ export function AppShell({ children }: AppShellProps) {
       <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--bg)' }}>
         {children}
       </main>
+      <Toaster position="bottom-right" richColors />
     </div>
   )
 }

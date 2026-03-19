@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Papa from 'papaparse'
+import { toast } from 'sonner'
 import { ParserRegistry, CdcDebitParser, GenericCsvParser, ParseError, generateTransactionHash, CustomCsvParser, computeHeaderFingerprint } from '@lokfi/parser-core'
 import type { Statement, CustomParserProfile } from '@lokfi/parser-core'
 import { db } from '../../lib/db/db'
@@ -16,6 +17,7 @@ export function ImportPage() {
   const [items, setItems] = useState<FileParseResult[]>([])
   const [importError, setImportError] = useState<string | null>(null)
   const [configuringItem, setConfiguringItem] = useState<FileParseResult | null>(null)
+  const [dupStats, setDupStats] = useState<{ newCount: number; existingCount: number } | null>(null)
 
   useEffect(() => {
     StorageManager.initPersistence()
@@ -32,6 +34,36 @@ export function ImportPage() {
     r.registerFallback(new GenericCsvParser())
     return r
   }, [profiles])
+
+  // Compute all transaction hashes for the given successful items (same logic as handleImport)
+  const computeHashes = useCallback((successItems: FileParseResult[]): string[] => {
+    const hashes: string[] = []
+    for (const item of successItems) {
+      if (!item.statement) continue
+      const occurrenceCounts = new Map<string, number>()
+      for (const txn of item.statement.transactions) {
+        const key = `${txn.date}|${txn.description}|${txn.transactionValue}`
+        const idx = occurrenceCounts.get(key) ?? 0
+        occurrenceCounts.set(key, idx + 1)
+        hashes.push(generateTransactionHash(txn, idx))
+      }
+    }
+    return hashes
+  }, [])
+
+  // Recompute dedup stats whenever items settle (no files still parsing)
+  useEffect(() => {
+    const successItems = items.filter((i) => i.status === 'success' && i.statement)
+    if (successItems.length === 0) { setDupStats(null); return }
+    if (items.some((i) => i.status === 'parsing')) return
+
+    const hashes = computeHashes(successItems)
+    if (hashes.length === 0) { setDupStats(null); return }
+
+    db.transactions.where('id').anyOf(hashes).count().then((existingCount) => {
+      setDupStats({ newCount: hashes.length - existingCount, existingCount })
+    })
+  }, [items, computeHashes])
 
   function updateItem(file: File, patch: Partial<FileParseResult>) {
     setItems((prev) =>
@@ -109,6 +141,13 @@ export function ImportPage() {
     try {
       await db.transactions.bulkPut(records)
       await applyRulesToImport(records.map((r) => r.id))
+      const newCount = dupStats?.newCount ?? records.length
+      const existingCount = dupStats?.existingCount ?? 0
+      toast.success(
+        existingCount > 0
+          ? `Imported ${newCount} new transaction${newCount !== 1 ? 's' : ''} · ${existingCount} already existed`
+          : `Imported ${newCount} transaction${newCount !== 1 ? 's' : ''}`,
+      )
       handleClear()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save transactions'
@@ -131,6 +170,7 @@ export function ImportPage() {
   function handleClear() {
     setItems([])
     setImportError(null)
+    setDupStats(null)
   }
 
   return (
@@ -147,7 +187,7 @@ export function ImportPage() {
         {importError && (
           <p className="text-sm text-red-600 dark:text-red-400 px-1">{importError}</p>
         )}
-        <ImportSummary results={items} onImport={handleImport} onClear={handleClear} />
+        <ImportSummary results={items} dupStats={dupStats} onImport={handleImport} onClear={handleClear} />
       </div>
       {configuringItem?.rawText && (
         <ParserConfigModal

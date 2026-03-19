@@ -1,13 +1,19 @@
 import { AlertTriangle } from 'lucide-react'
 import type { FileParseResult } from './FileStatusList'
 
+interface DupStats {
+  newCount: number
+  existingCount: number
+}
+
 interface ImportSummaryProps {
   results: FileParseResult[]
+  dupStats: DupStats | null
   onImport: () => void
   onClear: () => void
 }
 
-export function ImportSummary({ results, onImport, onClear }: ImportSummaryProps) {
+export function ImportSummary({ results, dupStats, onImport, onClear }: ImportSummaryProps) {
   const processed = results.filter((r) => r.status !== 'pending')
   if (processed.length === 0) return null
 
@@ -44,6 +50,14 @@ export function ImportSummary({ results, onImport, onClear }: ImportSummaryProps
             <span className="font-semibold">{totalTransactions}</span>
             <span className="text-gray-500"> transactions</span>
           </span>
+          {dupStats && (
+            <span>
+              <span className="font-semibold text-green-600 dark:text-green-400">{dupStats.newCount} new</span>
+              {dupStats.existingCount > 0 && (
+                <span className="text-gray-400"> · {dupStats.existingCount} already imported</span>
+              )}
+            </span>
+          )}
           {errors.length > 0 && (
             <span className="text-red-600 dark:text-red-400">
               <span className="font-semibold">{errors.length}</span> error{errors.length > 1 ? 's' : ''}
