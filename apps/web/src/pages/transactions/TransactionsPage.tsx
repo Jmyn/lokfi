@@ -4,13 +4,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db/db'
 import { TransactionTable } from './TransactionTable'
 import { TransactionFilters, defaultFilters, type Filters } from './TransactionFilters'
+import { CategoryCombobox } from './CategoryCombobox'
 
 export function TransactionsPage() {
   const [filters, setFilters] = useState<Filters>(defaultFilters)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkCategoryId, setBulkCategoryId] = useState('')
 
-  const categories = useLiveQuery(() => db.categories.toArray(), [])
   const totalCount = useLiveQuery(() => db.transactions.count(), [])
   const uncategorisedCount = useLiveQuery(async () => {
     const all = await db.transactions.toArray()
@@ -132,19 +132,11 @@ export function TransactionsPage() {
           <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">
             {selectedIds.size} selected · Categorise as:
           </span>
-          <select
+          <CategoryCombobox
             value={bulkCategoryId}
-            onChange={(e) => setBulkCategoryId(e.target.value)}
-            className="text-sm border rounded-full px-3 py-1.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <option value="">Pick a category…</option>
-            {categories?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            onChange={setBulkCategoryId}
+            placeholder="Pick a category…"
+          />
           <button
             onClick={handleBulkApply}
             disabled={!bulkCategoryId}

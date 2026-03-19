@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Trash2, X } from 'lucide-react'
 import { db } from '../../lib/db/db'
 import type { DbRule, RuleCondition } from '../../lib/db/db'
+import { CategoryCombobox } from '../transactions/CategoryCombobox'
 
 type RuleEditorModalProps = {
   rule?: DbRule
@@ -38,8 +38,6 @@ const NUMERIC_OPERATIONS = [
 ]
 
 export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
-  const categories = useLiveQuery(() => db.categories.toArray()) ?? []
-
   const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
       name: rule?.name ?? '',
@@ -55,6 +53,7 @@ export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
   })
 
   const watchConditions = watch('conditions')
+  const watchedCategory = watch('category')
 
   // Close on Escape key
   useEffect(() => {
@@ -136,15 +135,12 @@ export function RuleEditorModal({ rule, onClose }: RuleEditorModalProps) {
 
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Apply Category</label>
-              <select
-                {...register('category', { required: 'Select a category' })}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="">-- Choose Category --</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <input type="hidden" {...register('category', { required: 'Select a category' })} />
+              <CategoryCombobox
+                value={watchedCategory}
+                onChange={(id) => setValue('category', id, { shouldValidate: true })}
+                placeholder="-- Choose Category --"
+              />
               {errors.category && <p className="text-red-500 text-xs">{errors.category.message}</p>}
             </div>
 

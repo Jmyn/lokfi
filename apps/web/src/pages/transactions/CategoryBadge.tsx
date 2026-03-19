@@ -1,49 +1,56 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db/db'
+import { CategoryCombobox } from './CategoryCombobox'
 
 interface CategoryBadgeProps {
   transactionId: string
   category?: string
   manualCategory?: string
+  isEditing?: boolean
+  onStartEdit?: () => void
+  onStopEdit?: () => void
 }
 
-export function CategoryBadge({ transactionId, category, manualCategory }: CategoryBadgeProps) {
-  const [editing, setEditing] = useState(false)
+export function CategoryBadge({ 
+  transactionId, 
+  category, 
+  manualCategory,
+  isEditing,
+  onStartEdit,
+  onStopEdit
+}: CategoryBadgeProps) {
+  const [localEditing, setLocalEditing] = useState(false)
   const categories = useLiveQuery(() => db.categories.toArray(), [])
+
+  const editing = isEditing !== undefined ? isEditing : localEditing
+  const startEdit = onStartEdit || (() => setLocalEditing(true))
+  const stopEdit = onStopEdit || (() => setLocalEditing(false))
 
   const resolvedId = manualCategory ?? category ?? null
   const resolvedCategory = categories?.find((c) => c.id === resolvedId) ?? null
 
-  async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const value = e.target.value || undefined
-    await db.transactions.update(transactionId, { manualCategory: value })
-    setEditing(false)
+  async function handleChange(id: string) {
+    await db.transactions.update(transactionId, { manualCategory: id || undefined })
+    stopEdit()
   }
 
   if (editing) {
     return (
-      <select
-        autoFocus
-        defaultValue={resolvedId ?? ''}
+      <CategoryCombobox
+        value={resolvedId ?? ''}
         onChange={handleChange}
-        onBlur={() => setEditing(false)}
-        className="text-xs border rounded-md px-2 py-1 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2"
-        style={{ borderColor: 'var(--border)', '--tw-ring-color': 'var(--accent)' } as React.CSSProperties}
-      >
-        <option value="">Uncategorised</option>
-        {categories?.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
+        onClose={stopEdit}
+        autoOpen={true}
+        allowClear={true}
+        placeholder="Uncategorised"
+      />
     )
   }
 
   return (
     <button
-      onClick={() => setEditing(true)}
+      onClick={startEdit}
       className="flex items-center gap-1.5 text-xs rounded-full px-2 py-0.5 transition-colors"
       style={
         resolvedCategory

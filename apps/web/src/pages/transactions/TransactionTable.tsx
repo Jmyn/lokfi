@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db/db'
 import { CategoryBadge } from './CategoryBadge'
@@ -18,6 +19,8 @@ export function TransactionTable({
   onToggleSelect,
   onToggleAll,
 }: TransactionTableProps) {
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
+
   const transactions = useLiveQuery(async () => {
     const all = await db.transactions.orderBy('date').reverse().toArray()
 
@@ -50,7 +53,14 @@ export function TransactionTable({
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto relative">
+      {editingCategoryId && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/20 dark:bg-black/60 backdrop-blur-sm transition-all" 
+          aria-hidden="true" 
+          onClick={() => setEditingCategoryId(null)}
+        />
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr
@@ -96,8 +106,10 @@ export function TransactionTable({
             return (
               <tr
                 key={t.id}
-                className="border-b transition-colors"
-                style={{
+                className={`border-b transition-colors ${
+                  editingCategoryId === t.id ? 'relative z-50 ring-2 ring-amber-500 shadow-xl rounded-md bg-white dark:bg-gray-800' : ''
+                }`}
+                style={editingCategoryId === t.id ? undefined : {
                   borderColor: 'var(--border)',
                   backgroundColor: isSelected
                     ? 'var(--accent-subtle)'
@@ -117,7 +129,7 @@ export function TransactionTable({
                 <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono text-xs">
                   {t.date}
                 </td>
-                <td className="px-3 py-2.5 text-gray-900 dark:text-white max-w-xs truncate">
+                <td className={`px-3 py-2.5 text-gray-900 dark:text-white max-w-xs ${editingCategoryId === t.id ? 'whitespace-normal break-words' : 'truncate'}`}>
                   {t.description}
                 </td>
                 <td
@@ -129,11 +141,14 @@ export function TransactionTable({
                 >
                   {amountStr}
                 </td>
-                <td className="px-3 py-2.5">
+                <td className={`px-3 py-2.5 ${editingCategoryId === t.id ? 'relative z-50' : ''}`}>
                   <CategoryBadge
                     transactionId={t.id}
                     category={t.category}
                     manualCategory={t.manualCategory}
+                    isEditing={editingCategoryId === t.id}
+                    onStartEdit={() => setEditingCategoryId(t.id)}
+                    onStopEdit={() => setEditingCategoryId(null)}
                   />
                 </td>
                 <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide">
