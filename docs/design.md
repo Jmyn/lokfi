@@ -1,6 +1,6 @@
 # Lokfi — Product Design Document
 
-> Version 1.0 · March 2026 · Jermyn & Claude
+> Version 1.1 · March 2026 · Jermyn & Claude
 
 ---
 
@@ -183,15 +183,26 @@ All future GRAB transactions auto-categorised on import
 
 ---
 
-### `/stats` — Charts & Analytics
+### `/dashboard` — Summary & Insights
 
-**Purpose:** Understand spending patterns over time.
+**Purpose:** The "at a glance" view that replaces the user's mental model. (Replaces `/stats` from earlier designs.)
 
-**Chart types (phased):**
+**Summary cards:**
 
-- Phase 1: Stacked bar (existing, but responsive via Recharts)
-- Phase 2: Monthly trend line (spending over 12 months), category pie/donut
-- Phase 3: Top merchants bar chart, income vs expense waterfall
+- Total spend this month (vs last month: +12% / -8%)
+- Savings rate this month (income minus expense / income)
+- Top spending category (with % of total)
+- Uncategorised transactions count (CTA to review)
+- Top merchants widget
+
+**Widgets:**
+
+- Monthly trend line chart
+- Category pie/donut chart
+- Category budget bars
+- Spending heatmap
+- Savings rate gauge
+- Average spending comparison
 
 **Controls:**
 
@@ -201,22 +212,9 @@ All future GRAB transactions auto-categorised on import
 
 **Design notes:**
 
-- All charts must be fully responsive — no fixed pixel dimensions
-- Charts should respect dark/light theme
+- All charts fully responsive — no fixed pixel dimensions
+- Charts respect dark/light theme
 - Tooltip on hover: date, category, amount
-
----
-
-### `/dashboard` — Summary & Insights (Phase 3)
-
-**Purpose:** The "at a glance" view that replaces the user's mental model.
-
-**Summary cards:**
-
-- Total spend this month (vs last month: +12% / -8%)
-- Savings rate this month (income minus expense / income)
-- Top spending category (with % of total)
-- Uncategorised transactions count (CTA to review)
 
 **Insights (Phase 4 — AI powered):**
 
@@ -307,4 +305,4 @@ The free web app has no prompts, upsells, or locked features. The Gumroad listin
 
 ---
 
-*Last updated: March 2026*
+*Last updated: March 2026 · v1.1 — /dashboard replaces /stats, updated dashboard widgets list*

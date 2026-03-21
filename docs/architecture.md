@@ -1,6 +1,6 @@
 # Lokfi — Architecture Document
 
-> Version 1.1 · March 2026 · Jermyn & Claude
+> Version 1.2 · March 2026 · Jermyn & Claude
 
 ---
 
@@ -18,7 +18,7 @@ The name combines **local** + **finance** (lo-fi aesthetic, indie OSS spirit).
 | --------- | ------------- |
 | **Local-first** | All data lives on the user's device. No sync server, no auth, no cloud dependency. |
 | **Privacy by design** | Zero telemetry, zero analytics. The app never phones home. |
-| **Open core** | Full source is MIT licensed and auditable. Revenue comes from packaged release convenience, not paywalling features. |
+| **Open core** | Full source is MIT licensed and auditable. Revenue comes from convenience, not paywalling core features. |
 | **Parser extensibility** | The parser library is a standalone npm package, versioned independently, designed to accept community-contributed parsers. |
 | **No install required (web)** | The web app runs in any modern browser with no CLI dependency. |
 
@@ -44,6 +44,12 @@ lokfi/
 ├── packages/
 │   ├── parser-core/                # Standalone npm package (@lokfi/parser-core)
 │   │   ├── src/
+│   │   │   ├── extractors/         # Parser implementations (CSV + PDF)
+│   │   │   │   ├── pdf/
+│   │   │   │   │   ├── ocbc/       # OCBC Credit PDF parser
+│   │   │   │   │   └── ocbcCreditPdfParser.ts
+│   │   │   │   ├── ocrNormalizer.ts # OCR artifact cleaning for PDF parsers
+│   │   │   │   └── index.ts
 │   │   │   ├── parsers/
 │   │   │   │   ├── ocbc/
 │   │   │   │   │   ├── ocbc-credit.parser.ts
@@ -98,6 +104,7 @@ export interface Transaction {
   description: string
   transactionValue: number   // negative = outflow, positive = inflow
   balance?: number
+  accountNo?: string         // set by parsers that handle multi-card statements (e.g. OCBC consolidated)
 }
 
 export interface ConsolidatedTransaction extends Transaction {
@@ -210,8 +217,7 @@ The resulting fixture file is safe to commit under `packages/parser-core/src/par
 /import                 # PDF drag-and-drop import
 /transactions           # Transaction table with filters
 /transactions/rules     # Rule engine management
-/stats                  # Charts and analytics
-/dashboard              # Summary cards + insights
+/dashboard              # Summary cards + insights (replaces /stats)
 /profile                # Export / import / settings
 ```
 
@@ -583,24 +589,7 @@ This mechanism ensures high rule coverage with minimal manual configuration.
 
 ---
 
-## 11. Bank Parser Coverage Plan
-
-| Bank | Debit | Credit | Priority | Notes |
-| ---- | ----- | ------ | -------- | ----- |
-| OCBC | ✅ | ✅ | Done | Migrate from Deno to parser-core |
-| Citibank | — | ✅ | Done | |
-| UOB | — | ✅ | Done | |
-| CDC | ✅ | — | Done | |
-| **DBS / POSB** | P0 | P0 | Phase 2 | Largest SG bank — no parser yet |
-| **UOB debit** | P1 | — | Phase 2 | |
-| **Maybank** | P1 | P1 | Phase 3 | |
-| Standard Chartered | P2 | P2 | Phase 4 | |
-| HSBC | P2 | P2 | Phase 4 | |
-| GXS / Trust / Maribank | P3 | P3 | Future | Digital bank formats TBC |
-
----
-
-## 12. Phase 5: P2P Sync (Future / Post-Launch)
+## 11. Phase 5: P2P Sync (Future)
 
 ### Motivation
 
@@ -633,4 +622,4 @@ See also: **Principle: Local-first** (Section 2).
 
 ---
 
-*Last updated: March 2026 · v1.1 — addresses architecture review concerns (see `architecture_review.md`)*
+*Last updated: March 2026 · v1.2 — OCBC Credit PDF parser, Generic PDF parser, extractors/ directory, Transaction.accountNo, dashboard replaces stats page; bank parser table moved to README.md*
