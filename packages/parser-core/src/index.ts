@@ -18,4 +18,5 @@ export { CdcDebitParser } from './parsers/cdc/CdcDebitParser'
 export { GenericCsvParser } from './parsers/generic/GenericCsvParser'
 export { CustomCsvParser } from './parsers/generic/CustomCsvParser'
 export { computeHeaderFingerprint } from './parsers/generic/csvUtils'
+export { OcbcCreditPdfParser, GenericPdfParser, normalizeOcrText } from './extractors'
 

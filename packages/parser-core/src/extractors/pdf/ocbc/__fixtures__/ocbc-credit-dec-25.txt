@@ -1,0 +1,49 @@
+OCBC Bank
+65 Chulia Street, OCBC Centre
+Singapore 049513
+Contact Us
+1800 363 3333
+STATEMENT DATE PAYMENT DUE DATE TOTAL CREDIT LIMIT TOTAL AVAILABLE CREDIT LIMIT TOTAL MINIMUM DUE
+01-12-2025 24-12-2025 S$27,500 S$20,000.00 S$100.00
+Please examine this statement and advise us of any discrepancy within 7 days.
+If payment is not received in full by OCBC Bank by the payment due date, an interest charge at 27.78% per annum will be applied.
+If the minimum payment is not received by OCBC Bank by the payment due date, a late payment charge of S$100 will be levied.
+Interest charge for cash advance will be assessed at 28.92% per annum calculated on a daily basis.
+If the payment due date above is a Saturday, Sunday or Public Holiday, payment should be received by the last working day BEFORE that.
+TRANSACTION DATE DESCRIPTION AMOUNT (SGD)
+OCBC NXT CREDIT CARD
+REDACTED NAME **** **** **** 1874
+LAST MONTH'S BALANCE 850.00
+10/11 PAYMENT BY INTERNET (850.00 )
+02/11 TRAVEL WALLET $2,000.00 001/006 320.00
+17/11 TRAVEL WALLET $1,000.00 004/006 160.00
+23/11 TRAVEL WALLET $1,000.00 003/006 160.00
+27/11 TRAVEL WALLET $1,000.00 002/006 160.00
+01/12 CASH REBATE (20.00 )
+SUBTOTAL 730.00
+REDACTED SUPP **** **** **** 2984
+03/11 CITY HOSPITAL SINGAPORE SGP 30.00
+14/11 FAMILY PAYMENT $180.00 001/003 60.00
+24/11 POWER UTILITY PTE LTD SINGAPORE SGP 50.00
+25/11 POWER UTILITY PTE LTD $102.00 003/003 34.00
+25/11 MOBILE CARRIER SINGAPORE SGP 10.00
+27/11 INTERNET SERVICE SINGAPORE SGP 28.00
+SUBTOTAL 212.00
+TOTAL 942.00
+OCBC 365 CREDIT CARD
+REDACTED NAME **** **** **** 0228
+LAST MONTH'S BALANCE 250.00
+10/11 PAYMENT BY INTERNET (140.00 )
+
+--- Page Break ---
+
+TRANSACTION DATE DESCRIPTION AMOUNT (SGD)
+05/11 LATE CHARGE REVERSAL (100.00 )
+13/11 IPP ELECTRONICS 36M 026/036 75.00
+05/11 INTEREST REVERSAL (4.00 )
+SUBTOTAL 75.00
+TOTAL 75.00
+TOTAL AMOUNT DUE 1,100.00
+Instalment Payment Plan Summary
+02 Nov 2025 320.00 02 Dec 2025 1,600.00 1,600.00 02 Apr 2026
+**** **** **** 1874
