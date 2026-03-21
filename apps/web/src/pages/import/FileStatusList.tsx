@@ -19,6 +19,37 @@ interface FileStatusListProps {
   onRemove: (item: FileParseResult) => void
 }
 
+// When adding a new parser, add its source key here so users see a human-readable label.
+// Unlisted sources fall back to the raw source key string (see sourceLabel() below).
+const SOURCE_LABELS: Record<string, string> = {
+  'ocbc-credit': 'OCBC Credit',
+  'generic-pdf': 'Generic PDF',
+  'generic': 'Generic CSV',
+  'cdc': 'CDC Debit',
+}
+function sourceLabel(source: string): string {
+  return SOURCE_LABELS[source] ?? source
+}
+
+/** Groups statement transactions by their per-transaction accountNo, preserving insertion order. */
+function groupByAccount(statement: Statement) {
+  const groups = new Map<string, typeof statement.transactions>()
+  for (const txn of statement.transactions) {
+    const key = txn.accountNo ?? statement.accountNo
+    const existing = groups.get(key)
+    if (existing) existing.push(txn)
+    else groups.set(key, [txn])
+  }
+  return [...groups.entries()].map(([accountNo, transactions]) => ({ accountNo, transactions }))
+}
+
+/** Masks a 16-digit card number to show only the last 4 digits. */
+function maskCardNo(accountNo: string): string {
+  if (accountNo === 'UNKNOWN-ACCOUNT') return 'Unknown'
+  if (accountNo.length >= 4) return '····' + accountNo.slice(-4)
+  return accountNo
+}
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -74,11 +105,12 @@ export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListP
 
   return (
     <ul className="flex flex-col gap-2">
-      {items.map((item, i) => {
+      {items.map((item) => {
         const sample = item.statement?.transactions[0]
+        const isPdf = item.file.name.toLowerCase().endsWith('.pdf') || item.file.type === 'application/pdf'
         return (
           <li
-            key={i}
+            key={item.file.name + item.file.size}
             className="flex flex-col rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm overflow-hidden"
           >
             {/* Main row: filename + status + remove */}
@@ -110,7 +142,7 @@ export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListP
                     Generic fallback — verify data
                   </span>
                 )}
-                {item.status === 'success' && item.rawText && (
+                {item.status === 'success' && item.rawText && !isPdf && (
                   item.statement?.source === 'generic' && !item.profileName ? (
                     <button
                       onClick={() => onConfigure(item)}
@@ -151,38 +183,66 @@ export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListP
               </div>
             </div>
 
-            {/* Sample row: first parsed transaction + statement metadata */}
-            {item.status === 'success' && sample && item.statement && (
-              <div className="flex flex-col border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
-                {/* Statement metadata: source + account */}
-                <div className="flex items-center gap-3 px-4 pt-2 pb-1">
-                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">Source</span>
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wide">
-                    {item.statement.source}
-                  </span>
-                  <span className="text-xs text-gray-300 dark:text-gray-600">·</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">Account</span>
-                  <span className="text-xs font-mono text-gray-600 dark:text-gray-300 truncate">
-                    {item.statement.accountNo}
-                  </span>
+            {/* Accounts breakdown: per-account rows with sample transaction */}
+            {item.status === 'success' && sample && item.statement && (() => {
+              const groups = groupByAccount(item.statement)
+              const isMultiAccount = groups.length > 1
+              return (
+                <div className="flex flex-col border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
+                  {/* Source + summary row */}
+                  <div className="flex items-center gap-2 px-4 pt-2 pb-1.5">
+                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">Source</span>
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                      {sourceLabel(item.statement.source)}
+                    </span>
+                    {isMultiAccount && (
+                      <>
+                        <span className="text-xs text-gray-300 dark:text-gray-600">·</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {groups.length} accounts
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {/* Per-account rows */}
+                  {groups.map((group, idx) => {
+                    const txn = group.transactions[0]!
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 px-4 py-1.5 border-t border-gray-100 dark:border-gray-700/60"
+                      >
+                        {/* Card number (masked) + count */}
+                        <span className="text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0 w-14">
+                          {group.accountNo === 'UNKNOWN-ACCOUNT' ? (
+                            <span className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+                              <AlertTriangle className="h-3 w-3" />
+                              <span>????</span>
+                            </span>
+                          ) : (
+                            maskCardNo(group.accountNo)
+                          )}
+                        </span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-12 text-right">
+                          {group.transactions.length} txns
+                        </span>
+                        <span className="text-xs text-gray-300 dark:text-gray-600 shrink-0">·</span>
+                        {/* First transaction sample */}
+                        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                          {formatDate(txn.date)}
+                        </span>
+                        <span className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1 mx-1">
+                          {txn.description}
+                        </span>
+                        <span className={`text-xs font-mono shrink-0 ${txn.transactionValue < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                          {formatAmount(txn.transactionValue)}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
-                {/* First transaction sample */}
-                <div className="flex items-center justify-between px-4 pb-2">
-                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-3">
-                    Sample
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
-                    {formatDate(sample.date)}
-                  </span>
-                  <span className="text-xs text-gray-700 dark:text-gray-300 truncate mx-3 flex-1">
-                    {sample.description}
-                  </span>
-                  <span className={`text-xs font-mono shrink-0 ${sample.transactionValue < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                    {formatAmount(sample.transactionValue)}
-                  </span>
-                </div>
-              </div>
-            )}
+              )
+            })()}
           </li>
         )
       })}
