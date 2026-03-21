@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Papa from 'papaparse'
 import { toast } from 'sonner'
-import { ParserRegistry, CdcDebitParser, GenericCsvParser, ParseError, generateTransactionHash, CustomCsvParser, computeHeaderFingerprint, PREDEFINED_SOURCES } from '@lokfi/parser-core'
+import { ParserRegistry, CdcDebitParser, GenericCsvParser, ParseError, generateTransactionHash, CustomCsvParser, computeHeaderFingerprint, PREDEFINED_SOURCES, OcbcCreditPdfParser, GenericPdfParser } from '@lokfi/parser-core'
 import type { Statement, CustomParserProfile } from '@lokfi/parser-core'
 import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
@@ -12,6 +12,7 @@ import { UploadZone } from './UploadZone'
 import { FileStatusList, type FileParseResult } from './FileStatusList'
 import { ImportSummary } from './ImportSummary'
 import { ParserConfigModal } from './ParserConfigModal'
+import { usePdfWorker } from '../../lib/workers/usePdfWorker'
 
 export function ImportPage() {
   const [items, setItems] = useState<FileParseResult[]>([])
@@ -25,12 +26,16 @@ export function ImportPage() {
 
   const profiles = useLiveQuery(() => db.customParsers.toArray(), []) ?? []
 
+  const { parsePdf } = usePdfWorker()
+
   const registry = useMemo(() => {
     const r = new ParserRegistry()
     for (const profile of profiles) {
       r.register(new CustomCsvParser(profile))
     }
     r.register(new CdcDebitParser())
+    r.register(new OcbcCreditPdfParser())
+    r.register(new GenericPdfParser())
     r.registerFallback(new GenericCsvParser())
     return r
   }, [profiles])
@@ -80,13 +85,29 @@ export function ImportPage() {
     const newItems: FileParseResult[] = files.map((file) => ({ file, status: 'pending' }))
     setItems((prev) => [...prev, ...newItems])
 
-    files.forEach((file) => {
+    files.forEach(async (file) => {
       updateItem(file, { status: 'parsing' })
 
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const text = e.target?.result as string
-        try {
+      try {
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+
+        if (isPdf) {
+          // PDF: read as ArrayBuffer, extract text via worker, then parse
+          const buffer = await file.arrayBuffer()
+          const extractedText = await parsePdf(buffer)
+          const parser = registry.getParser(extractedText)
+          if (!parser) throw new ParseError('No parser found for this PDF')
+          const statement = parser.parse(extractedText)
+
+          updateItem(file, {
+            status: 'success',
+            transactionCount: statement.transactions.length,
+            statement,
+            rawText: extractedText,
+          })
+        } else {
+          // CSV/text: read as text directly
+          const text = await file.text()
           const parser = registry.getParser(text)
           if (!parser) throw new ParseError('No parser found for this file')
           const statement = parser.parse(text)
@@ -103,13 +124,11 @@ export function ImportPage() {
             rawText: text,
             profileName: matchedProfile?.name,
           })
-        } catch (err) {
-          const message = err instanceof Error ? err.message : 'Unknown error'
-          updateItem(file, { status: 'error', error: message, rawText: text })
         }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        updateItem(file, { status: 'error', error: message })
       }
-      reader.onerror = () => updateItem(file, { status: 'error', error: 'Failed to read file' })
-      reader.readAsText(file)
     })
   }
 
@@ -133,7 +152,7 @@ export function ImportPage() {
           id: hash,
           hash,
           source: stmt.source,
-          accountNo: stmt.accountNo,
+          accountNo: txn.accountNo ?? stmt.accountNo,
           date: txn.date,
           description: txn.description,
           transactionValue: txn.transactionValue,
