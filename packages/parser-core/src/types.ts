@@ -17,6 +17,7 @@ export interface Transaction {
   description: string
   transactionValue: number // negative = outflow, positive = inflow
   balance?: number // running balance — only present on debit statements that expose it
+  accountNo?: string // set by parsers that handle multi-card statements (e.g. OCBC consolidated)
 }
 
 /** Transaction enriched with bank metadata and a dedup hash. */
