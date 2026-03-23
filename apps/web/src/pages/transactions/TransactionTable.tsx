@@ -7,6 +7,7 @@ import { CategoryBadge } from './CategoryBadge'
 import type { Filters } from './filterTypes'
 
 const fmt = new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD' })
+const PAGE_SIZE = 100
 
 interface TransactionTableProps {
   filters: Filters
@@ -14,6 +15,10 @@ interface TransactionTableProps {
   onToggleSelect: (id: string) => void
   onToggleAll: (ids: string[]) => void
   onCategoryChanged?: (txn: DbTransaction, categoryId: string | undefined) => void
+  pageOffset: number
+  onLoadedChange: (loaded: number, total: number, hasMore: boolean) => void
+  totalFiltered: number
+  onLoadMore: () => void
 }
 
 export function TransactionTable({
@@ -22,30 +27,67 @@ export function TransactionTable({
   onToggleSelect,
   onToggleAll,
   onCategoryChanged,
+  pageOffset,
+  onLoadedChange,
+  totalFiltered,
+  onLoadMore,
 }: TransactionTableProps) {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
 
   const transactions = useLiveQuery(async () => {
-    const all = await db.transactions.orderBy('date').reverse().toArray()
+    // Build the base query chain:
+    // Use indexed where() for date range (if available), then chain .and() for secondary filters.
+    // .and() always returns Collection, so subsequent .and() calls chain cleanly.
+    const baseQuery =
+      filters.dateFrom
+        ? db.transactions.where('date').aboveOrEqual(filters.dateFrom)
+        : db.transactions.orderBy('date').reverse()
 
-    return all.filter((t) => {
-      if (filters.dateFrom && t.date < filters.dateFrom) return false
-      if (filters.dateTo && t.date > filters.dateTo) return false
-      if (filters.sources.length > 0 && !filters.sources.includes(t.source)) return false
-      if (filters.accounts?.length > 0 && !filters.accounts.includes(t.accountNo)) return false
-      if (filters.categoryId) {
-        if (filters.categoryId === '__uncategorised__') {
-          const resolved = t.manualCategory ?? t.category
-          if (resolved) return false
-        } else {
-          const resolved = t.manualCategory ?? t.category
-          if (resolved !== filters.categoryId) return false
-        }
-      }
-      return true
-    })
-  }, [filters])
+    // Apply upper date bound
+    const dateFiltered =
+      filters.dateTo
+        ? baseQuery.and((t) => t.date <= filters.dateTo)
+        : baseQuery
+
+    // Apply source filter
+    const sourceFiltered =
+      filters.sources.length > 0
+        ? dateFiltered.and((t) => filters.sources.includes(t.source))
+        : dateFiltered
+
+    // Apply account filter
+    const accountFiltered =
+      filters.accounts.length > 0
+        ? sourceFiltered.and((t) => filters.accounts.includes(t.accountNo))
+        : sourceFiltered
+
+    // Apply category filter (resolved: manualCategory ?? category)
+    const categoryFiltered =
+      filters.categoryId
+        ? accountFiltered.and((t) => {
+            const resolved = t.manualCategory ?? t.category
+            return filters.categoryId === '__uncategorised__'
+              ? !resolved
+              : resolved === filters.categoryId
+          })
+        : accountFiltered
+
+    // Get total count
+    const total = await categoryFiltered.count()
+
+    // Paginate
+    const rows = await categoryFiltered.limit(PAGE_SIZE).offset(pageOffset).toArray()
+
+    // Report loaded/total/hasMore
+    const loaded = rows.length
+    const more = pageOffset + loaded < total
+    setHasMore(more)
+    onLoadedChange(pageOffset + loaded, total, more)
+
+    return rows
+  }, [filters, pageOffset, onLoadedChange])
 
   if (!transactions) {
     return (
@@ -185,6 +227,25 @@ export function TransactionTable({
           })}
         </tbody>
       </table>
+
+      {/* Footer: showing count + load more */}
+      <div
+        className="flex items-center justify-between px-4 py-2.5 border-t text-xs text-gray-400 dark:text-gray-500"
+        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+      >
+        <span>
+          Showing {pageOffset + (transactions?.length ?? 0)} of {totalFiltered} transactions
+        </span>
+        {hasMore && (
+          <button
+            onClick={onLoadMore}
+            className="text-xs font-medium px-3 py-1 rounded border transition-colors hover:border-amber-500 hover:text-amber-600"
+            style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
+          >
+            Load more ({totalFiltered - pageOffset - (transactions?.length ?? 0)} remaining)
+          </button>
+        )}
+      </div>
     </div>
   )
 }
