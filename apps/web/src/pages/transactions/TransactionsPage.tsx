@@ -28,6 +28,28 @@ export function TransactionsPage() {
   const [toast, setToast] = useState<string | null>(null)
   const dismissedTxIds = useRef<Set<string>>(new Set())
 
+  // Pagination state
+  const [pageOffset, setPageOffset] = useState(0)
+  const [filteredTotal, setFilteredTotal] = useState(0)
+
+  // Cache all transactions for suggestRules (only reload when categories/rules change)
+  const allTxnsRef = useRef<DbTransaction[]>([])
+
+  // Query categories first so the useEffect below can reference it
+  const categories = useLiveQuery(() => db.categories.toArray(), [])
+
+  // Reset page offset when filters change
+  useEffect(() => {
+    setPageOffset(0)
+  }, [filters])
+
+  // Reload all transactions for suggestRules only when categories change
+  useEffect(() => {
+    db.transactions.toArray().then((txns) => {
+      allTxnsRef.current = txns
+    })
+  }, [categories]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Re-evaluate rules on mount (handles cleared manual overrides, new rules, etc.)
   useEffect(() => {
     db.transactions.toArray().then((txns) => {
@@ -39,10 +61,8 @@ export function TransactionsPage() {
 
   const totalCount = useLiveQuery(() => db.transactions.count(), [])
   const uncategorisedCount = useLiveQuery(async () => {
-    const all = await db.transactions.toArray()
-    return all.filter((t) => !t.manualCategory && !t.category).length
+    return await db.transactions.filter((t) => !t.manualCategory && !t.category).count()
   }, [])
-  const categories = useLiveQuery(() => db.categories.toArray(), [])
 
   const hasFilters =
     filters.dateFrom !== '' ||
@@ -88,8 +108,8 @@ export function TransactionsPage() {
     // A new categorization clears any prior dismiss for this txn
     dismissedTxIds.current.delete(txn.id)
 
-    const allTransactions = await db.transactions.toArray()
-    const suggestions = suggestRules(txn, categoryId, allTransactions)
+    // Use cached allTransactions (only refreshed when categories change)
+    const suggestions = suggestRules(txn, categoryId, allTxnsRef.current)
     if (suggestions.length === 0) return
 
     const category = categories?.find((c) => c.id === categoryId)
@@ -197,7 +217,7 @@ export function TransactionsPage() {
       <TransactionFilters filters={filters} onChange={setFilters} />
 
       <div className="flex-1 overflow-auto">
-        {totalCount === 0 && hasFilters ? (
+        {totalCount !== undefined && totalCount > 0 && hasFilters && filteredTotal === 0 ? (
           <div className="flex items-center justify-center h-40">
             <p className="text-gray-400 dark:text-gray-500 text-sm">
               No transactions match your filters.
@@ -210,6 +230,12 @@ export function TransactionsPage() {
             onToggleSelect={handleToggleSelect}
             onToggleAll={handleToggleAll}
             onCategoryChanged={handleCategoryChanged}
+            pageOffset={pageOffset}
+            onLoadedChange={(_loaded, total, _more) => {
+              setFilteredTotal(total)
+            }}
+            totalFiltered={filteredTotal}
+            onLoadMore={() => setPageOffset((o) => o + 100)}
           />
         )}
       </div>
