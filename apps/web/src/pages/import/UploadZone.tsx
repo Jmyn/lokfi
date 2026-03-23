@@ -103,6 +103,7 @@ export function UploadZone({ onFilesAdded }: UploadZoneProps) {
         multiple
         accept=".csv,.pdf"
         className="hidden"
+        aria-label="Upload CSV or PDF files"
         onChange={handleChange}
       />
     </div>
