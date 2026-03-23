@@ -1,5 +1,6 @@
-import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle, X } from 'lucide-react'
-import type { Statement } from '@lokfi/parser-core'
+import { useState } from 'react'
+import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle, X, ChevronDown } from 'lucide-react'
+import type { Statement, Transaction } from '@lokfi/parser-core'
 
 export type FileParseStatus = 'pending' | 'parsing' | 'success' | 'error'
 
@@ -50,6 +51,19 @@ function maskCardNo(accountNo: string): string {
   return accountNo
 }
 
+/** Returns the display label for an account number (handles UNKNOWN-ACCOUNT case). */
+function accountNoLabel(accountNo: string): React.ReactNode {
+  if (accountNo === 'UNKNOWN-ACCOUNT') {
+    return (
+      <span className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+        <AlertTriangle className="h-3 w-3" />
+        <span>????</span>
+      </span>
+    )
+  }
+  return maskCardNo(accountNo)
+}
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -65,6 +79,145 @@ function formatDate(iso: string) {
   const [y, m, d] = iso.split('-')
   const date = new Date(Number(y), Number(m) - 1, Number(d))
   return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/** Renders a single transaction row */
+function TransactionRow({ txn }: { txn: Transaction }) {
+  return (
+    <>
+      <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+        {formatDate(txn.date)}
+      </span>
+      <span className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1 mx-1">
+        {txn.description}
+      </span>
+      <span className={`text-xs font-mono shrink-0 ${txn.transactionValue < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+        {formatAmount(txn.transactionValue)}
+      </span>
+    </>
+  )
+}
+
+/** Collapsed preview: shows first 3 transactions + expand toggle */
+function CollapsedAccountGroup({
+  group,
+  accountKey,
+  isExpanded,
+  onToggle,
+}: {
+  group: { accountNo: string; transactions: Transaction[] }
+  accountKey: string
+  isExpanded: boolean
+  onToggle: () => void
+}) {
+  const PREVIEW_COUNT = 3
+  const previewTxns = group.transactions.slice(0, PREVIEW_COUNT)
+  const hiddenCount = group.transactions.length - PREVIEW_COUNT
+
+  return (
+    <div className="flex flex-col">
+      {/* Toggle row */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center gap-2 px-4 py-1.5 border-t border-gray-100 dark:border-gray-700/60 hover:bg-gray-100 dark:hover:bg-gray-700/40 transition-colors w-full text-left"
+        aria-expanded={isExpanded}
+        aria-label={`Expand ${maskCardNo(group.accountNo)} transactions`}
+      >
+        {/* Card number (masked) */}
+        <span className="text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0 w-14">
+          {accountNoLabel(group.accountNo)}
+        </span>
+
+        {/* Transaction count + expand indicator */}
+        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-12 text-right">
+          {group.transactions.length} txns
+        </span>
+
+        <span className="text-xs text-gray-300 dark:text-gray-600 shrink-0">·</span>
+
+        {/* Preview: first 3 transactions */}
+        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 flex items-center gap-1">
+          {isExpanded ? (
+            <>all {group.transactions.length} transactions</>
+          ) : hiddenCount > 0 ? (
+            <>
+              showing {PREVIEW_COUNT} of {group.transactions.length}
+            </>
+          ) : (
+            <>{group.transactions.length} transaction{group.transactions.length !== 1 ? 's' : ''}</>
+          )}
+        </span>
+
+        <ChevronDown
+          className={`h-3.5 w-3.5 text-gray-400 dark:text-gray-500 shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {/* Preview rows (when collapsed) */}
+      {!isExpanded && previewTxns.map((txn, i) => (
+        <div
+          key={`${accountKey}-${txn.date}-${i}`}
+          className="flex items-center gap-2 px-4 py-1 pl-8 bg-gray-50 dark:bg-gray-800/40"
+        >
+          <TransactionRow txn={txn} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Expanded account group: all transactions in a scrollable list */
+function ExpandedAccountGroup({
+  group,
+  accountKey,
+  isExpanded,
+  onCollapse,
+}: {
+  group: { accountNo: string; transactions: Transaction[] }
+  accountKey: string
+  isExpanded: boolean
+  onCollapse: () => void
+}) {
+  return (
+    <div className="flex flex-col border-t border-gray-100 dark:border-gray-700/60">
+      {/* Header row with account info + collapse button */}
+      <div className="flex items-center gap-2 px-4 py-1.5 bg-gray-50 dark:bg-gray-800/40">
+        <span className="text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0 w-14">
+          {accountNoLabel(group.accountNo)}
+        </span>
+        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-12 text-right">
+          {group.transactions.length} txns
+        </span>
+        <span className="text-xs text-gray-300 dark:text-gray-600 shrink-0">·</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+          all {group.transactions.length} transactions
+        </span>
+        <button
+          type="button"
+          onClick={onCollapse}
+          className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          aria-expanded={isExpanded}
+          aria-label={`Collapse ${maskCardNo(group.accountNo)}`}
+        >
+          <ChevronDown className="h-3.5 w-3.5 rotate-180 transition-transform duration-200" />
+          collapse
+        </button>
+      </div>
+
+      {/* Scrollable transaction list */}
+      <div className="max-h-64 overflow-y-auto">
+        {group.transactions.map((txn, i) => (
+          <div
+            key={`${accountKey}-${txn.date}-${i}`}
+            className="flex items-center gap-2 px-4 py-1.5 pl-8 border-t border-gray-100 dark:border-gray-700/60 last:border-b-0"
+          >
+            <TransactionRow txn={txn} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function StatusBadge({ status }: { status: FileParseStatus }) {
@@ -103,11 +256,24 @@ function StatusBadge({ status }: { status: FileParseStatus }) {
 export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListProps) {
   if (items.length === 0) return null
 
+  // Expand state per account (keyed by file name + file size + accountNo)
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
+
+  const toggleAccount = (accountKey: string) => {
+    setExpandedAccounts((prev) => {
+      const next = new Set(prev)
+      if (next.has(accountKey)) next.delete(accountKey)
+      else next.add(accountKey)
+      return next
+    })
+  }
+
   return (
     <ul className="flex flex-col gap-2">
       {items.map((item) => {
         const sample = item.statement?.transactions[0]
         const isPdf = item.file.name.toLowerCase().endsWith('.pdf') || item.file.type === 'application/pdf'
+
         return (
           <li
             key={item.file.name + item.file.size}
@@ -183,7 +349,7 @@ export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListP
               </div>
             </div>
 
-            {/* Accounts breakdown: per-account rows with sample transaction */}
+            {/* Accounts breakdown: per-account rows with expandable transactions */}
             {item.status === 'success' && sample && item.statement && (() => {
               const groups = groupByAccount(item.statement)
               const isMultiAccount = groups.length > 1
@@ -205,39 +371,25 @@ export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListP
                     )}
                   </div>
                   {/* Per-account rows */}
-                  {groups.map((group, idx) => {
-                    const txn = group.transactions[0]!
-                    return (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 px-4 py-1.5 border-t border-gray-100 dark:border-gray-700/60"
-                      >
-                        {/* Card number (masked) + count */}
-                        <span className="text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0 w-14">
-                          {group.accountNo === 'UNKNOWN-ACCOUNT' ? (
-                            <span className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
-                              <AlertTriangle className="h-3 w-3" />
-                              <span>????</span>
-                            </span>
-                          ) : (
-                            maskCardNo(group.accountNo)
-                          )}
-                        </span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-12 text-right">
-                          {group.transactions.length} txns
-                        </span>
-                        <span className="text-xs text-gray-300 dark:text-gray-600 shrink-0">·</span>
-                        {/* First transaction sample */}
-                        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
-                          {formatDate(txn.date)}
-                        </span>
-                        <span className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1 mx-1">
-                          {txn.description}
-                        </span>
-                        <span className={`text-xs font-mono shrink-0 ${txn.transactionValue < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                          {formatAmount(txn.transactionValue)}
-                        </span>
-                      </div>
+                  {groups.map((group) => {
+                    const accountKey = `${item.file.name}-${item.file.size}-${group.accountNo}`
+                    const isExpanded = expandedAccounts.has(accountKey)
+                    return isExpanded ? (
+                      <ExpandedAccountGroup
+                        key={accountKey}
+                        group={group}
+                        accountKey={accountKey}
+                        isExpanded={isExpanded}
+                        onCollapse={() => toggleAccount(accountKey)}
+                      />
+                    ) : (
+                      <CollapsedAccountGroup
+                        key={accountKey}
+                        group={group}
+                        accountKey={accountKey}
+                        isExpanded={isExpanded}
+                        onToggle={() => toggleAccount(accountKey)}
+                      />
                     )
                   })}
                 </div>
