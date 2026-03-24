@@ -77,8 +77,11 @@ export function TransactionTable({
     // Get total count
     const total = await categoryFiltered.count()
 
-    // Paginate
-    const rows = await categoryFiltered.limit(PAGE_SIZE).offset(pageOffset).toArray()
+    // Paginate — fetch all filtered results then slice.
+    // Dexie's offset() on chained .and() collections can return 0 rows unexpectedly,
+    // so we fetch all results and paginate in JS instead.
+    const allFiltered = await categoryFiltered.toArray()
+    const rows = allFiltered.slice(pageOffset, pageOffset + PAGE_SIZE)
 
     // Report loaded/total/hasMore
     const loaded = rows.length
@@ -103,9 +106,9 @@ export function TransactionTable({
   return (
     <div className="overflow-x-auto relative">
       {editingCategoryId && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/20 dark:bg-black/60 backdrop-blur-sm transition-all" 
-          aria-hidden="true" 
+        <div
+          className="fixed inset-0 z-40 bg-black/20 dark:bg-black/60 backdrop-blur-sm transition-all"
+          aria-hidden="true"
           onClick={() => setEditingCategoryId(null)}
         />
       )}
