@@ -113,19 +113,33 @@ export function DashboardFilters() {
 
       {/* Date presets */}
       <div className="flex items-center gap-1">
-        {PRESETS.map((p) => (
-          <button
-            key={p.label}
-            onClick={() => setFilters({ ...filters, dateFrom: p.from(), dateTo: p.to() })}
-            className="text-xs rounded-full px-2.5 py-1 border font-medium transition-colors hover:opacity-80"
-            style={{
-              backgroundColor: 'var(--bg)',
-              borderColor: 'var(--border)',
-            }}
-          >
-            {p.label}
-          </button>
-        ))}
+        {PRESETS.map((p) => {
+          const isActive =
+            filters.dateFrom === p.from() &&
+            filters.dateTo === p.to()
+          return (
+            <button
+              key={p.label}
+              onClick={() => setFilters({ ...filters, dateFrom: p.from(), dateTo: p.to() })}
+              aria-pressed={isActive}
+              className="text-xs rounded-full px-2.5 py-1 border font-medium transition-colors hover:opacity-80"
+              style={
+                isActive
+                  ? {
+                      backgroundColor: 'var(--accent)',
+                      borderColor: 'var(--accent)',
+                      color: '#fff',
+                    }
+                  : {
+                      backgroundColor: 'var(--bg)',
+                      borderColor: 'var(--border)',
+                    }
+              }
+            >
+              {p.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Separator */}
