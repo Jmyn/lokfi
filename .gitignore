@@ -4,7 +4,7 @@ dist/
 *.tsbuildinfo
 .env
 .DS_Store
-.worktrees/
+.worktree*
 coverage/
 statements/
 *.local.*
