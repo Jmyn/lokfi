@@ -38,11 +38,11 @@ export function RulesPage() {
       accountNo: '',
     } as unknown as DbTransaction
 
-    const matchCatId = evaluateRules(mockTxn, rules)
+    const sortedRules = [...rules].sort((a, b) => a.priority - b.priority)
+    const matchCatId = evaluateRules(mockTxn, sortedRules)
     if (!matchCatId) {
       setSimResult('NO_MATCH')
     } else {
-      const sortedRules = [...rules].sort((a, b) => a.priority - b.priority)
       let foundRule = null
       for (const r of sortedRules) {
         if (!r.conditions || !r.conditions.length) continue
