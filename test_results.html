@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { background-color: #0d1117; color: #c9d1d9; font-family: monospace; padding: 20px; }
+  .pass { color: #3fb950; }
+  .fail { color: #f85149; }
+  .header { color: #58a6ff; font-weight: bold; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<div class="header">bun test v1.2.14</div>
+<div>packages/parser-core/src/parsers/generic/csvUtils.test.ts:</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > handles ISO YYYY-MM-DD</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > handles YYYY/MM/DD</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > handles DD/MM/YYYY when DD > 12</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > handles MM/DD/YYYY when DD > 12</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > defaults to DD/MM/YYYY for ambiguous / dates</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > handles DD-MM-YYYY when DD > 12</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > handles MM-DD-YYYY when DD > 12</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > defaults to DD/MM/YYYY for ambiguous - dates</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > handles DD-MMM-YYYY</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > handles DD MMM YYYY</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > handles MMM DD, YYYY</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > strips time component after space or T</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > falls back to Date.parse() for other formats</div>
+<div><span class="pass">✓</span> csvUtils > normalizeDate() > returns null for invalid dates</div>
+<div><span class="pass">✓</span> csvUtils > parseAmount() > parses standard numbers</div>
+<div><span class="pass">✓</span> csvUtils > parseAmount() > parses negative numbers with minus sign</div>
+<div><span class="pass">✓</span> csvUtils > parseAmount() > parses negative numbers with parentheses</div>
+<div><span class="pass">✓</span> csvUtils > parseAmount() > handles currency symbols and commas</div>
+<div><span class="pass">✓</span> csvUtils > parseAmount() > handles leading currency codes</div>
+<div><span class="pass">✓</span> csvUtils > parseAmount() > returns null for empty or invalid strings</div>
+<div><span class="pass">✓</span> csvUtils > computeHeaderFingerprint() > computes fingerprint for a valid header row</div>
+<div><span class="pass">✓</span> csvUtils > computeHeaderFingerprint() > handles extra whitespace and different casing</div>
+<div><span class="pass">✓</span> csvUtils > computeHeaderFingerprint() > skips rows with fewer than 2 non-empty columns</div>
+<div><span class="pass">✓</span> csvUtils > computeHeaderFingerprint() > returns empty string if no valid header found</div>
+<br>
+<div class="pass">24 pass</div>
+<div>0 fail</div>
+<div>37 expect() calls</div>
+<div>Ran 24 tests across 1 files. [2.26s]</div>
+</body>
+</html>
