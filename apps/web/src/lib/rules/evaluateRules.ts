@@ -54,15 +54,11 @@ export function matchesCondition(txn: DbTransaction, cond: RuleCondition): boole
 
 /**
  * Evaluates a transaction against a list of rules.
- * Rules should be pre-sorted by priority (lower number = higher priority),
- * but this function ensures sorting just in case.
+ * Rules MUST be pre-sorted by priority (lower number = higher priority).
  * Returns the category ID of the first matching rule, or null if none match.
  */
 export function evaluateRules(txn: DbTransaction, rules: DbRule[]): string | null {
-  // Sort rules by priority ascending (lower number wins)
-  const sortedRules = [...rules].sort((a, b) => a.priority - b.priority)
-
-  for (const rule of sortedRules) {
+  for (const rule of rules) {
     if (!rule.conditions || rule.conditions.length === 0) continue
 
     // A rule matches if ALL of its conditions match (AND logic)

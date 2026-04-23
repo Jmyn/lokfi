@@ -101,8 +101,9 @@ describe('Rule Engine - evaluateRules', () => {
         conditions: [{ field: 'description', operation: 'contains', value: 'starbucks' }]
       }
       
-      // Pass them in reverse order to ensure the function sorts them
-      expect(evaluateRules(baseTxn, [ruleLowPriority, ruleHighPriority])).toBe('cat_food')
+      // Pre-sort by priority (lower number first)
+      const sortedRules = [ruleLowPriority, ruleHighPriority].sort((a, b) => a.priority - b.priority)
+      expect(evaluateRules(baseTxn, sortedRules)).toBe('cat_food')
     })
 
     it('requires ALL conditions to match (AND logic)', () => {
