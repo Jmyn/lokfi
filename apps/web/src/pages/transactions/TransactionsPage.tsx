@@ -10,8 +10,8 @@ import { CategoryCombobox } from './CategoryCombobox'
 import { RuleSuggestionBar } from './RuleSuggestionBar'
 import { TransactionFilters } from './TransactionFilters'
 import { TransactionTable } from './TransactionTable'
-import { type Filters, defaultFilters } from './filterTypes'
 import type { SortConfig } from './TransactionTable'
+import { type Filters, defaultFilters } from './filterTypes'
 
 type SuggestionState = {
   txnId: string

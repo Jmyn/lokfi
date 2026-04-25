@@ -181,11 +181,7 @@ export function TransactionTable({
                     aria-sort={ariaSort}
                   >
                     {col.label}
-                    {isActive && (
-                      <span className="text-xs">
-                        {sort.direction === 'asc' ? '↑' : '↓'}
-                      </span>
-                    )}
+                    {isActive && <span className="text-xs">{sort.direction === 'asc' ? '↑' : '↓'}</span>}
                   </button>
                 </th>
               )

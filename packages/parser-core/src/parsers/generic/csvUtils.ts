@@ -114,6 +114,14 @@ export function normalizeDate(raw: string): string | null {
     if (m) return `${y}-${m}-${d!.padStart(2, '0')}`
   }
 
+  // MMMM D, YYYY or MMMM DD, YYYY (January 15, 2025)
+  const mmmmDdYyyy = raw.trim().match(/^([A-Za-z]{4,9})\s+(\d{1,2}),?\s+(\d{4})$/)
+  if (mmmmDdYyyy) {
+    const [, mon, d, y] = mmmmDdYyyy
+    const m = MONTH_ABBR[mon!.toLowerCase().slice(0, 3)]
+    if (m) return `${y}-${m}-${d!.padStart(2, '0')}`
+  }
+
   // Fallback: try native Date.parse (timezone-safe: treat as UTC noon)
   const p = Date.parse(raw.trim())
   if (!isNaN(p)) {
