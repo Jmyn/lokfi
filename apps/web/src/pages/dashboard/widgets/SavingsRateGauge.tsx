@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import { useDashboard } from '../DashboardContext'
 import { fmt } from '../../../lib/format'
+import { useDashboard } from '../DashboardContext'
 
 export function SavingsRateGauge() {
   const { transactions } = useDashboard()
@@ -45,9 +45,7 @@ export function SavingsRateGauge() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-        Savings Rate
-      </h2>
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">Savings Rate</h2>
       <div
         className="rounded-xl border p-5 flex flex-col items-center"
         style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
@@ -74,22 +72,10 @@ export function SavingsRateGauge() {
             />
           )}
           {/* Center label */}
-          <text
-            x={cx}
-            y={cy - 15}
-            textAnchor="middle"
-            className="text-3xl font-mono font-medium"
-            fill={color}
-          >
+          <text x={cx} y={cy - 15} textAnchor="middle" className="text-3xl font-mono font-medium" fill={color}>
             {label}
           </text>
-          <text
-            x={cx}
-            y={cy + 5}
-            textAnchor="middle"
-            className="text-xs"
-            fill="#9ca3af"
-          >
+          <text x={cx} y={cy + 5} textAnchor="middle" className="text-xs" fill="#9ca3af">
             savings rate
           </text>
         </svg>

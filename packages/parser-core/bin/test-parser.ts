@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { ParserRegistry, generateTransactionHash, CdcDebitParser, GenericCsvParser } from '../src/index'
+import { CdcDebitParser, GenericCsvParser, ParserRegistry, generateTransactionHash } from '../src/index'
 
 const args = process.argv.slice(2)
 const filePath = args[0]
@@ -39,12 +39,12 @@ try {
     ...txn,
     source: statement.source,
     accountNo: statement.accountNo,
-    hash: generateTransactionHash(txn, i)
+    hash: generateTransactionHash(txn, i),
   }))
 
   console.log(`✅ Success! Detected parser for: ${statement.source.toUpperCase()}`)
   console.log(`📊 Parsed ${statement.transactions.length} transactions.\n`)
-  
+
   if (consolidated.length > 0) {
     console.log('Sample of first 3 consolidated transactions:')
     console.log(JSON.stringify(consolidated.slice(0, 3), null, 2))

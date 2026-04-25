@@ -1,19 +1,8 @@
-import { useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
+import { LayoutDashboard, List, type LucideIcon, Moon, Pin, PinOff, Sun, Upload, User, Wand2 } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { useState } from 'react'
 import { Toaster } from 'sonner'
-import {
-  Upload,
-  List,
-  Wand2,
-  User,
-  Sun,
-  Moon,
-  Pin,
-  PinOff,
-  LayoutDashboard,
-  type LucideIcon,
-} from 'lucide-react'
 
 interface NavItem {
   label: string
@@ -51,9 +40,7 @@ export function AppShell({ children }: AppShellProps) {
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'var(--bg)' }}>
       {/* Sidebar */}
       <aside
-        className={`flex flex-col border-r transition-all duration-200 ${
-          expanded ? 'w-56' : 'w-16'
-        }`}
+        className={`flex flex-col border-r transition-all duration-200 ${expanded ? 'w-56' : 'w-16'}`}
         style={{
           backgroundColor: 'var(--bg-sidebar)',
           borderColor: 'var(--border)',
@@ -120,15 +107,9 @@ export function AppShell({ children }: AppShellProps) {
                     : {}
                 }
               >
-                <Icon
-                  size={17}
-                  className="shrink-0"
-                  style={isActive ? { color: 'var(--accent)' } : {}}
-                />
+                <Icon size={17} className="shrink-0" style={isActive ? { color: 'var(--accent)' } : {}} />
                 {expanded && (
-                  <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
-                    {item.label}
-                  </span>
+                  <span className="text-sm font-medium whitespace-nowrap overflow-hidden">{item.label}</span>
                 )}
               </Link>
             )
@@ -145,11 +126,7 @@ export function AppShell({ children }: AppShellProps) {
             onClick={toggleTheme}
             className="flex items-center h-10 px-4 gap-3 w-full text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
           >
-            {theme === 'dark' ? (
-              <Sun size={17} className="shrink-0" />
-            ) : (
-              <Moon size={17} className="shrink-0" />
-            )}
+            {theme === 'dark' ? <Sun size={17} className="shrink-0" /> : <Moon size={17} className="shrink-0" />}
             {expanded && (
               <span className="text-sm font-medium whitespace-nowrap">
                 {theme === 'dark' ? 'Light mode' : 'Dark mode'}
@@ -180,9 +157,7 @@ export function AppShell({ children }: AppShellProps) {
               className="shrink-0"
               style={pathname === BOTTOM_NAV.path ? { color: 'var(--accent)' } : {}}
             />
-            {expanded && (
-              <span className="text-sm font-medium whitespace-nowrap">{BOTTOM_NAV.label}</span>
-            )}
+            {expanded && <span className="text-sm font-medium whitespace-nowrap">{BOTTOM_NAV.label}</span>}
           </Link>
         </div>
       </aside>

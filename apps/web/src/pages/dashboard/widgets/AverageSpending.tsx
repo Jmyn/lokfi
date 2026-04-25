@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useDashboard } from '../DashboardContext'
 import { fmt } from '../../../lib/format'
+import { useDashboard } from '../DashboardContext'
 
 type Period = 'daily' | 'weekly' | 'monthly'
 
@@ -26,7 +26,7 @@ export function AverageSpending() {
           const jan1 = new Date(d.getFullYear(), 0, 1)
           const weekNum = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7)
           return `${d.getFullYear()}-W${weekNum}`
-        }),
+        })
       )
       return { avg: weeks.size > 0 ? total / weeks.size : 0, periodCount: weeks.size }
     }
@@ -55,7 +55,11 @@ export function AverageSpending() {
               className="text-xs rounded-full px-3 py-1 border font-medium transition-colors capitalize"
               style={
                 p === period
-                  ? { backgroundColor: 'var(--accent)', borderColor: 'var(--accent)', color: '#fff' }
+                  ? {
+                      backgroundColor: 'var(--accent)',
+                      borderColor: 'var(--accent)',
+                      color: '#fff',
+                    }
                   : { backgroundColor: 'var(--bg)', borderColor: 'var(--border)' }
               }
             >
@@ -64,9 +68,7 @@ export function AverageSpending() {
           ))}
         </div>
 
-        <div className="font-mono text-3xl font-medium text-gray-900 dark:text-white">
-          {fmt.format(avg)}
-        </div>
+        <div className="font-mono text-3xl font-medium text-gray-900 dark:text-white">{fmt.format(avg)}</div>
         <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
           avg per {period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month'}
           {' · '}

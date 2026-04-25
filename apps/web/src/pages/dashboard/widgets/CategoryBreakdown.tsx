@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
-import { useDashboard } from '../DashboardContext'
-import { fmt } from '../../../lib/format'
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { CATEGORY_PALETTE } from '../../../lib/charts/chartPalette'
-import { TOOLTIP_STYLE, LEGEND_STYLE } from '../../../lib/charts/chartTheme'
+import { LEGEND_STYLE, TOOLTIP_STYLE } from '../../../lib/charts/chartTheme'
+import { fmt } from '../../../lib/format'
+import { useDashboard } from '../DashboardContext'
 
 export function CategoryBreakdown() {
   const { transactions, categories } = useDashboard()
@@ -40,8 +40,7 @@ export function CategoryBreakdown() {
         >
           <p className="text-sm text-gray-400">No categorised expenses yet.</p>
           <p className="text-xs text-gray-400 mt-1">
-            Use Rules or click{' '}
-            <span style={{ color: 'var(--accent)' }}>+ Categorise</span> on transactions.
+            Use Rules or click <span style={{ color: 'var(--accent)' }}>+ Categorise</span> on transactions.
           </p>
         </div>
       ) : (
@@ -51,22 +50,12 @@ export function CategoryBreakdown() {
         >
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
-              <Pie
-                data={catData}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={65}
-                outerRadius={110}
-                paddingAngle={2}
-              >
+              <Pie data={catData} dataKey="value" nameKey="name" innerRadius={65} outerRadius={110} paddingAngle={2}>
                 {catData.map((entry, i) => (
                   <Cell key={i} fill={entry.color} stroke="none" />
                 ))}
               </Pie>
-              <Tooltip
-                formatter={(v: number, name: string) => [fmt.format(v), name]}
-                contentStyle={TOOLTIP_STYLE}
-              />
+              <Tooltip formatter={(v: number, name: string) => [fmt.format(v), name]} contentStyle={TOOLTIP_STYLE} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND_STYLE} />
             </PieChart>
           </ResponsiveContainer>

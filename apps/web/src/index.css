@@ -24,7 +24,7 @@
   }
 
   html {
-    font-family: 'DM Sans', system-ui, sans-serif;
+    font-family: "DM Sans", system-ui, sans-serif;
     background-color: var(--bg);
   }
 
@@ -34,7 +34,7 @@
 
   /* Tabular numbers for financial data */
   .tabular {
-    font-family: 'DM Mono', 'Courier New', monospace;
+    font-family: "DM Mono", "Courier New", monospace;
     font-variant-numeric: tabular-nums;
   }
 }

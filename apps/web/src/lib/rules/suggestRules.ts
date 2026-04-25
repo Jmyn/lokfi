@@ -10,12 +10,31 @@ export type RuleSuggestion = {
 
 const NOISE_WORDS = new Set([
   // Generic banking operation prefixes
-  'POS', 'IBG', 'PURCHASE', 'DEBIT', 'CREDIT', 'TRANSFER',
-  'PAYMENT', 'TRF', 'CR', 'DR', 'REF',
+  'POS',
+  'IBG',
+  'PURCHASE',
+  'DEBIT',
+  'CREDIT',
+  'TRANSFER',
+  'PAYMENT',
+  'TRF',
+  'CR',
+  'DR',
+  'REF',
   // Payment networks / rails (not merchant names)
-  'NETS', 'NETSQR', 'PAYNOW', 'PAYLAH', 'GIRO', 'ATM',
-  'VISA', 'MASTERCARD', 'CONTACTLESS', 'CARDLESS',
-  'INTERBANK', 'OVERSEAS', 'FAST',
+  'NETS',
+  'NETSQR',
+  'PAYNOW',
+  'PAYLAH',
+  'GIRO',
+  'ATM',
+  'VISA',
+  'MASTERCARD',
+  'CONTACTLESS',
+  'CARDLESS',
+  'INTERBANK',
+  'OVERSEAS',
+  'FAST',
 ])
 
 /** Collapse runs of whitespace into single spaces and trim. */
@@ -31,9 +50,7 @@ function normalizeWhitespace(s: string): string {
  * the reference number.
  */
 export function extractPrefix(description: string): string {
-  return normalizeWhitespace(
-    description.replace(/[\*\s\-\/]\d+[\s\S]*$/, ''),
-  )
+  return normalizeWhitespace(description.replace(/[\*\s\-\/]\d+[\s\S]*$/, ''))
 }
 
 /**
@@ -44,9 +61,7 @@ export function extractPrefix(description: string): string {
  * 2. Prefix-based fallback — stable prefix before first numeric group, if it contains substance
  * 3. null — no meaningful identifier found
  */
-export function extractIdentifier(
-  description: string,
-): { value: string; operation: 'contains' | 'startsWith' } | null {
+export function extractIdentifier(description: string): { value: string; operation: 'contains' | 'startsWith' } | null {
   // 1. Try "to [MERCHANT]" pattern (Singapore PayNow/transfer format)
   //    Handles: "... to QI JI EATERY", "... to VIRKHAL PTE. LTDvia PayNow"
   const toMatch = description.match(/\bto\s+(.+?)(?=\s*via\b|$)/i)
@@ -62,9 +77,9 @@ export function extractIdentifier(
   //    but only use it if it contains at least one meaningful token
   const prefix = extractPrefix(description)
   if (prefix) {
-    const hasSubstance = prefix.split(/[\*\s\-\/]+/).some(
-      (t) => t.length >= 3 && !/^\d+$/.test(t) && !NOISE_WORDS.has(t.toUpperCase()),
-    )
+    const hasSubstance = prefix
+      .split(/[\*\s\-\/]+/)
+      .some((t) => t.length >= 3 && !/^\d+$/.test(t) && !NOISE_WORDS.has(t.toUpperCase()))
     if (hasSubstance) {
       return { value: prefix, operation: 'startsWith' }
     }
@@ -76,21 +91,16 @@ export function extractIdentifier(
 function conditionsEqual(a: RuleCondition[], b: RuleCondition[]): boolean {
   if (a.length !== b.length) return false
   return a.every(
-    (cond, i) =>
-      cond.field === b[i].field &&
-      cond.operation === b[i].operation &&
-      cond.value === b[i].value,
+    (cond, i) => cond.field === b[i].field && cond.operation === b[i].operation && cond.value === b[i].value
   )
 }
 
 function buildSuggestion(
   label: RuleSuggestion['label'],
   conditions: RuleCondition[],
-  allTransactions: DbTransaction[],
+  allTransactions: DbTransaction[]
 ): RuleSuggestion {
-  const matching = allTransactions.filter((t) =>
-    conditions.every((cond) => matchesCondition(t, cond)),
-  )
+  const matching = allTransactions.filter((t) => conditions.every((cond) => matchesCondition(t, cond)))
   return {
     label,
     conditions,
@@ -113,7 +123,7 @@ function buildSuggestion(
 export function suggestRules(
   txn: DbTransaction,
   _categoryId: string,
-  allTransactions: DbTransaction[],
+  allTransactions: DbTransaction[]
 ): RuleSuggestion[] {
   const identifier = extractIdentifier(txn.description)
   if (!identifier) return []

@@ -1,10 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import type {
-  StatementSource,
-  StatementType,
-  Transaction,
-  ConsolidatedTransaction,
-} from './types'
+import { describe, expect, it } from 'vitest'
+import type { ConsolidatedTransaction, StatementSource, StatementType, Transaction } from './types'
 
 describe('Type system', () => {
   it('StatementSource covers all supported banks', () => {

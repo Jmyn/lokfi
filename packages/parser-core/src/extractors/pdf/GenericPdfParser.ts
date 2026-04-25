@@ -1,6 +1,6 @@
-import { StatementParser, Statement, Transaction, ParseError } from '../../types'
-import { normalizeOcrText } from './ocrNormalizer'
 import { normalizeDate, parseAmount } from '../../parsers/generic/csvUtils'
+import { ParseError, type Statement, type StatementParser, type Transaction } from '../../types'
+import { normalizeOcrText } from './ocrNormalizer'
 
 /**
  * Generic PDF Statement Parser — fallback for unknown bank formats.
@@ -29,12 +29,11 @@ const AMOUNT_PATTERNS = [
   /[(][\d,]+\.\d{2}[)]/g,
 ]
 
-
 export class GenericPdfParser implements StatementParser {
   detect(text: string): boolean {
     if (!text) return false
     // Must have some date-like patterns and numeric content
-    const hasDate = DATE_PATTERNS.some(re => re.test(text))
+    const hasDate = DATE_PATTERNS.some((re) => re.test(text))
     const hasAmount = /\d{1,3}(,\d{3})*\.\d{2}/.test(text)
     return hasDate && hasAmount
   }
@@ -45,7 +44,10 @@ export class GenericPdfParser implements StatementParser {
     }
 
     const text = normalizeOcrText(rawText)
-    const lines = text.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+    const lines = text
+      .split('\n')
+      .map((l: string) => l.trim())
+      .filter((l: string) => l.length > 0)
 
     const transactions: Transaction[] = []
     let i = 0
@@ -90,8 +92,8 @@ export class GenericPdfParser implements StatementParser {
 
   private isContinuation(current: string, next: string): boolean {
     // A continuation line has no date but has text content
-    const currentHasDate = DATE_PATTERNS.some(re => re.test(current))
-    const nextHasDate = DATE_PATTERNS.some(re => re.test(next))
+    const currentHasDate = DATE_PATTERNS.some((re) => re.test(current))
+    const nextHasDate = DATE_PATTERNS.some((re) => re.test(next))
     return !nextHasDate && /\w{3,}/.test(next) && currentHasDate
   }
 
@@ -119,13 +121,18 @@ export class GenericPdfParser implements StatementParser {
       }
 
       // If description is empty/short and we have a next line, try that
-      if (description.length < 3 && nextLine && !DATE_PATTERNS.some(re => re.test(nextLine))) {
+      if (description.length < 3 && nextLine && !DATE_PATTERNS.some((re) => re.test(nextLine))) {
         description = nextLine.trim().slice(0, 100)
       }
 
       description = description.replace(/[\r\n]+/g, ' ').trim() || 'Unknown'
 
-      return { date: dateStr, description, transactionValue, ...(balance !== undefined && { balance }) }
+      return {
+        date: dateStr,
+        description,
+        transactionValue,
+        ...(balance !== undefined && { balance }),
+      }
     }
 
     return null
@@ -156,7 +163,7 @@ export class GenericPdfParser implements StatementParser {
     const isDebit = /(\bdr\b|debit|outward)/i.test(lowerLine) && !/\bcr\b|credit\b/i.test(lowerLine)
 
     // Filter out likely balance amounts (usually the largest or smallest depending on context)
-    let txAmounts = amounts.filter(a => Math.abs(a) > 0.01)
+    const txAmounts = amounts.filter((a) => Math.abs(a) > 0.01)
 
     if (txAmounts.length === 0) {
       return { transactionValue: 0 }

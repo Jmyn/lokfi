@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useDashboard } from '../DashboardContext'
 import { fmt } from '../../../lib/format'
+import { useDashboard } from '../DashboardContext'
 
 const CELL = 14
 const GAP = 2
@@ -13,7 +13,7 @@ function interpolateColor(t: number): string {
   if (t === 0) return 'var(--border)'
   const r = Math.round(217 + (217 - 217) * t) // stays ~217
   const g = Math.round(217 + (119 - 217) * t) // 217 → 119
-  const b = Math.round(217 + (6 - 217) * t)   // 217 → 6
+  const b = Math.round(217 + (6 - 217) * t) // 217 → 6
   return `rgb(${r}, ${g}, ${b})`
 }
 
@@ -31,7 +31,7 @@ export function SpendingHeatmap() {
   const { cells, weeks, maxSpend, monthLabels } = useMemo(() => {
     // Determine date range: use filter dates or default to last 6 months
     const today = new Date()
-    let endDate = filters.dateTo ? new Date(filters.dateTo) : today
+    const endDate = filters.dateTo ? new Date(filters.dateTo) : today
     let startDate = filters.dateFrom
       ? new Date(filters.dateFrom)
       : new Date(today.getFullYear(), today.getMonth() - 6, today.getDate())
@@ -120,17 +120,11 @@ export function SpendingHeatmap() {
               >
                 {label}
               </text>
-            ) : null,
+            ) : null
           )}
           {/* Month labels */}
           {monthLabels.map((m, i) => (
-            <text
-              key={i}
-              x={MARGIN_LEFT + m.col * (CELL + GAP)}
-              y={12}
-              className="text-[9px]"
-              fill="#9ca3af"
-            >
+            <text key={i} x={MARGIN_LEFT + m.col * (CELL + GAP)} y={12} className="text-[9px]" fill="#9ca3af">
               {m.label}
             </text>
           ))}

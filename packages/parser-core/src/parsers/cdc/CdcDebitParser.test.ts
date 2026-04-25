@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { CdcDebitParser } from './CdcDebitParser'
+import { describe, expect, it } from 'vitest'
 import { ParseError } from '../../types'
+import { CdcDebitParser } from './CdcDebitParser'
 
 describe('CdcDebitParser', () => {
   const parser = new CdcDebitParser()
@@ -28,7 +28,7 @@ describe('CdcDebitParser', () => {
   describe('parse', () => {
     it('parses transactions correctly', () => {
       const statement = parser.parse(validCsv)
-      
+
       expect(statement.source).toBe('cdc')
       expect(statement.statementType).toBe('debit')
       expect(statement.accountNo).toBe('CDC-CARD')
@@ -43,7 +43,7 @@ describe('CdcDebitParser', () => {
       expect(statement.transactions[1]).toEqual({
         date: '2025-12-21',
         description: 'Top Up from Bank',
-        transactionValue: 100.00,
+        transactionValue: 100.0,
       })
     })
 

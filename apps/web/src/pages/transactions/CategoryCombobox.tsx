@@ -1,11 +1,8 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '../../lib/db/db'
 
-const CUSTOM_COLORS = [
-  '#f43f5e', '#f97316', '#eab308', '#84cc16',
-  '#06b6d4', '#6366f1', '#a855f7', '#ec4899',
-]
+const CUSTOM_COLORS = ['#f43f5e', '#f97316', '#eab308', '#84cc16', '#06b6d4', '#6366f1', '#a855f7', '#ec4899']
 
 interface CategoryComboboxProps {
   value: string
@@ -16,9 +13,9 @@ interface CategoryComboboxProps {
   autoOpen?: boolean
 }
 
-type ComboboxOption = 
+type ComboboxOption =
   | { type: 'clear'; id: string }
-  | { type: 'category'; id: string; category: { id: string, name: string, color: string } }
+  | { type: 'category'; id: string; category: { id: string; name: string; color: string } }
   | { type: 'create'; name: string }
 
 export function CategoryCombobox({
@@ -39,20 +36,17 @@ export function CategoryCombobox({
 
   const selectedCategory = categories.find((c) => c.id === value) ?? null
 
-  const filtered = categories.filter((c) =>
-    c.name.toLowerCase().includes(inputText.toLowerCase())
-  )
+  const filtered = categories.filter((c) => c.name.toLowerCase().includes(inputText.toLowerCase()))
 
   const showCreate =
-    inputText.trim().length > 0 &&
-    !categories.some((c) => c.name.toLowerCase() === inputText.trim().toLowerCase())
+    inputText.trim().length > 0 && !categories.some((c) => c.name.toLowerCase() === inputText.trim().toLowerCase())
 
   const options = useMemo(() => {
     const opts: ComboboxOption[] = []
     if (allowClear) {
       opts.push({ type: 'clear', id: '' })
     }
-    filtered.forEach(c => opts.push({ type: 'category', id: c.id, category: c }))
+    filtered.forEach((c) => opts.push({ type: 'category', id: c.id, category: c }))
     if (showCreate) {
       opts.push({ type: 'create', name: inputText.trim() })
     }
@@ -149,20 +143,13 @@ export function CategoryCombobox({
       >
         {selectedCategory ? (
           <>
-            <span
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: selectedCategory.color }}
-            />
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: selectedCategory.color }} />
             <span className="truncate">{selectedCategory.name}</span>
           </>
         ) : (
           <span className="text-gray-400 dark:text-gray-500 truncate">{placeholder}</span>
         )}
-        <svg
-          className="ml-auto w-3.5 h-3.5 text-gray-400 shrink-0"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
+        <svg className="ml-auto w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
           <path
             fillRule="evenodd"
             d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
@@ -188,17 +175,22 @@ export function CategoryCombobox({
               onKeyDown={handleKeyDown}
               placeholder="Search or create…"
               className="w-full rounded-md border px-2 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1"
-              style={{ borderColor: 'var(--border)', '--tw-ring-color': 'var(--accent)' } as React.CSSProperties}
+              style={
+                {
+                  borderColor: 'var(--border)',
+                  '--tw-ring-color': 'var(--accent)',
+                } as React.CSSProperties
+              }
             />
           </div>
 
           <div className="max-h-52 overflow-y-auto">
             {options.map((opt, index) => {
               const isHighlighted = index === highlightedIndex
-              const baseClass = "w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-left "
-              const highlightClass = isHighlighted 
-                ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100" 
-                : "text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+              const baseClass = 'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-left '
+              const highlightClass = isHighlighted
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                : 'text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
 
               if (opt.type === 'clear') {
                 return (
@@ -207,7 +199,12 @@ export function CategoryCombobox({
                     type="button"
                     onClick={() => handleSelect('')}
                     data-highlighted={isHighlighted}
-                    className={baseClass + (isHighlighted ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800")}
+                    className={
+                      baseClass +
+                      (isHighlighted
+                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800')
+                    }
                   >
                     Uncategorised
                   </button>
@@ -236,7 +233,13 @@ export function CategoryCombobox({
                     type="button"
                     onClick={handleCreateCategory}
                     data-highlighted={isHighlighted}
-                    className={baseClass + "font-medium " + (isHighlighted ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100" : "hover:bg-gray-50 dark:hover:bg-gray-800")}
+                    className={
+                      baseClass +
+                      'font-medium ' +
+                      (isHighlighted
+                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-800')
+                    }
                     style={{ color: 'var(--accent)' }}
                   >
                     + Create &ldquo;{opt.name}&rdquo;
@@ -246,9 +249,7 @@ export function CategoryCombobox({
               return null
             })}
 
-            {options.length === 0 && (
-              <p className="px-3 py-2 text-xs text-gray-400">No categories found.</p>
-            )}
+            {options.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No categories found.</p>}
           </div>
         </div>
       )}

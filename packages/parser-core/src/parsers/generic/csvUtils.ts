@@ -9,7 +9,7 @@ export function parseAmount(raw: string): number | null {
   // Strip parentheses, currency symbols ($€£¥), commas, and leading 2–3 letter
   // currency codes (e.g. "SGD ", "RM ", "USD ")
   s = s.replace(/[()$€£¥,\s]/g, '').replace(/^[A-Z]{2,3}/, '')
-  const n = parseFloat(s)
+  const n = Number.parseFloat(s)
   if (isNaN(n)) return null
   return isNeg ? -Math.abs(n) : n
 }
@@ -20,8 +20,18 @@ export function parseAmount(raw: string): number | null {
 
 /** Month abbreviation map used by normalizeDate and CustomCsvParser. */
 export const MONTH_ABBR: Record<string, string> = {
-  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
-  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+  jan: '01',
+  feb: '02',
+  mar: '03',
+  apr: '04',
+  may: '05',
+  jun: '06',
+  jul: '07',
+  aug: '08',
+  sep: '09',
+  oct: '10',
+  nov: '11',
+  dec: '12',
 }
 
 export function normalizeDate(raw: string): string | null {
@@ -40,18 +50,21 @@ export function normalizeDate(raw: string): string | null {
   const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
   if (slashMatch) {
     const [, a, b, y] = slashMatch
-    const ai = parseInt(a!, 10)
-    const bi = parseInt(b!, 10)
+    const ai = Number.parseInt(a!, 10)
+    const bi = Number.parseInt(b!, 10)
     let day: string, month: string
     if (ai > 12) {
       // First part must be day (DD/MM/YYYY)
-      day = a!.padStart(2, '0'); month = b!.padStart(2, '0')
+      day = a!.padStart(2, '0')
+      month = b!.padStart(2, '0')
     } else if (bi > 12) {
       // Second part must be day (MM/DD/YYYY)
-      month = a!.padStart(2, '0'); day = b!.padStart(2, '0')
+      month = a!.padStart(2, '0')
+      day = b!.padStart(2, '0')
     } else {
       // Ambiguous — default DD/MM/YYYY (most common outside US)
-      day = a!.padStart(2, '0'); month = b!.padStart(2, '0')
+      day = a!.padStart(2, '0')
+      month = b!.padStart(2, '0')
     }
     return `${y}-${month}-${day}`
   }
@@ -60,15 +73,18 @@ export function normalizeDate(raw: string): string | null {
   const dashNumMatch = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
   if (dashNumMatch) {
     const [, a, b, y] = dashNumMatch
-    const ai = parseInt(a!, 10)
-    const bi = parseInt(b!, 10)
+    const ai = Number.parseInt(a!, 10)
+    const bi = Number.parseInt(b!, 10)
     let day: string, month: string
     if (ai > 12) {
-      day = a!.padStart(2, '0'); month = b!.padStart(2, '0')
+      day = a!.padStart(2, '0')
+      month = b!.padStart(2, '0')
     } else if (bi > 12) {
-      month = a!.padStart(2, '0'); day = b!.padStart(2, '0')
+      month = a!.padStart(2, '0')
+      day = b!.padStart(2, '0')
     } else {
-      day = a!.padStart(2, '0'); month = b!.padStart(2, '0')
+      day = a!.padStart(2, '0')
+      month = b!.padStart(2, '0')
     }
     return `${y}-${month}-${day}`
   }
@@ -114,7 +130,7 @@ export function normalizeDate(raw: string): string | null {
  */
 export function computeHeaderFingerprint(rows: string[][]): string {
   for (const row of rows) {
-    const cleaned = row.map(c => c.trim().toLowerCase()).filter(Boolean)
+    const cleaned = row.map((c) => c.trim().toLowerCase()).filter(Boolean)
     if (cleaned.length >= 2) {
       return [...cleaned].sort().join('|')
     }

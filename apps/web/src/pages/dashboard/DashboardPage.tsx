@@ -1,12 +1,12 @@
 import { DashboardFilterProvider, useDashboard } from './DashboardContext'
 import { DashboardFilters } from './DashboardFilters'
-import { KpiRow } from './widgets/KpiRow'
-import { SavingsRateGauge } from './widgets/SavingsRateGauge'
 import { AverageSpending } from './widgets/AverageSpending'
-import { MonthlyTrendChart } from './widgets/MonthlyTrendChart'
-import { SpendingHeatmap } from './widgets/SpendingHeatmap'
 import { CategoryBreakdown } from './widgets/CategoryBreakdown'
 import { CategoryBudgetBars } from './widgets/CategoryBudgetBars'
+import { KpiRow } from './widgets/KpiRow'
+import { MonthlyTrendChart } from './widgets/MonthlyTrendChart'
+import { SavingsRateGauge } from './widgets/SavingsRateGauge'
+import { SpendingHeatmap } from './widgets/SpendingHeatmap'
 import { TopMerchants } from './widgets/TopMerchants'
 
 function DashboardContent() {
@@ -14,9 +14,7 @@ function DashboardContent() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">
-        Loading...
-      </div>
+      <div className="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">Loading...</div>
     )
   }
 

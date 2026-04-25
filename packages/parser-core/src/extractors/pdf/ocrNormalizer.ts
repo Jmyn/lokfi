@@ -10,18 +10,18 @@
 /** Characters that OCR commonly misreads as hyphens or dashes. */
 const OCR_HYPHEN_REPLACEMENTS: Array<[RegExp, string]> = [
   // Full-width hyphens and dashes
-  [/\u2014/g, '-'],  // em-dash
-  [/\u2013/g, '-'],  // en-dash
-  [/\u00AD/g, '-'],  // soft hyphen
-  [/\u2010/g, '-'],  // hyphen
-  [/\u2011/g, '-'],  // non-breaking hyphen
+  [/\u2014/g, '-'], // em-dash
+  [/\u2013/g, '-'], // en-dash
+  [/\u00AD/g, '-'], // soft hyphen
+  [/\u2010/g, '-'], // hyphen
+  [/\u2011/g, '-'], // non-breaking hyphen
   // CJK characters that OCR misreads as hyphens
-  [/\u4E00/g, '-'],  // 一 (one)
-  [/\u4E8C/g, '-'],  // 二 (two)
-  [/\u4E09/g, '-'],  // 三 (three) — appears in "Tesco-3" style corruption
+  [/\u4E00/g, '-'], // 一 (one)
+  [/\u4E8C/g, '-'], // 二 (two)
+  [/\u4E09/g, '-'], // 三 (three) — appears in "Tesco-3" style corruption
   // Other common OCR artifacts
-  [/\u2500/g, '-'],  // box drawing horizontal
-  [/\u2012/g, '-'],  // figure dash
+  [/\u2500/g, '-'], // box drawing horizontal
+  [/\u2012/g, '-'], // figure dash
 ]
 
 /** Whitespace sequences (excluding newlines) to collapse to single space. */
@@ -47,7 +47,7 @@ export function normalizeOcrText(raw: string): string {
   // Step 3: Trim each line and rejoin
   text = text
     .split('\n')
-    .map(line => line.trim())
+    .map((line) => line.trim())
     .join('\n')
 
   return text

@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Bot, Pen } from 'lucide-react'
+import { useState } from 'react'
 import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
 import { CategoryCombobox } from './CategoryCombobox'
@@ -63,32 +63,30 @@ export function CategoryBadge({
     <button
       onClick={startEdit}
       className="flex items-center gap-1.5 text-xs rounded-full px-2 py-0.5 transition-colors"
-      title={isRule ? 'Assigned by rule — click to override' : isManual ? 'Manually assigned — click to unassign and refresh to evaluate by rules' : undefined}
+      title={
+        isRule
+          ? 'Assigned by rule — click to override'
+          : isManual
+            ? 'Manually assigned — click to unassign and refresh to evaluate by rules'
+            : undefined
+      }
       style={
         resolvedCategory
-          ? { backgroundColor: 'color-mix(in srgb, ' + resolvedCategory.color + ' 15%, transparent)' }
+          ? {
+              backgroundColor: 'color-mix(in srgb, ' + resolvedCategory.color + ' 15%, transparent)',
+            }
           : { backgroundColor: 'transparent' }
       }
     >
       {resolvedCategory ? (
         <>
-          <span
-            className="w-1.5 h-1.5 rounded-full shrink-0"
-            style={{ backgroundColor: resolvedCategory.color }}
-          />
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: resolvedCategory.color }} />
           <span className="text-gray-700 dark:text-gray-300 font-medium">{resolvedCategory.name}</span>
-          {isRule && (
-            <Bot className="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" />
-          )}
-          {isManual && (
-            <Pen className="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" />
-          )}
+          {isRule && <Bot className="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" />}
+          {isManual && <Pen className="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" />}
         </>
       ) : (
-        <span
-          className="font-medium tracking-tight"
-          style={{ color: 'var(--accent)' }}
-        >
+        <span className="font-medium tracking-tight" style={{ color: 'var(--accent)' }}>
           + Categorise
         </span>
       )}

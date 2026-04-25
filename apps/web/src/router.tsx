@@ -1,12 +1,12 @@
-import { createRouter, createRoute, createRootRoute, Outlet } from '@tanstack/react-router'
+import { Outlet, createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 import { ThemeProvider } from 'next-themes'
 import { AppShell } from './layouts/AppShell'
-import { LandingPage } from './pages/landing/LandingPage'
-import { ImportPage } from './pages/import/ImportPage'
-import { TransactionsPage } from './pages/transactions/TransactionsPage'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
+import { ImportPage } from './pages/import/ImportPage'
+import { LandingPage } from './pages/landing/LandingPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
 import { RulesPage } from './pages/rules/RulesPage'
+import { TransactionsPage } from './pages/transactions/TransactionsPage'
 
 const rootRoute = createRootRoute({
   component: () => (

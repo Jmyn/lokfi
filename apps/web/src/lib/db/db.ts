@@ -1,19 +1,19 @@
+import type { CustomParserProfile, StatementSource } from '@lokfi/parser-core'
 import Dexie, { type Table } from 'dexie'
-import type { StatementSource, CustomParserProfile } from '@lokfi/parser-core'
-import { defaultCategories, type DbCategory } from './seedCategories'
+import { type DbCategory, defaultCategories } from './seedCategories'
 
 export interface DbTransaction {
-  id: string              // UUID (same as hash)
-  hash: string            // dedup key
+  id: string // UUID (same as hash)
+  hash: string // dedup key
   source: StatementSource
   accountNo: string
-  date: string            // ISO 8601 YYYY-MM-DD
+  date: string // ISO 8601 YYYY-MM-DD
   description: string
   transactionValue: number
   balance?: number
-  category?: string       // set by rule engine
+  category?: string // set by rule engine
   manualCategory?: string // set directly by user action; overrides rule engine
-  importedAt: string      // ISO 8601 timestamp
+  importedAt: string // ISO 8601 timestamp
 }
 
 export interface RuleCondition {
@@ -25,9 +25,9 @@ export interface RuleCondition {
 export interface DbRule {
   id: string
   name: string
-  priority: number        // lower = applied first
+  priority: number // lower = applied first
   conditions: RuleCondition[]
-  category: string        // category id
+  category: string // category id
   createdAt: string
 }
 
@@ -55,7 +55,7 @@ export class LokfiDatabase extends Dexie {
 
   constructor() {
     super('lokfi')
-    
+
     // v1 schema
     this.version(1).stores({
       transactions: 'id, hash, source, accountNo, date, category, importedAt',

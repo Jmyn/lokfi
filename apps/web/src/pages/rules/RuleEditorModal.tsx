@@ -1,11 +1,11 @@
-import { useEffect, useMemo } from 'react'
-import { useForm, useFieldArray } from 'react-hook-form'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
+import { useFieldArray, useForm } from 'react-hook-form'
 import { db } from '../../lib/db/db'
 import type { DbRule, RuleCondition } from '../../lib/db/db'
-import { matchesCondition } from '../../lib/rules/evaluateRules'
 import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
+import { matchesCondition } from '../../lib/rules/evaluateRules'
 import { CategoryCombobox } from '../transactions/CategoryCombobox'
 
 type RuleEditorModalProps = {
@@ -42,18 +42,27 @@ const NUMERIC_OPERATIONS = [
 ]
 
 export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps) {
-  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues>({
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<FormValues>({
     defaultValues: {
       name: rule?.name ?? '',
       priority: rule?.priority ?? 100,
       category: rule?.category ?? '',
-      conditions: rule?.conditions?.length ? rule.conditions : [{ field: 'description', operation: 'contains', value: '' }]
-    }
+      conditions: rule?.conditions?.length
+        ? rule.conditions
+        : [{ field: 'description', operation: 'contains', value: '' }],
+    },
   })
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: 'conditions'
+    name: 'conditions',
   })
 
   const watchConditions = watch('conditions')
@@ -68,9 +77,7 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
   const preview = useMemo(() => {
     if (!allTransactions || watchConditions.length === 0) return null
     // Only match if every condition has a non-empty value
-    const validConditions = watchConditions.filter(
-      (c) => c.value !== '' && c.value !== undefined,
-    )
+    const validConditions = watchConditions.filter((c) => c.value !== '' && c.value !== undefined)
     if (validConditions.length === 0) return null
 
     const matches: string[] = []
@@ -94,16 +101,16 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
 
   const onSubmit = async (data: FormValues) => {
     if (data.conditions.length === 0) {
-      alert("Please add at least one condition.")
+      alert('Please add at least one condition.')
       return
     }
 
-    const cleanedConditions = data.conditions.map(cond => {
+    const cleanedConditions = data.conditions.map((cond) => {
       if (cond.field === 'transactionValue') {
         if (cond.operation === 'between') {
           // If it's stored as a string "a,b"
           if (typeof cond.value === 'string') {
-            const parts = cond.value.split(',').map(n => Number(n.trim()))
+            const parts = cond.value.split(',').map((n) => Number(n.trim()))
             return { ...cond, value: [parts[0] || 0, parts[1] || 0] as [number, number] }
           }
         } else {
@@ -119,7 +126,7 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
       priority: Number(data.priority),
       category: data.category,
       conditions: cleanedConditions,
-      createdAt: rule?.createdAt || new Date().toISOString()
+      createdAt: rule?.createdAt || new Date().toISOString(),
     }
 
     await db.rules.put(record)
@@ -129,8 +136,8 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
     await applyRulesToImport(allTxns.map((t) => t.id))
 
     // Count how many transactions match this rule's conditions
-    const matchCount = allTxns.filter((t) =>
-      !t.manualCategory && cleanedConditions.every((cond) => matchesCondition(t, cond)),
+    const matchCount = allTxns.filter(
+      (t) => !t.manualCategory && cleanedConditions.every((cond) => matchesCondition(t, cond))
     ).length
 
     onClose()
@@ -144,14 +151,16 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             {rule ? 'Edit Rule' : 'Create Rule'}
           </h2>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md">
+          <button
+            onClick={onClose}
+            className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-4 overflow-y-auto flex-1">
           <form id="rule-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Rule Name</label>
@@ -165,7 +174,9 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Priority (Lower is higher)</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Priority (Lower is higher)
+                </label>
                 <input
                   type="number"
                   {...register('priority', { required: true, valueAsNumber: true })}
@@ -205,7 +216,10 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
                 const isBetween = watchConditions[index]?.operation === 'between'
 
                 return (
-                  <div key={field.id} className="flex gap-2 items-start bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border dark:border-gray-800">
+                  <div
+                    key={field.id}
+                    className="flex gap-2 items-start bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border dark:border-gray-800"
+                  >
                     <select
                       {...register(`conditions.${index}.field`)}
                       onChange={(e) => {
@@ -216,22 +230,30 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
                       }}
                       className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
                     >
-                      {FIELD_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      {FIELD_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
                     </select>
 
                     <select
                       {...register(`conditions.${index}.operation`)}
                       className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
                     >
-                      {ops.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      {ops.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
                     </select>
 
                     <div className="flex-1">
                       <input
-                        type={isNumeric && !isBetween ? "number" : "text"}
-                        step={isNumeric && !isBetween ? "0.01" : undefined}
+                        type={isNumeric && !isBetween ? 'number' : 'text'}
+                        step={isNumeric && !isBetween ? '0.01' : undefined}
                         {...register(`conditions.${index}.value`, { required: true })}
-                        placeholder={isBetween ? "-10, -1" : "Value..."}
+                        placeholder={isBetween ? '-10, -1' : 'Value...'}
                         className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400"
                       />
                     </div>
@@ -247,9 +269,7 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
                   </div>
                 )
               })}
-              {fields.length === 0 && (
-                 <p className="text-red-500 text-xs">At least one condition is required.</p>
-              )}
+              {fields.length === 0 && <p className="text-red-500 text-xs">At least one condition is required.</p>}
             </div>
 
             {/* Live preview */}
@@ -268,15 +288,12 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
                       </li>
                     ))}
                     {preview.count > 3 && (
-                      <li className="text-xs text-gray-400 dark:text-gray-500">
-                        + {preview.count - 3} more
-                      </li>
+                      <li className="text-xs text-gray-400 dark:text-gray-500">+ {preview.count - 3} more</li>
                     )}
                   </ul>
                 )}
               </div>
             )}
-
           </form>
         </div>
 

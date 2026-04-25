@@ -1,15 +1,34 @@
 import { useMemo } from 'react'
-import { useDashboard } from '../DashboardContext'
 import { fmt } from '../../../lib/format'
+import { useDashboard } from '../DashboardContext'
 
 // Noise words to strip from descriptions when extracting merchant names
 // Reuses the same set from suggestRules.ts conceptually
 const NOISE = new Set([
-  'POS', 'IBG', 'PURCHASE', 'DEBIT', 'CREDIT', 'TRANSFER',
-  'PAYMENT', 'TRF', 'CR', 'DR', 'REF',
-  'NETS', 'NETSQR', 'PAYNOW', 'PAYLAH', 'GIRO', 'ATM',
-  'VISA', 'MASTERCARD', 'CONTACTLESS', 'CARDLESS',
-  'INTERBANK', 'OVERSEAS', 'FAST',
+  'POS',
+  'IBG',
+  'PURCHASE',
+  'DEBIT',
+  'CREDIT',
+  'TRANSFER',
+  'PAYMENT',
+  'TRF',
+  'CR',
+  'DR',
+  'REF',
+  'NETS',
+  'NETSQR',
+  'PAYNOW',
+  'PAYLAH',
+  'GIRO',
+  'ATM',
+  'VISA',
+  'MASTERCARD',
+  'CONTACTLESS',
+  'CARDLESS',
+  'INTERBANK',
+  'OVERSEAS',
+  'FAST',
 ])
 
 function extractMerchant(description: string): string {
@@ -60,9 +79,7 @@ export function TopMerchants() {
         map.set(key, { name, total: Math.abs(t.transactionValue), count: 1 })
       }
     }
-    return [...map.values()]
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10)
+    return [...map.values()].sort((a, b) => b.total - a.total).slice(0, 10)
   }, [transactions])
 
   if (merchants.length === 0) {
@@ -103,10 +120,10 @@ export function TopMerchants() {
             />
 
             <span className="font-mono text-xs text-gray-400 w-5 text-right relative">{i + 1}</span>
-            <span className="flex-1 text-sm font-medium text-gray-900 dark:text-white truncate relative">
-              {m.name}
+            <span className="flex-1 text-sm font-medium text-gray-900 dark:text-white truncate relative">{m.name}</span>
+            <span className="text-xs text-gray-400 relative">
+              {m.count} txn{m.count !== 1 ? 's' : ''}
             </span>
-            <span className="text-xs text-gray-400 relative">{m.count} txn{m.count !== 1 ? 's' : ''}</span>
             <span className="font-mono text-sm font-medium text-gray-900 dark:text-white relative">
               {fmt.format(m.total)}
             </span>

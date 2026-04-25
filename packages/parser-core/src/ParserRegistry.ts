@@ -1,4 +1,4 @@
-import { StatementParser } from './types'
+import type { StatementParser } from './types'
 
 export class ParserRegistry {
   private parsers: StatementParser[] = []

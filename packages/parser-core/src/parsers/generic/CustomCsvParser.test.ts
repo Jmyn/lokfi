@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { CustomCsvParser } from './CustomCsvParser'
+import { describe, expect, it } from 'vitest'
 import type { CustomParserProfile } from '../../types'
+import { CustomCsvParser } from './CustomCsvParser'
 
 const baseProfile: CustomParserProfile = {
   id: 'test-1',
@@ -53,7 +53,7 @@ describe('CustomCsvParser', () => {
       expect(result.transactions[0]).toEqual({
         date: '2025-01-15',
         description: 'Coffee Shop',
-        transactionValue: -4.50,
+        transactionValue: -4.5,
       })
       expect(result.transactions[1]!.transactionValue).toBe(3000)
     })
@@ -61,12 +61,16 @@ describe('CustomCsvParser', () => {
     it('applies negateAmount when enabled', () => {
       const parser = new CustomCsvParser({ ...baseProfile, negateAmount: true })
       const result = parser.parse(CSV_SINGLE_AMT)
-      expect(result.transactions[0]!.transactionValue).toBe(4.50)
+      expect(result.transactions[0]!.transactionValue).toBe(4.5)
       expect(result.transactions[1]!.transactionValue).toBe(-3000)
     })
 
     it('sets source and statementType from profile', () => {
-      const parser = new CustomCsvParser({ ...baseProfile, source: 'ocbc', statementType: 'credit' })
+      const parser = new CustomCsvParser({
+        ...baseProfile,
+        source: 'ocbc',
+        statementType: 'credit',
+      })
       const result = parser.parse(CSV_SINGLE_AMT)
       expect(result.source).toBe('ocbc')
       expect(result.statementType).toBe('credit')
@@ -83,7 +87,7 @@ describe('CustomCsvParser', () => {
     it('parses debit rows as negative and credit rows as positive', () => {
       const parser = new CustomCsvParser(splitProfile)
       const result = parser.parse(CSV_SPLIT_AMT)
-      expect(result.transactions[0]!.transactionValue).toBe(-4.50)
+      expect(result.transactions[0]!.transactionValue).toBe(-4.5)
       expect(result.transactions[1]!.transactionValue).toBe(3000)
     })
   })

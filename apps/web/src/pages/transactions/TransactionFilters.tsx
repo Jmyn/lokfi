@@ -1,6 +1,6 @@
+import type { StatementSource } from '@lokfi/parser-core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db/db'
-import type { StatementSource } from '@lokfi/parser-core'
 
 import { type Filters, defaultFilters } from './filterTypes'
 
@@ -15,14 +15,8 @@ const inputCls =
 const inputStyle = { borderColor: 'var(--border)' }
 
 export function TransactionFilters({ filters, onChange }: TransactionFiltersProps) {
-  const sources = useLiveQuery(
-    () => db.transactions.orderBy('source').uniqueKeys() as Promise<StatementSource[]>,
-    []
-  )
-  const accounts = useLiveQuery(
-    () => db.transactions.orderBy('accountNo').uniqueKeys() as Promise<string[]>,
-    []
-  )
+  const sources = useLiveQuery(() => db.transactions.orderBy('source').uniqueKeys() as Promise<StatementSource[]>, [])
+  const accounts = useLiveQuery(() => db.transactions.orderBy('accountNo').uniqueKeys() as Promise<string[]>, [])
   const categories = useLiveQuery(() => db.categories.toArray(), [])
 
   function toggleSource(source: StatementSource) {
@@ -74,9 +68,7 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
       </div>
 
       {/* Separator */}
-      {sources && sources.length > 0 && (
-        <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
-      )}
+      {sources && sources.length > 0 && <span className="text-gray-300 dark:text-gray-700 select-none">·</span>}
 
       {/* Source pills */}
       {sources && sources.length > 0 && (

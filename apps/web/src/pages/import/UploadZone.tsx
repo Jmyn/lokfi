@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
 import { ArrowUpFromLine } from 'lucide-react'
+import { useRef, useState } from 'react'
 
 interface UploadZoneProps {
   onFilesAdded: (files: File[]) => void

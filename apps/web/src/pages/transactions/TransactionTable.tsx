@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Copy, Check } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
+import { useState } from 'react'
 import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
 import { CategoryBadge } from './CategoryBadge'
@@ -40,39 +40,28 @@ export function TransactionTable({
     // Build the base query chain:
     // Use indexed where() for date range (if available), then chain .and() for secondary filters.
     // .and() always returns Collection, so subsequent .and() calls chain cleanly.
-    const baseQuery =
-      filters.dateFrom
-        ? db.transactions.where('date').aboveOrEqual(filters.dateFrom)
-        : db.transactions.orderBy('date').reverse()
+    const baseQuery = filters.dateFrom
+      ? db.transactions.where('date').aboveOrEqual(filters.dateFrom)
+      : db.transactions.orderBy('date').reverse()
 
     // Apply upper date bound
-    const dateFiltered =
-      filters.dateTo
-        ? baseQuery.and((t) => t.date <= filters.dateTo)
-        : baseQuery
+    const dateFiltered = filters.dateTo ? baseQuery.and((t) => t.date <= filters.dateTo) : baseQuery
 
     // Apply source filter
     const sourceFiltered =
-      filters.sources.length > 0
-        ? dateFiltered.and((t) => filters.sources.includes(t.source))
-        : dateFiltered
+      filters.sources.length > 0 ? dateFiltered.and((t) => filters.sources.includes(t.source)) : dateFiltered
 
     // Apply account filter
     const accountFiltered =
-      filters.accounts.length > 0
-        ? sourceFiltered.and((t) => filters.accounts.includes(t.accountNo))
-        : sourceFiltered
+      filters.accounts.length > 0 ? sourceFiltered.and((t) => filters.accounts.includes(t.accountNo)) : sourceFiltered
 
     // Apply category filter (resolved: manualCategory ?? category)
-    const categoryFiltered =
-      filters.categoryId
-        ? accountFiltered.and((t) => {
-            const resolved = t.manualCategory ?? t.category
-            return filters.categoryId === '__uncategorised__'
-              ? !resolved
-              : resolved === filters.categoryId
-          })
-        : accountFiltered
+    const categoryFiltered = filters.categoryId
+      ? accountFiltered.and((t) => {
+          const resolved = t.manualCategory ?? t.category
+          return filters.categoryId === '__uncategorised__' ? !resolved : resolved === filters.categoryId
+        })
+      : accountFiltered
 
     // Get total count
     const total = await categoryFiltered.count()
@@ -94,9 +83,7 @@ export function TransactionTable({
 
   if (!transactions) {
     return (
-      <div className="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">
-        Loading…
-      </div>
+      <div className="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">Loading…</div>
     )
   }
 
@@ -114,10 +101,7 @@ export function TransactionTable({
       )}
       <table className="w-full text-sm">
         <thead>
-          <tr
-            className="border-b"
-            style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
-          >
+          <tr className="border-b" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}>
             <th className="w-10 px-3 py-2.5 text-left">
               <input
                 type="checkbox"
@@ -149,8 +133,7 @@ export function TransactionTable({
         <tbody>
           {transactions.map((t, i) => {
             const isNeg = t.transactionValue < 0
-            const amountStr =
-              (isNeg ? '−' : '+') + fmt.format(Math.abs(t.transactionValue))
+            const amountStr = (isNeg ? '−' : '+') + fmt.format(Math.abs(t.transactionValue))
             const isSelected = selectedIds.has(t.id)
             const isEven = i % 2 === 0
 
@@ -158,16 +141,22 @@ export function TransactionTable({
               <tr
                 key={t.id}
                 className={`border-b transition-colors ${
-                  editingCategoryId === t.id ? 'relative z-50 ring-2 ring-amber-500 shadow-xl rounded-md bg-white dark:bg-gray-800' : ''
+                  editingCategoryId === t.id
+                    ? 'relative z-50 ring-2 ring-amber-500 shadow-xl rounded-md bg-white dark:bg-gray-800'
+                    : ''
                 }`}
-                style={editingCategoryId === t.id ? undefined : {
-                  borderColor: 'var(--border)',
-                  backgroundColor: isSelected
-                    ? 'var(--accent-subtle)'
-                    : isEven
-                    ? 'var(--bg)'
-                    : 'var(--bg-sidebar)',
-                }}
+                style={
+                  editingCategoryId === t.id
+                    ? undefined
+                    : {
+                        borderColor: 'var(--border)',
+                        backgroundColor: isSelected
+                          ? 'var(--accent-subtle)'
+                          : isEven
+                            ? 'var(--bg)'
+                            : 'var(--bg-sidebar)',
+                      }
+                }
               >
                 <td className="px-3 py-2.5">
                   <input
@@ -180,7 +169,9 @@ export function TransactionTable({
                 <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono text-xs">
                   {t.date}
                 </td>
-                <td className={`px-3 py-2.5 text-gray-900 dark:text-white max-w-xs ${editingCategoryId === t.id ? 'whitespace-normal break-words' : ''}`}>
+                <td
+                  className={`px-3 py-2.5 text-gray-900 dark:text-white max-w-xs ${editingCategoryId === t.id ? 'whitespace-normal break-words' : ''}`}
+                >
                   <div className="flex items-center gap-1 group">
                     <span className={editingCategoryId === t.id ? '' : 'truncate'}>{t.description}</span>
                     <button
@@ -192,18 +183,17 @@ export function TransactionTable({
                       className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                       title="Copy description"
                     >
-                      {copiedId === t.id
-                        ? <Check className="w-3.5 h-3.5 text-emerald-500" />
-                        : <Copy className="w-3.5 h-3.5 text-gray-400" />
-                      }
+                      {copiedId === t.id ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-gray-400" />
+                      )}
                     </button>
                   </div>
                 </td>
                 <td
                   className={`px-3 py-2.5 text-right font-mono whitespace-nowrap text-xs font-medium ${
-                    isNeg
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-emerald-600 dark:text-emerald-400'
+                    isNeg ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
                   }`}
                 >
                   {amountStr}
@@ -222,9 +212,7 @@ export function TransactionTable({
                 <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide">
                   {t.source}
                 </td>
-                <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs font-mono">
-                  {t.accountNo}
-                </td>
+                <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs font-mono">{t.accountNo}</td>
               </tr>
             )
           })}

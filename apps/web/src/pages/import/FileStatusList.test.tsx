@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { Statement, Transaction } from '@lokfi/parser-core'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FileStatusList } from './FileStatusList'
-import type { Statement, Transaction } from '@lokfi/parser-core'
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -26,9 +26,8 @@ const mockStatement = (overrides: Partial<Statement> = {}): Statement => ({
   ...overrides,
 })
 
-const makeResult = (
-  overrides: Partial<import('./FileStatusList').FileParseResult> = {},
-) => overrides as import('./FileStatusList').FileParseResult
+const makeResult = (overrides: Partial<import('./FileStatusList').FileParseResult> = {}) =>
+  overrides as import('./FileStatusList').FileParseResult
 
 // ─── Pure Helper Implementations (mirrors FileStatusList.tsx logic) ──────────
 
@@ -202,7 +201,7 @@ describe('StatusBadge via FileStatusList', () => {
         items={[makeResult({ file: mockFile('test.pdf'), status: 'pending' })]}
         onConfigure={vi.fn()}
         onRemove={vi.fn()}
-      />,
+      />
     )
     expect(screen.getByText('Pending')).toBeInTheDocument()
   })
@@ -213,7 +212,7 @@ describe('StatusBadge via FileStatusList', () => {
         items={[makeResult({ file: mockFile('test.csv'), status: 'parsing' })]}
         onConfigure={vi.fn()}
         onRemove={vi.fn()}
-      />,
+      />
     )
     expect(screen.getByText('Parsing…')).toBeInTheDocument()
   })
@@ -230,7 +229,7 @@ describe('StatusBadge via FileStatusList', () => {
         ]}
         onConfigure={vi.fn()}
         onRemove={vi.fn()}
-      />,
+      />
     )
     expect(screen.getByText('Done')).toBeInTheDocument()
   })
@@ -238,12 +237,10 @@ describe('StatusBadge via FileStatusList', () => {
   it('shows "Error" with XCircle icon for error status', () => {
     render(
       <FileStatusList
-        items={[
-          makeResult({ file: mockFile('test.pdf'), status: 'error', error: 'fail' }),
-        ]}
+        items={[makeResult({ file: mockFile('test.pdf'), status: 'error', error: 'fail' })]}
         onConfigure={vi.fn()}
         onRemove={vi.fn()}
-      />,
+      />
     )
     expect(screen.getByText('Error')).toBeInTheDocument()
   })
@@ -263,9 +260,7 @@ describe('FileStatusList', () => {
   })
 
   it('renders nothing when items is empty', () => {
-    const { container } = render(
-      <FileStatusList items={[]} {...defaultProps} />,
-    )
+    const { container } = render(<FileStatusList items={[]} {...defaultProps} />)
     expect(container).toBeEmptyDOMElement()
   })
 
@@ -279,7 +274,7 @@ describe('FileStatusList', () => {
           }),
         ]}
         {...defaultProps}
-      />,
+      />
     )
     expect(screen.getByText('statement.pdf')).toBeInTheDocument()
     expect(screen.getByText('Pending')).toBeInTheDocument()
@@ -295,7 +290,7 @@ describe('FileStatusList', () => {
           }),
         ]}
         {...defaultProps}
-      />,
+      />
     )
     expect(screen.getByText('data.csv')).toBeInTheDocument()
     expect(screen.getByText('Parsing…')).toBeInTheDocument()
@@ -314,7 +309,7 @@ describe('FileStatusList', () => {
           }),
         ]}
         {...defaultProps}
-      />,
+      />
     )
     expect(screen.getByText('bad.pdf')).toBeInTheDocument()
     expect(screen.getByText('Failed to parse PDF')).toBeInTheDocument()
@@ -333,16 +328,12 @@ describe('FileStatusList', () => {
             status: 'success',
             transactionCount: 3,
             statement: mockStatement({
-              transactions: [
-                mockTransaction(),
-                mockTransaction(),
-                mockTransaction(),
-              ],
+              transactions: [mockTransaction(), mockTransaction(), mockTransaction()],
             }),
           }),
         ]}
         {...defaultProps}
-      />,
+      />
     )
     expect(screen.getByText('ok.csv')).toBeInTheDocument()
     expect(screen.getByText('3 transactions found')).toBeInTheDocument()
@@ -365,7 +356,7 @@ describe('FileStatusList', () => {
           }),
         ]}
         {...defaultProps}
-      />,
+      />
     )
     expect(screen.getByText(/Generic fallback/i)).toBeInTheDocument()
   })
@@ -383,7 +374,7 @@ describe('FileStatusList', () => {
           }),
         ]}
         {...defaultProps}
-      />,
+      />
     )
     expect(screen.getByText('Profile: My Bank')).toBeInTheDocument()
     expect(screen.queryByText(/Generic fallback/i)).not.toBeInTheDocument()
@@ -407,7 +398,7 @@ describe('FileStatusList', () => {
           }),
         ]}
         {...defaultProps}
-      />,
+      />
     )
     // Initial state: expand button visible with aria-expanded=false
     const expandBtn = screen.getByRole('button', { name: /^expand/i })
@@ -447,7 +438,7 @@ describe('FileStatusList', () => {
           }),
         ]}
         {...defaultProps}
-      />,
+      />
     )
     // Expand first
     const expandBtn = screen.getByRole('button', { name: /^expand/i })
@@ -506,7 +497,7 @@ describe('FileStatusList', () => {
           }),
         ]}
         {...defaultProps}
-      />,
+      />
     )
     // Should show 2 accounts label
     expect(screen.getByText('2 accounts')).toBeInTheDocument()

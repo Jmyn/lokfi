@@ -1,18 +1,29 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import {
+  CdcDebitParser,
+  CustomCsvParser,
+  GenericCsvParser,
+  GenericPdfParser,
+  OcbcCreditPdfParser,
+  PREDEFINED_SOURCES,
+  ParseError,
+  ParserRegistry,
+  computeHeaderFingerprint,
+  generateTransactionHash,
+} from '@lokfi/parser-core'
+import type { CustomParserProfile, Statement } from '@lokfi/parser-core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Papa from 'papaparse'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { ParserRegistry, CdcDebitParser, GenericCsvParser, ParseError, generateTransactionHash, CustomCsvParser, computeHeaderFingerprint, PREDEFINED_SOURCES, OcbcCreditPdfParser, GenericPdfParser } from '@lokfi/parser-core'
-import type { Statement, CustomParserProfile } from '@lokfi/parser-core'
+import { StorageManager } from '../../lib/db/StorageManager'
 import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
-import { StorageManager } from '../../lib/db/StorageManager'
 import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
-import { UploadZone } from './UploadZone'
-import { FileStatusList, type FileParseResult } from './FileStatusList'
+import { usePdfWorker } from '../../lib/workers/usePdfWorker'
+import { type FileParseResult, FileStatusList } from './FileStatusList'
 import { ImportSummary } from './ImportSummary'
 import { ParserConfigModal } from './ParserConfigModal'
-import { usePdfWorker } from '../../lib/workers/usePdfWorker'
+import { UploadZone } from './UploadZone'
 
 export function ImportPage() {
   const [items, setItems] = useState<FileParseResult[]>([])
@@ -42,7 +53,7 @@ export function ImportPage() {
 
   const customSources = useMemo(() => {
     const predefined = new Set(PREDEFINED_SOURCES)
-    return [...new Set(profiles.map(p => p.source).filter(s => !predefined.has(s as never)))]
+    return [...new Set(profiles.map((p) => p.source).filter((s) => !predefined.has(s as never)))]
   }, [profiles])
 
   // Compute all transaction hashes for the given successful items (same logic as handleImport)
@@ -64,21 +75,29 @@ export function ImportPage() {
   // Recompute dedup stats whenever items settle (no files still parsing)
   useEffect(() => {
     const successItems = items.filter((i) => i.status === 'success' && i.statement)
-    if (successItems.length === 0) { setDupStats(null); return }
+    if (successItems.length === 0) {
+      setDupStats(null)
+      return
+    }
     if (items.some((i) => i.status === 'parsing')) return
 
     const hashes = computeHashes(successItems)
-    if (hashes.length === 0) { setDupStats(null); return }
+    if (hashes.length === 0) {
+      setDupStats(null)
+      return
+    }
 
-    db.transactions.where('id').anyOf(hashes).count().then((existingCount) => {
-      setDupStats({ newCount: hashes.length - existingCount, existingCount })
-    })
+    db.transactions
+      .where('id')
+      .anyOf(hashes)
+      .count()
+      .then((existingCount) => {
+        setDupStats({ newCount: hashes.length - existingCount, existingCount })
+      })
   }, [items, computeHashes])
 
   function updateItem(file: File, patch: Partial<FileParseResult>) {
-    setItems((prev) =>
-      prev.map((item) => (item.file === file ? { ...item, ...patch } : item)),
-    )
+    setItems((prev) => prev.map((item) => (item.file === file ? { ...item, ...patch } : item)))
   }
 
   function handleFilesAdded(files: File[]) {
@@ -115,7 +134,7 @@ export function ImportPage() {
           // Check if a custom profile was matched (for badge display)
           const { data } = Papa.parse<string[]>(text, { skipEmptyLines: true })
           const fingerprint = computeHeaderFingerprint(data as string[][])
-          const matchedProfile = profiles.find(p => p.headerFingerprint === fingerprint)
+          const matchedProfile = profiles.find((p) => p.headerFingerprint === fingerprint)
 
           updateItem(file, {
             status: 'success',
@@ -180,7 +199,7 @@ export function ImportPage() {
       toast.success(
         existingCount > 0
           ? `Imported ${newCount} new transaction${newCount !== 1 ? 's' : ''} · ${existingCount} already existed`
-          : `Imported ${newCount} transaction${newCount !== 1 ? 's' : ''}`,
+          : `Imported ${newCount} transaction${newCount !== 1 ? 's' : ''}`
       )
       handleClear()
     } catch (err) {
@@ -222,16 +241,14 @@ export function ImportPage() {
         </div>
         <UploadZone onFilesAdded={handleFilesAdded} />
         <FileStatusList items={items} onConfigure={setConfiguringItem} onRemove={handleRemoveItem} />
-        {importError && (
-          <p className="text-sm text-red-600 dark:text-red-400 px-1">{importError}</p>
-        )}
+        {importError && <p className="text-sm text-red-600 dark:text-red-400 px-1">{importError}</p>}
         <ImportSummary results={items} dupStats={dupStats} onImport={handleImport} onClear={handleClear} />
       </div>
       {configuringItem?.rawText && (
         <ParserConfigModal
           file={configuringItem.file}
           rawText={configuringItem.rawText}
-          existingProfile={profiles.find(p => p.name === configuringItem.profileName)}
+          existingProfile={profiles.find((p) => p.name === configuringItem.profileName)}
           customSources={customSources}
           onClose={() => setConfiguringItem(null)}
           onApply={handleConfigureApply}

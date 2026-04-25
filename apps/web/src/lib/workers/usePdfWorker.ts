@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 interface WorkerMessage {
   type: 'parse'
@@ -60,19 +60,22 @@ export function usePdfWorker() {
    * @param buffer ArrayBuffer of the PDF file
    * @returns Raw extracted text string
    */
-  const parsePdf = useCallback((buffer: ArrayBuffer): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const id = `pdf-${++counterRef.current}`
-      pendingRef.current.set(id, { resolve, reject })
+  const parsePdf = useCallback(
+    (buffer: ArrayBuffer): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const id = `pdf-${++counterRef.current}`
+        pendingRef.current.set(id, { resolve, reject })
 
-      const worker = getWorker()
-      const msg: WorkerMessage = { type: 'parse', buffer, id }
-      // Transfer the ArrayBuffer to avoid a costly structured-clone copy on large PDFs.
-      // After transfer, msg.buffer on the main thread becomes detached (zero-byte),
-      // which is safe since we don't use it after posting.
-      worker.postMessage(msg, [msg.buffer])
-    })
-  }, [getWorker])
+        const worker = getWorker()
+        const msg: WorkerMessage = { type: 'parse', buffer, id }
+        // Transfer the ArrayBuffer to avoid a costly structured-clone copy on large PDFs.
+        // After transfer, msg.buffer on the main thread becomes detached (zero-byte),
+        // which is safe since we don't use it after posting.
+        worker.postMessage(msg, [msg.buffer])
+      })
+    },
+    [getWorker]
+  )
 
   // Terminate worker on component unmount to prevent memory leaks
   useEffect(() => {

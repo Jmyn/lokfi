@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { normalizeDate, parseAmount, computeHeaderFingerprint } from './csvUtils'
+import { describe, expect, it } from 'vitest'
+import { computeHeaderFingerprint, normalizeDate, parseAmount } from './csvUtils'
 
 describe('csvUtils', () => {
   describe('normalizeDate()', () => {
@@ -102,26 +102,17 @@ describe('csvUtils', () => {
 
   describe('computeHeaderFingerprint()', () => {
     it('computes fingerprint for a valid header row', () => {
-      const rows = [
-        ['Date', 'Description', 'Amount'],
-      ]
+      const rows = [['Date', 'Description', 'Amount']]
       expect(computeHeaderFingerprint(rows)).toBe('amount|date|description')
     })
 
     it('handles extra whitespace and different casing', () => {
-      const rows = [
-        ['  DATE  ', ' desc ', ' AmOuNt '],
-      ]
+      const rows = [['  DATE  ', ' desc ', ' AmOuNt ']]
       expect(computeHeaderFingerprint(rows)).toBe('amount|date|desc')
     })
 
     it('skips rows with fewer than 2 non-empty columns', () => {
-      const rows = [
-        ['Statement'],
-        ['Account: 123'],
-        [],
-        ['Date', 'Amount'],
-      ]
+      const rows = [['Statement'], ['Account: 123'], [], ['Date', 'Amount']]
       expect(computeHeaderFingerprint(rows)).toBe('amount|date')
     })
 

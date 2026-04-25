@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { redactAccountNo, redactName, shiftDate, fuzzAmount } from './index'
+import { describe, expect, it } from 'vitest'
+import { fuzzAmount, redactAccountNo, redactName, shiftDate } from './index'
 
 describe('Seed transformations', () => {
   it('redactAccountNo replaces middle segment with X', () => {

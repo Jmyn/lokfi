@@ -1,6 +1,9 @@
 /** Thrown when a parser fails to process statement text. */
 export class ParseError extends Error {
-  constructor(message: string, public readonly source?: string) {
+  constructor(
+    message: string,
+    public readonly source?: string
+  ) {
     super(message)
     this.name = 'ParseError'
   }
@@ -74,10 +77,10 @@ export interface CustomParserProfile {
     balance?: ColumnRef
   }
 
-  skipRows: number               // rows to skip before the header row (0-based)
-  dateFormat?: string            // hint for non-standard date formats
+  skipRows: number // rows to skip before the header row (0-based)
+  dateFormat?: string // hint for non-standard date formats
   statementType: 'debit' | 'credit'
-  accountNo?: string             // manual override
-  negateAmount: boolean          // flip the sign of all parsed amounts
-  source: StatementSource        // bank label shown on transactions
+  accountNo?: string // manual override
+  negateAmount: boolean // flip the sign of all parsed amounts
+  source: StatementSource // bank label shown on transactions
 }

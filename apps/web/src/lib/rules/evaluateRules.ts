@@ -1,4 +1,4 @@
-import type { DbTransaction, DbRule, RuleCondition } from '../db/db'
+import type { DbRule, DbTransaction, RuleCondition } from '../db/db'
 
 export function matchesCondition(txn: DbTransaction, cond: RuleCondition): boolean {
   const fieldValue = txn[cond.field]

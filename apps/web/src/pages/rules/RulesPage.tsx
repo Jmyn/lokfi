@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Plus, FlaskConical, Trash2, Edit3, ArrowRight, Wand2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { ArrowRight, Edit3, FlaskConical, Plus, Trash2, Wand2 } from 'lucide-react'
+import { useState } from 'react'
 import { db } from '../../lib/db/db'
 import type { DbRule, DbTransaction } from '../../lib/db/db'
 import { evaluateRules } from '../../lib/rules/evaluateRules'
@@ -10,12 +10,13 @@ export function RulesPage() {
   const [editorRule, setEditorRule] = useState<DbRule | 'CREATE' | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
-  const rules = useLiveQuery(async () => {
-    const all = await db.rules.toArray()
-    return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  }) ?? []
+  const rules =
+    useLiveQuery(async () => {
+      const all = await db.rules.toArray()
+      return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    }) ?? []
   const categories = useLiveQuery(() => db.categories.toArray()) ?? []
-  const catMap = new Map(categories.map(c => [c.id, c]))
+  const catMap = new Map(categories.map((c) => [c.id, c]))
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this rule?')) {
@@ -46,14 +47,15 @@ export function RulesPage() {
       let foundRule = null
       for (const r of sortedRules) {
         if (!r.conditions || !r.conditions.length) continue
-        const hasMatch = r.conditions.every(cond => {
+        const hasMatch = r.conditions.every((cond) => {
           const fieldVal = mockTxn[cond.field]
           if (fieldVal === undefined) return false
           if (cond.field === 'transactionValue') {
             const nv = Number(fieldVal)
             if (cond.operation === 'gt') return nv > Number(cond.value)
             if (cond.operation === 'lt') return nv < Number(cond.value)
-            if (cond.operation === 'between' && Array.isArray(cond.value)) return nv >= cond.value[0] && nv <= cond.value[1]
+            if (cond.operation === 'between' && Array.isArray(cond.value))
+              return nv >= cond.value[0] && nv <= cond.value[1]
             return false
           }
           const sv = String(fieldVal).toLowerCase()
@@ -61,10 +63,13 @@ export function RulesPage() {
           if (cond.operation === 'contains') return sv.includes(cv)
           if (cond.operation === 'equals') return sv === cv
           if (cond.operation === 'startsWith') return sv.startsWith(cv)
-          if (cond.operation === 'regex') return (new RegExp(String(cond.value), 'i')).test(String(fieldVal))
+          if (cond.operation === 'regex') return new RegExp(String(cond.value), 'i').test(String(fieldVal))
           return false
         })
-        if (hasMatch) { foundRule = r; break }
+        if (hasMatch) {
+          foundRule = r
+          break
+        }
       }
       if (foundRule) {
         const cat = catMap.get(foundRule.category)
@@ -81,13 +86,10 @@ export function RulesPage() {
   return (
     <div className="min-h-screen px-6 py-10" style={{ backgroundColor: 'var(--bg)' }}>
       <div className="mx-auto max-w-4xl flex flex-col gap-6">
-
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="font-serif text-2xl text-gray-900 dark:text-gray-100">
-              Categorisation Rules
-            </h1>
+            <h1 className="font-serif text-2xl text-gray-900 dark:text-gray-100">Categorisation Rules</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Automatically categorize transactions when importing statements.
             </p>
@@ -117,7 +119,7 @@ export function RulesPage() {
                 <input
                   type="text"
                   value={simDesc}
-                  onChange={e => setSimDesc(e.target.value)}
+                  onChange={(e) => setSimDesc(e.target.value)}
                   placeholder="e.g. GRABFOOD"
                   className={inputCls}
                   style={{ borderColor: 'var(--border)' }}
@@ -129,7 +131,7 @@ export function RulesPage() {
                   type="number"
                   step="0.01"
                   value={simVal}
-                  onChange={e => setSimVal(e.target.value)}
+                  onChange={(e) => setSimVal(e.target.value)}
                   placeholder="-15.00"
                   className={inputCls}
                   style={{ borderColor: 'var(--border)' }}
@@ -140,7 +142,7 @@ export function RulesPage() {
                 <input
                   type="text"
                   value={simSrc}
-                  onChange={e => setSimSrc(e.target.value)}
+                  onChange={(e) => setSimSrc(e.target.value)}
                   placeholder="ocbc"
                   className={inputCls}
                   style={{ borderColor: 'var(--border)' }}
@@ -166,8 +168,16 @@ export function RulesPage() {
                 className={`mt-4 p-3 rounded-lg text-sm flex items-center gap-2 border`}
                 style={
                   simResult === 'NO_MATCH'
-                    ? { backgroundColor: 'var(--bg)', borderColor: 'var(--border)', color: '#6b7280' }
-                    : { backgroundColor: 'var(--accent-subtle)', borderColor: 'var(--accent)', color: 'var(--accent-text)' }
+                    ? {
+                        backgroundColor: 'var(--bg)',
+                        borderColor: 'var(--border)',
+                        color: '#6b7280',
+                      }
+                    : {
+                        backgroundColor: 'var(--accent-subtle)',
+                        borderColor: 'var(--accent)',
+                        color: 'var(--accent-text)',
+                      }
                 }
               >
                 {simResult === 'NO_MATCH' ? (
@@ -230,9 +240,7 @@ export function RulesPage() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1">
-                        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                          {rule.name}
-                        </h3>
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{rule.name}</h3>
                         {category && (
                           <span
                             className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border"
@@ -249,8 +257,14 @@ export function RulesPage() {
                       <div className="text-xs text-gray-500 dark:text-gray-400 truncate font-mono">
                         {rule.conditions?.map((c, i) => (
                           <span key={i}>
-                            {i > 0 && <span className="mx-1.5 font-sans font-semibold text-gray-300 dark:text-gray-600">AND</span>}
-                            <span>{c.field} {c.operation} "{Array.isArray(c.value) ? c.value.join(' to ') : c.value}"</span>
+                            {i > 0 && (
+                              <span className="mx-1.5 font-sans font-semibold text-gray-300 dark:text-gray-600">
+                                AND
+                              </span>
+                            )}
+                            <span>
+                              {c.field} {c.operation} "{Array.isArray(c.value) ? c.value.join(' to ') : c.value}"
+                            </span>
                           </span>
                         ))}
                       </div>
@@ -279,7 +293,6 @@ export function RulesPage() {
             </div>
           )}
         </div>
-
       </div>
 
       {editorRule && (

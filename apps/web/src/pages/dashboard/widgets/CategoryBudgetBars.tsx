@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useDashboard } from '../DashboardContext'
 import { db } from '../../../lib/db/db'
 import { fmt } from '../../../lib/format'
+import { useDashboard } from '../DashboardContext'
 
 export function CategoryBudgetBars() {
   const { transactions, categories, budgets } = useDashboard()
@@ -35,7 +35,7 @@ export function CategoryBudgetBars() {
   }, [categories, budgetMap, spentByCategory])
 
   async function saveBudget(categoryId: string) {
-    const amount = parseFloat(editValue)
+    const amount = Number.parseFloat(editValue)
     if (isNaN(amount) || amount <= 0) {
       setEditingCatId(null)
       return
@@ -86,10 +86,7 @@ export function CategoryBudgetBars() {
               <div key={cat.id} className="space-y-1.5">
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full inline-block"
-                      style={{ backgroundColor: cat.color }}
-                    />
+                    <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: cat.color }} />
                     <span className="font-medium text-gray-900 dark:text-white">{cat.name}</span>
                   </span>
                   <span className="font-mono text-xs text-gray-500">
@@ -99,7 +96,10 @@ export function CategoryBudgetBars() {
                 </div>
 
                 {budget ? (
-                  <div className="relative h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border)' }}>
+                  <div
+                    className="relative h-2 rounded-full overflow-hidden"
+                    style={{ backgroundColor: 'var(--border)' }}
+                  >
                     <div
                       className="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
                       style={{
@@ -111,9 +111,7 @@ export function CategoryBudgetBars() {
                 ) : null}
 
                 {overBudget && (
-                  <div className="text-xs text-red-500 font-medium">
-                    Over budget by {fmt.format(spent - budget!)}
-                  </div>
+                  <div className="text-xs text-red-500 font-medium">Over budget by {fmt.format(spent - budget!)}</div>
                 )}
 
                 {/* Edit / Set budget */}
@@ -147,10 +145,7 @@ export function CategoryBudgetBars() {
                         Remove
                       </button>
                     )}
-                    <button
-                      onClick={() => setEditingCatId(null)}
-                      className="text-xs text-gray-400 px-2 py-1"
-                    >
+                    <button onClick={() => setEditingCatId(null)} className="text-xs text-gray-400 px-2 py-1">
                       Cancel
                     </button>
                   </div>

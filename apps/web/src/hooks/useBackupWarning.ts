@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { db } from '../lib/db/db'
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
@@ -13,10 +13,7 @@ export function useBackupWarning() {
     return () => clearInterval(interval)
   }, [])
 
-  const lastExportedSetting = useLiveQuery(
-    () => db.settings.get('lastExportedAt'),
-    []
-  )
+  const lastExportedSetting = useLiveQuery(() => db.settings.get('lastExportedAt'), [])
 
   if (lastExportedSetting === undefined && !db.isOpen()) {
     return false
@@ -28,9 +25,8 @@ export function useBackupWarning() {
 
   try {
     const lastExportDate = new Date(lastExportedSetting.value)
-    return (now - lastExportDate.getTime()) > THIRTY_DAYS_MS
+    return now - lastExportDate.getTime() > THIRTY_DAYS_MS
   } catch {
     return true
   }
 }
-

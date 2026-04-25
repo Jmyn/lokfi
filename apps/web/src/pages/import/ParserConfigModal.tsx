@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
-import Papa from 'papaparse'
+import { CustomCsvParser, PREDEFINED_SOURCES, computeHeaderFingerprint } from '@lokfi/parser-core'
+import type { CustomParserProfile, Statement } from '@lokfi/parser-core'
 import { X } from 'lucide-react'
-import { CustomCsvParser, computeHeaderFingerprint, PREDEFINED_SOURCES } from '@lokfi/parser-core'
-import type { Statement, CustomParserProfile } from '@lokfi/parser-core'
+import Papa from 'papaparse'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '../../lib/db/db'
 
 interface Props {
@@ -21,36 +21,32 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
   const [source, setSource] = useState<string>(existingProfile?.source ?? 'generic')
   const [sourceDropdownOpen, setSourceDropdownOpen] = useState<boolean>(false)
   const sourceComboRef = useRef<HTMLDivElement>(null)
-  const [statementType, setStatementType] = useState<'debit' | 'credit'>(
-    existingProfile?.statementType ?? 'debit',
-  )
+  const [statementType, setStatementType] = useState<'debit' | 'credit'>(existingProfile?.statementType ?? 'debit')
   const [accountNo, setAccountNo] = useState<string>(existingProfile?.accountNo ?? '')
   const [negateAmount, setNegateAmount] = useState<boolean>(existingProfile?.negateAmount ?? false)
 
   const [dateCol, setDateCol] = useState<number>(
-    typeof existingProfile?.columnMap.date === 'number' ? existingProfile.columnMap.date : 0,
+    typeof existingProfile?.columnMap.date === 'number' ? existingProfile.columnMap.date : 0
   )
   const [descCol, setDescCol] = useState<number>(
-    typeof existingProfile?.columnMap.description === 'number'
-      ? existingProfile.columnMap.description
-      : 1,
+    typeof existingProfile?.columnMap.description === 'number' ? existingProfile.columnMap.description : 1
   )
   const [amountMode, setAmountMode] = useState<AmountMode>(
     existingProfile?.columnMap.debit !== undefined || existingProfile?.columnMap.credit !== undefined
       ? 'split'
-      : 'single',
+      : 'single'
   )
   const [amountCol, setAmountCol] = useState<number>(
-    typeof existingProfile?.columnMap.amount === 'number' ? existingProfile.columnMap.amount : 2,
+    typeof existingProfile?.columnMap.amount === 'number' ? existingProfile.columnMap.amount : 2
   )
   const [debitCol, setDebitCol] = useState<number>(
-    typeof existingProfile?.columnMap.debit === 'number' ? existingProfile.columnMap.debit : 2,
+    typeof existingProfile?.columnMap.debit === 'number' ? existingProfile.columnMap.debit : 2
   )
   const [creditCol, setCreditCol] = useState<number>(
-    typeof existingProfile?.columnMap.credit === 'number' ? existingProfile.columnMap.credit : 3,
+    typeof existingProfile?.columnMap.credit === 'number' ? existingProfile.columnMap.credit : 3
   )
   const [balanceCol, setBalanceCol] = useState<number>(
-    typeof existingProfile?.columnMap.balance === 'number' ? existingProfile.columnMap.balance : -1,
+    typeof existingProfile?.columnMap.balance === 'number' ? existingProfile.columnMap.balance : -1
   )
 
   const [sourceError, setSourceError] = useState<string | null>(null)
@@ -72,7 +68,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
   // Parse raw CSV once
   const parsedRows = useMemo<string[][]>(() => {
     const { data } = Papa.parse<string[]>(rawText, { skipEmptyLines: false })
-    return (data as string[][]).filter(r => r.some(c => c.trim()))
+    return (data as string[][]).filter((r) => r.some((c) => c.trim()))
   }, [rawText])
 
   // Header row is at index `skipRows`
@@ -93,12 +89,12 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
   // Issue 3: clamp column selections when headerRow shrinks due to skipRows change
   useEffect(() => {
     const max = Math.max(0, headerRow.length - 1)
-    setDateCol(prev => Math.min(prev, max))
-    setDescCol(prev => Math.min(prev, max))
-    setAmountCol(prev => Math.min(prev, max))
-    setDebitCol(prev => Math.min(prev, max))
-    setCreditCol(prev => Math.min(prev, max))
-    setBalanceCol(prev => prev === -1 ? -1 : Math.min(prev, max))
+    setDateCol((prev) => Math.min(prev, max))
+    setDescCol((prev) => Math.min(prev, max))
+    setAmountCol((prev) => Math.min(prev, max))
+    setDebitCol((prev) => Math.min(prev, max))
+    setCreditCol((prev) => Math.min(prev, max))
+    setBalanceCol((prev) => (prev === -1 ? -1 : Math.min(prev, max)))
   }, [headerRow.length])
 
   function buildProfile(name: string): CustomParserProfile {
@@ -108,9 +104,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
       date: dateCol,
       description: descCol,
       ...(balanceCol !== -1 ? { balance: balanceCol } : {}),
-      ...(amountMode === 'single'
-        ? { amount: amountCol }
-        : { debit: debitCol, credit: creditCol }),
+      ...(amountMode === 'single' ? { amount: amountCol } : { debit: debitCol, credit: creditCol }),
     }
     return {
       id: existingProfile?.id ?? crypto.randomUUID(),
@@ -165,7 +159,9 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <div
         className="relative flex flex-col w-full max-w-2xl max-h-[90vh] rounded-xl overflow-hidden shadow-2xl"
@@ -184,22 +180,16 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
               {file.name}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-md p-1.5 transition-colors"
-            style={{ color: 'var(--fg)' }}
-          >
+          <button onClick={onClose} className="rounded-md p-1.5 transition-colors" style={{ color: 'var(--fg)' }}>
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 px-5 py-5 flex flex-col gap-6">
-
           {/* Section 1: Options */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3"
-              style={{ color: 'var(--accent-text)' }}>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--accent-text)' }}>
               Options
             </h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -212,7 +202,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                   type="number"
                   min={0}
                   value={skipRows}
-                  onChange={(e) => setSkipRows(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  onChange={(e) => setSkipRows(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
                   className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
                   style={{
                     backgroundColor: 'var(--bg-sidebar)',
@@ -231,43 +221,68 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                   <input
                     type="text"
                     value={source}
-                    onChange={e => { setSource(e.target.value); setSourceError(null); setSourceDropdownOpen(true) }}
+                    onChange={(e) => {
+                      setSource(e.target.value)
+                      setSourceError(null)
+                      setSourceDropdownOpen(true)
+                    }}
                     onFocus={() => setSourceDropdownOpen(true)}
                     className="w-full rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
-                    style={{ backgroundColor: 'var(--bg-sidebar)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+                    style={{
+                      backgroundColor: 'var(--bg-sidebar)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--fg)',
+                    }}
                     placeholder="e.g. ocbc, generic, my-bank"
                   />
-                  {sourceDropdownOpen && (() => {
-                    const query = source.toLowerCase()
-                    const allOptions = [...PREDEFINED_SOURCES, ...(customSources ?? [])]
-                    const filtered = allOptions.filter(s => s.includes(query))
-                    if (!filtered.length) return null
-                    return (
-                      <ul className="absolute z-10 w-full mt-1 rounded-md shadow-md text-sm overflow-auto max-h-48"
-                          style={{ backgroundColor: 'var(--bg-sidebar)', border: '1px solid var(--border)' }}>
-                        {filtered.map(s => (
-                          <li key={s}
+                  {sourceDropdownOpen &&
+                    (() => {
+                      const query = source.toLowerCase()
+                      const allOptions = [...PREDEFINED_SOURCES, ...(customSources ?? [])]
+                      const filtered = allOptions.filter((s) => s.includes(query))
+                      if (!filtered.length) return null
+                      return (
+                        <ul
+                          className="absolute z-10 w-full mt-1 rounded-md shadow-md text-sm overflow-auto max-h-48"
+                          style={{
+                            backgroundColor: 'var(--bg-sidebar)',
+                            border: '1px solid var(--border)',
+                          }}
+                        >
+                          {filtered.map((s) => (
+                            <li
+                              key={s}
                               className="px-3 py-1.5 cursor-pointer hover:bg-[var(--bg-hover)]"
                               style={{ color: 'var(--fg)' }}
-                              onMouseDown={() => { setSource(s); setSourceError(null); setSourceDropdownOpen(false) }}>
-                            {s}
-                          </li>
-                        ))}
-                        <li className="px-3 py-1.5 cursor-pointer hover:bg-[var(--bg-hover)]"
+                              onMouseDown={() => {
+                                setSource(s)
+                                setSourceError(null)
+                                setSourceDropdownOpen(false)
+                              }}
+                            >
+                              {s}
+                            </li>
+                          ))}
+                          <li
+                            className="px-3 py-1.5 cursor-pointer hover:bg-[var(--bg-hover)]"
                             style={{ color: 'var(--fg-muted)' }}
                             onMouseDown={() => {
-                              if (!source.trim()) { setSourceError('Please enter a source name.'); return }
-                              setSource(source.trim()); setSourceError(null); setSourceDropdownOpen(false)
-                            }}>
-                          {source.trim() ? `+ Add "${source.trim()}"` : '+ Add custom source'}
-                        </li>
-                      </ul>
-                    )
-                  })()}
+                              if (!source.trim()) {
+                                setSourceError('Please enter a source name.')
+                                return
+                              }
+                              setSource(source.trim())
+                              setSourceError(null)
+                              setSourceDropdownOpen(false)
+                            }}
+                          >
+                            {source.trim() ? `+ Add "${source.trim()}"` : '+ Add custom source'}
+                          </li>
+                        </ul>
+                      )
+                    })()}
                 </div>
-                {sourceError && (
-                  <span className="text-xs text-red-500 dark:text-red-400">{sourceError}</span>
-                )}
+                {sourceError && <span className="text-xs text-red-500 dark:text-red-400">{sourceError}</span>}
               </div>
 
               {/* Statement type */}
@@ -328,20 +343,16 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
 
           {/* Section 2: CSV Preview */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3"
-              style={{ color: 'var(--accent-text)' }}>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--accent-text)' }}>
               CSV Preview
             </h3>
-            <div
-              className="rounded-lg overflow-hidden text-xs"
-              style={{ border: '1px solid var(--border)' }}
-            >
+            <div className="rounded-lg overflow-hidden text-xs" style={{ border: '1px solid var(--border)' }}>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
                     <tr style={{ backgroundColor: 'var(--bg-sidebar)' }}>
-                      {headerRow.length > 0
-                        ? headerRow.map((col, i) => (
+                      {headerRow.length > 0 ? (
+                        headerRow.map((col, i) => (
                           <th
                             key={i}
                             className="px-3 py-2 text-left font-medium whitespace-nowrap"
@@ -350,14 +361,14 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                             [{i}] {col}
                           </th>
                         ))
-                        : (
-                          <th
-                            className="px-3 py-2 text-left"
-                            style={{ color: 'var(--fg)', borderBottom: '1px solid var(--border)' }}
-                          >
-                            No header detected
-                          </th>
-                        )}
+                      ) : (
+                        <th
+                          className="px-3 py-2 text-left"
+                          style={{ color: 'var(--fg)', borderBottom: '1px solid var(--border)' }}
+                        >
+                          No header detected
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -381,9 +392,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                       <tr
                         key={ri}
                         style={{
-                          borderBottom: ri < previewDataRows.length - 1
-                            ? '1px solid var(--border)'
-                            : undefined,
+                          borderBottom: ri < previewDataRows.length - 1 ? '1px solid var(--border)' : undefined,
                         }}
                       >
                         {headerRow.map((_, ci) => (
@@ -416,8 +425,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
 
           {/* Section 3: Column Mapping */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3"
-              style={{ color: 'var(--accent-text)' }}>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--accent-text)' }}>
               Column Mapping
             </h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -428,7 +436,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                 </label>
                 <select
                   value={dateCol}
-                  onChange={(e) => setDateCol(parseInt(e.target.value, 10))}
+                  onChange={(e) => setDateCol(Number.parseInt(e.target.value, 10))}
                   className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
                   style={{
                     backgroundColor: 'var(--bg-sidebar)',
@@ -437,7 +445,9 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                   }}
                 >
                   {columnLabels.map((label, i) => (
-                    <option key={i} value={i}>{label}</option>
+                    <option key={i} value={i}>
+                      {label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -449,7 +459,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                 </label>
                 <select
                   value={descCol}
-                  onChange={(e) => setDescCol(parseInt(e.target.value, 10))}
+                  onChange={(e) => setDescCol(Number.parseInt(e.target.value, 10))}
                   className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
                   style={{
                     backgroundColor: 'var(--bg-sidebar)',
@@ -458,7 +468,9 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                   }}
                 >
                   {columnLabels.map((label, i) => (
-                    <option key={i} value={i}>{label}</option>
+                    <option key={i} value={i}>
+                      {label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -469,8 +481,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                   Amount mode
                 </span>
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-1.5 text-sm cursor-pointer"
-                    style={{ color: 'var(--fg)' }}>
+                  <label className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: 'var(--fg)' }}>
                     <input
                       type="radio"
                       name="amount-mode"
@@ -481,8 +492,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                     />
                     Single amount column
                   </label>
-                  <label className="flex items-center gap-1.5 text-sm cursor-pointer"
-                    style={{ color: 'var(--fg)' }}>
+                  <label className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: 'var(--fg)' }}>
                     <input
                       type="radio"
                       name="amount-mode"
@@ -511,7 +521,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                   </label>
                   <select
                     value={amountCol}
-                    onChange={(e) => setAmountCol(parseInt(e.target.value, 10))}
+                    onChange={(e) => setAmountCol(Number.parseInt(e.target.value, 10))}
                     className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
                     style={{
                       backgroundColor: 'var(--bg-sidebar)',
@@ -520,7 +530,9 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                     }}
                   >
                     {columnLabels.map((label, i) => (
-                      <option key={i} value={i}>{label}</option>
+                      <option key={i} value={i}>
+                        {label}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -535,7 +547,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                     </label>
                     <select
                       value={debitCol}
-                      onChange={(e) => setDebitCol(parseInt(e.target.value, 10))}
+                      onChange={(e) => setDebitCol(Number.parseInt(e.target.value, 10))}
                       className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
                       style={{
                         backgroundColor: 'var(--bg-sidebar)',
@@ -544,7 +556,9 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                       }}
                     >
                       {columnLabels.map((label, i) => (
-                        <option key={i} value={i}>{label}</option>
+                        <option key={i} value={i}>
+                          {label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -554,7 +568,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                     </label>
                     <select
                       value={creditCol}
-                      onChange={(e) => setCreditCol(parseInt(e.target.value, 10))}
+                      onChange={(e) => setCreditCol(Number.parseInt(e.target.value, 10))}
                       className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
                       style={{
                         backgroundColor: 'var(--bg-sidebar)',
@@ -563,7 +577,9 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                       }}
                     >
                       {columnLabels.map((label, i) => (
-                        <option key={i} value={i}>{label}</option>
+                        <option key={i} value={i}>
+                          {label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -577,7 +593,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                 </label>
                 <select
                   value={balanceCol}
-                  onChange={(e) => setBalanceCol(parseInt(e.target.value, 10))}
+                  onChange={(e) => setBalanceCol(Number.parseInt(e.target.value, 10))}
                   className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
                   style={{
                     backgroundColor: 'var(--bg-sidebar)',
@@ -587,7 +603,9 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
                 >
                   <option value={-1}>— none —</option>
                   {columnLabels.map((label, i) => (
-                    <option key={i} value={i}>{label}</option>
+                    <option key={i} value={i}>
+                      {label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -596,9 +614,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
 
           {/* Parse error */}
           {parseError && (
-            <div
-              className="rounded-md px-4 py-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800"
-            >
+            <div className="rounded-md px-4 py-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800">
               {parseError}
             </div>
           )}
@@ -612,7 +628,10 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
               ref={profileNameRef}
               type="text"
               value={profileName}
-              onChange={(e) => { setProfileName(e.target.value); if (nameError) setNameError(false) }}
+              onChange={(e) => {
+                setProfileName(e.target.value)
+                if (nameError) setNameError(false)
+              }}
               placeholder="e.g. DBS Savings 2024"
               className="rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1"
               style={{
@@ -622,9 +641,7 @@ export function ParserConfigModal({ file, rawText, existingProfile, customSource
               }}
             />
             {nameError && (
-              <span className="text-xs text-red-500 dark:text-red-400">
-                Please enter a profile name before saving.
-              </span>
+              <span className="text-xs text-red-500 dark:text-red-400">Please enter a profile name before saving.</span>
             )}
           </div>
         </div>

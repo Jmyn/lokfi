@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle, X, ChevronDown } from 'lucide-react'
 import type { Statement, Transaction } from '@lokfi/parser-core'
+import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Loader2, X, XCircle } from 'lucide-react'
+import { useState } from 'react'
 
 export type FileParseStatus = 'pending' | 'parsing' | 'success' | 'error'
 
@@ -25,8 +25,8 @@ interface FileStatusListProps {
 const SOURCE_LABELS: Record<string, string> = {
   'ocbc-credit': 'OCBC Credit',
   'generic-pdf': 'Generic PDF',
-  'generic': 'Generic CSV',
-  'cdc': 'CDC Debit',
+  generic: 'Generic CSV',
+  cdc: 'CDC Debit',
 }
 function sourceLabel(source: string): string {
   return SOURCE_LABELS[source] ?? source
@@ -85,13 +85,11 @@ function formatDate(iso: string) {
 function TransactionRow({ txn }: { txn: Transaction }) {
   return (
     <>
-      <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
-        {formatDate(txn.date)}
-      </span>
-      <span className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1 mx-1">
-        {txn.description}
-      </span>
-      <span className={`text-xs font-mono shrink-0 ${txn.transactionValue < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+      <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{formatDate(txn.date)}</span>
+      <span className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1 mx-1">{txn.description}</span>
+      <span
+        className={`text-xs font-mono shrink-0 ${txn.transactionValue < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}
+      >
         {formatAmount(txn.transactionValue)}
       </span>
     </>
@@ -145,7 +143,9 @@ function CollapsedAccountGroup({
               showing {PREVIEW_COUNT} of {group.transactions.length}
             </>
           ) : (
-            <>{group.transactions.length} transaction{group.transactions.length !== 1 ? 's' : ''}</>
+            <>
+              {group.transactions.length} transaction{group.transactions.length !== 1 ? 's' : ''}
+            </>
           )}
         </span>
 
@@ -155,14 +155,15 @@ function CollapsedAccountGroup({
       </button>
 
       {/* Preview rows (when collapsed) */}
-      {!isExpanded && previewTxns.map((txn, i) => (
-        <div
-          key={`${accountKey}-${txn.date}-${i}`}
-          className="flex items-center gap-2 px-4 py-1 pl-8 bg-gray-50 dark:bg-gray-800/40"
-        >
-          <TransactionRow txn={txn} />
-        </div>
-      ))}
+      {!isExpanded &&
+        previewTxns.map((txn, i) => (
+          <div
+            key={`${accountKey}-${txn.date}-${i}`}
+            className="flex items-center gap-2 px-4 py-1 pl-8 bg-gray-50 dark:bg-gray-800/40"
+          >
+            <TransactionRow txn={txn} />
+          </div>
+        ))}
     </div>
   )
 }
@@ -282,119 +283,115 @@ export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListP
             {/* Main row: filename + status + remove */}
             <div className="flex items-center justify-between px-4 py-3">
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="font-medium text-gray-800 dark:text-gray-100 truncate">
-                  {item.file.name}
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {formatBytes(item.file.size)}
-                </span>
+                <span className="font-medium text-gray-800 dark:text-gray-100 truncate">{item.file.name}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{formatBytes(item.file.size)}</span>
               </div>
               <div className="ml-4 flex items-start gap-2 shrink-0">
-              <div className="flex flex-col items-end gap-0.5">
-                <StatusBadge status={item.status} />
-                {item.status === 'success' && item.transactionCount !== undefined && (
-                  <span className="text-xs text-green-600 dark:text-green-400">
-                    {item.transactionCount} transactions found
-                  </span>
-                )}
-                {item.status === 'success' && item.profileName && (
-                  <span className="text-xs text-blue-600 dark:text-blue-400">
-                    Profile: {item.profileName}
-                  </span>
-                )}
-                {item.status === 'success' && item.statement?.source === 'generic' && !item.profileName && (
-                  <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500 max-w-[200px] text-right">
-                    <AlertTriangle className="h-3 w-3 shrink-0" />
-                    Generic fallback — verify data
-                  </span>
-                )}
-                {item.status === 'success' && item.rawText && !isPdf && (
-                  item.statement?.source === 'generic' && !item.profileName ? (
+                <div className="flex flex-col items-end gap-0.5">
+                  <StatusBadge status={item.status} />
+                  {item.status === 'success' && item.transactionCount !== undefined && (
+                    <span className="text-xs text-green-600 dark:text-green-400">
+                      {item.transactionCount} transactions found
+                    </span>
+                  )}
+                  {item.status === 'success' && item.profileName && (
+                    <span className="text-xs text-blue-600 dark:text-blue-400">Profile: {item.profileName}</span>
+                  )}
+                  {item.status === 'success' && item.statement?.source === 'generic' && !item.profileName && (
+                    <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500 max-w-[200px] text-right">
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      Generic fallback — verify data
+                    </span>
+                  )}
+                  {item.status === 'success' &&
+                    item.rawText &&
+                    !isPdf &&
+                    (item.statement?.source === 'generic' && !item.profileName ? (
+                      <button
+                        onClick={() => onConfigure(item)}
+                        className="text-xs font-medium px-2 py-1 rounded border border-yellow-400 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+                      >
+                        Configure mapping
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onConfigure(item)}
+                        className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline"
+                      >
+                        Wrong mapping? Configure
+                      </button>
+                    ))}
+                  {item.status === 'error' && item.error && (
+                    <span className="text-xs text-red-500 dark:text-red-400 max-w-[200px] text-right">
+                      {item.error}
+                    </span>
+                  )}
+                  {item.status === 'error' && item.rawText && (
                     <button
                       onClick={() => onConfigure(item)}
-                      className="text-xs font-medium px-2 py-1 rounded border border-yellow-400 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+                      className="text-xs font-medium px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                     >
-                      Configure mapping
+                      Configure parser
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => onConfigure(item)}
-                      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline"
-                    >
-                      Wrong mapping? Configure
-                    </button>
-                  )
-                )}
-                {item.status === 'error' && item.error && (
-                  <span className="text-xs text-red-500 dark:text-red-400 max-w-[200px] text-right">
-                    {item.error}
-                  </span>
-                )}
-                {item.status === 'error' && item.rawText && (
-                  <button
-                    onClick={() => onConfigure(item)}
-                    className="text-xs font-medium px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  >
-                    Configure parser
-                  </button>
-                )}
-              </div>
-              <button
-                onClick={() => onRemove(item)}
-                className="text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors mt-0.5"
-                aria-label="Remove file"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => onRemove(item)}
+                  className="text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors mt-0.5"
+                  aria-label="Remove file"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
 
             {/* Accounts breakdown: per-account rows with expandable transactions */}
-            {item.status === 'success' && sample && item.statement && (() => {
-              const groups = groupByAccount(item.statement)
-              const isMultiAccount = groups.length > 1
-              return (
-                <div className="flex flex-col border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
-                  {/* Source + summary row */}
-                  <div className="flex items-center gap-2 px-4 pt-2 pb-1.5">
-                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">Source</span>
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wide">
-                      {sourceLabel(item.statement.source)}
-                    </span>
-                    {isMultiAccount && (
-                      <>
-                        <span className="text-xs text-gray-300 dark:text-gray-600">·</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {groups.length} accounts
-                        </span>
-                      </>
-                    )}
+            {item.status === 'success' &&
+              sample &&
+              item.statement &&
+              (() => {
+                const groups = groupByAccount(item.statement)
+                const isMultiAccount = groups.length > 1
+                return (
+                  <div className="flex flex-col border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
+                    {/* Source + summary row */}
+                    <div className="flex items-center gap-2 px-4 pt-2 pb-1.5">
+                      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">Source</span>
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                        {sourceLabel(item.statement.source)}
+                      </span>
+                      {isMultiAccount && (
+                        <>
+                          <span className="text-xs text-gray-300 dark:text-gray-600">·</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{groups.length} accounts</span>
+                        </>
+                      )}
+                    </div>
+                    {/* Per-account rows */}
+                    {groups.map((group) => {
+                      const accountKey = `${item.file.name}-${item.file.size}-${group.accountNo}`
+                      const isExpanded = expandedAccounts.has(accountKey)
+                      return isExpanded ? (
+                        <ExpandedAccountGroup
+                          key={accountKey}
+                          group={group}
+                          accountKey={accountKey}
+                          isExpanded={isExpanded}
+                          onCollapse={() => toggleAccount(accountKey)}
+                        />
+                      ) : (
+                        <CollapsedAccountGroup
+                          key={accountKey}
+                          group={group}
+                          accountKey={accountKey}
+                          isExpanded={isExpanded}
+                          onToggle={() => toggleAccount(accountKey)}
+                        />
+                      )
+                    })}
                   </div>
-                  {/* Per-account rows */}
-                  {groups.map((group) => {
-                    const accountKey = `${item.file.name}-${item.file.size}-${group.accountNo}`
-                    const isExpanded = expandedAccounts.has(accountKey)
-                    return isExpanded ? (
-                      <ExpandedAccountGroup
-                        key={accountKey}
-                        group={group}
-                        accountKey={accountKey}
-                        isExpanded={isExpanded}
-                        onCollapse={() => toggleAccount(accountKey)}
-                      />
-                    ) : (
-                      <CollapsedAccountGroup
-                        key={accountKey}
-                        group={group}
-                        accountKey={accountKey}
-                        isExpanded={isExpanded}
-                        onToggle={() => toggleAccount(accountKey)}
-                      />
-                    )
-                  })}
-                </div>
-              )
-            })()}
+                )
+              })()}
           </li>
         )
       })}

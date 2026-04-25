@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type DbTransaction, type DbBudget } from '../../lib/db/db'
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { type DbBudget, type DbTransaction, db } from '../../lib/db/db'
 import type { DbCategory } from '../../lib/db/seedCategories'
 
 export interface DashboardFilters {
@@ -105,9 +105,7 @@ export function DashboardFilterProvider({ children }: { children: ReactNode }) {
 
   // allSelected flags: when every option is selected, skip filtering for that dimension
   // (so uncategorised transactions still appear when all categories are toggled on)
-  const allCategoriesSelected = categories
-    ? filters.categoryIds.length === categories.length
-    : true
+  const allCategoriesSelected = categories ? filters.categoryIds.length === categories.length : true
   const allAccountsSelected = allTransactions
     ? filters.accounts.length === [...new Set(allTransactions.map((t) => t.accountNo))].length
     : true

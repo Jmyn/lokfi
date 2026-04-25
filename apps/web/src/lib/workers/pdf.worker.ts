@@ -11,8 +11,8 @@
  */
 
 import * as pdfjsLib from 'pdfjs-dist'
-import type { TextItem } from 'pdfjs-dist/types/src/display/api'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import type { TextItem } from 'pdfjs-dist/types/src/display/api'
 
 // Use the locally bundled pdfjs worker served by Vite as a static asset.
 // The ?url suffix tells Vite to copy the file to dist and return its public URL,
@@ -23,7 +23,11 @@ self.addEventListener('message', async (event: MessageEvent<{ type: string; buff
   const { type, buffer, id } = event.data
 
   if (type !== 'parse' || !buffer) {
-    postMessage({ type: 'error', message: 'Invalid message: expected { type: "parse", buffer: ArrayBuffer }', id })
+    postMessage({
+      type: 'error',
+      message: 'Invalid message: expected { type: "parse", buffer: ArrayBuffer }',
+      id,
+    })
     return
   }
 
@@ -99,5 +103,3 @@ function reconstructText(items: TextItem[]): string {
   if (currentLine.trim()) lines.push(currentLine.trim())
   return lines.join('\n')
 }
-
-export type {}

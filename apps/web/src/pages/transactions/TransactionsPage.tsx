@@ -1,16 +1,16 @@
-import { useState, useRef, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useEffect, useRef, useState } from 'react'
 import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
-import { TransactionTable } from './TransactionTable'
-import { TransactionFilters } from './TransactionFilters'
-import { defaultFilters, type Filters } from './filterTypes'
+import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
+import { type RuleSuggestion, suggestRules } from '../../lib/rules/suggestRules'
+import { RuleEditorModal } from '../rules/RuleEditorModal'
 import { CategoryCombobox } from './CategoryCombobox'
 import { RuleSuggestionBar } from './RuleSuggestionBar'
-import { RuleEditorModal } from '../rules/RuleEditorModal'
-import { suggestRules, type RuleSuggestion } from '../../lib/rules/suggestRules'
-import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
+import { TransactionFilters } from './TransactionFilters'
+import { TransactionTable } from './TransactionTable'
+import { type Filters, defaultFilters } from './filterTypes'
 
 type SuggestionState = {
   txnId: string
@@ -167,11 +167,7 @@ export function TransactionsPage() {
       <div className="flex items-center justify-center h-full">
         <div className="text-center p-8 rounded-xl border max-w-sm" style={{ borderColor: 'var(--border)' }}>
           <p className="text-gray-600 dark:text-gray-400 mb-4">No transactions yet</p>
-          <Link
-            to="/import"
-            className="text-sm font-medium hover:underline"
-            style={{ color: 'var(--accent)' }}
-          >
+          <Link to="/import" className="text-sm font-medium hover:underline" style={{ color: 'var(--accent)' }}>
             Import a statement →
           </Link>
         </div>
@@ -182,10 +178,7 @@ export function TransactionsPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-5 py-3.5 border-b"
-        style={{ borderColor: 'var(--border)' }}
-      >
+      <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-baseline gap-3">
           <h1 className="font-serif text-xl text-gray-900 dark:text-white">Transactions</h1>
           {totalCount !== undefined && (
@@ -205,8 +198,7 @@ export function TransactionsPage() {
             style={{
               color: 'var(--accent)',
               borderColor: 'var(--accent)',
-              backgroundColor:
-                filters.categoryId === '__uncategorised__' ? 'var(--accent-subtle)' : 'transparent',
+              backgroundColor: filters.categoryId === '__uncategorised__' ? 'var(--accent-subtle)' : 'transparent',
             }}
           >
             {uncategorisedCount} uncategorised
@@ -219,9 +211,7 @@ export function TransactionsPage() {
       <div className="flex-1 overflow-auto">
         {totalCount !== undefined && totalCount > 0 && hasFilters && filteredTotal === 0 ? (
           <div className="flex items-center justify-center h-40">
-            <p className="text-gray-400 dark:text-gray-500 text-sm">
-              No transactions match your filters.
-            </p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm">No transactions match your filters.</p>
           </div>
         ) : (
           <TransactionTable
@@ -258,11 +248,7 @@ export function TransactionsPage() {
           <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">
             {selectedIds.size} selected · Categorise as:
           </span>
-          <CategoryCombobox
-            value={bulkCategoryId}
-            onChange={setBulkCategoryId}
-            placeholder="Pick a category…"
-          />
+          <CategoryCombobox value={bulkCategoryId} onChange={setBulkCategoryId} placeholder="Pick a category…" />
           <button
             onClick={handleBulkApply}
             disabled={!bulkCategoryId}

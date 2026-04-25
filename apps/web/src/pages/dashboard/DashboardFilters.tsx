@@ -57,9 +57,7 @@ export function DashboardFilters() {
   }
 
   function toggleAccount(acc: string) {
-    const next = filters.accounts.includes(acc)
-      ? filters.accounts.filter((a) => a !== acc)
-      : [...filters.accounts, acc]
+    const next = filters.accounts.includes(acc) ? filters.accounts.filter((a) => a !== acc) : [...filters.accounts, acc]
     setFilters({ ...filters, accounts: next })
   }
 
@@ -75,11 +73,7 @@ export function DashboardFilters() {
     })
   }
 
-  const hasActiveFilters =
-    filters.dateFrom !== '' ||
-    filters.dateTo !== '' ||
-    !allCatsSelected ||
-    !allAccsSelected
+  const hasActiveFilters = filters.dateFrom !== '' || filters.dateTo !== '' || !allCatsSelected || !allAccsSelected
 
   return (
     <div
@@ -114,9 +108,7 @@ export function DashboardFilters() {
       {/* Date presets */}
       <div className="flex items-center gap-1">
         {PRESETS.map((p) => {
-          const isActive =
-            filters.dateFrom === p.from() &&
-            filters.dateTo === p.to()
+          const isActive = filters.dateFrom === p.from() && filters.dateTo === p.to()
           return (
             <button
               key={p.label}
@@ -143,9 +135,7 @@ export function DashboardFilters() {
       </div>
 
       {/* Separator */}
-      {categories.length > 0 && (
-        <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
-      )}
+      {categories.length > 0 && <span className="text-gray-300 dark:text-gray-700 select-none">·</span>}
 
       {/* Category pills */}
       {categories.length > 0 && (
@@ -197,9 +187,7 @@ export function DashboardFilters() {
       )}
 
       {/* Separator */}
-      {accounts.length > 0 && (
-        <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
-      )}
+      {accounts.length > 0 && <span className="text-gray-300 dark:text-gray-700 select-none">·</span>}
 
       {/* Account pills */}
       {accounts.length > 0 && (

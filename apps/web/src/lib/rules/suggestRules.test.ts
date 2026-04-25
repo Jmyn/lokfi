@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { suggestRules, extractIdentifier, extractPrefix } from './suggestRules'
+import { describe, expect, it } from 'vitest'
 import type { DbTransaction } from '../db/db'
+import { extractIdentifier, extractPrefix, suggestRules } from './suggestRules'
 
 // Minimal transaction factory — only fields suggestRules touches
 function makeTxn(overrides: Partial<DbTransaction> & { id: string; description: string }): DbTransaction {
@@ -38,30 +38,22 @@ describe('extractPrefix', () => {
 describe('extractIdentifier', () => {
   describe('"to [MERCHANT]" pattern', () => {
     it('extracts merchant after "to" at end of description', () => {
-      const result = extractIdentifier(
-        'FAST PAYMENT OTHR-200502526MPOS0142084 via PayNow-UEN to QI JI EATERY',
-      )
+      const result = extractIdentifier('FAST PAYMENT OTHR-200502526MPOS0142084 via PayNow-UEN to QI JI EATERY')
       expect(result).toEqual({ value: 'QI JI EATERY', operation: 'contains' })
     })
 
     it('extracts merchant when "via" follows without space', () => {
-      const result = extractIdentifier(
-        'FAST PAYMENT OTHR-12345 to VIRKHAL PTE. LTDvia PayNow-UEN',
-      )
+      const result = extractIdentifier('FAST PAYMENT OTHR-12345 to VIRKHAL PTE. LTDvia PayNow-UEN')
       expect(result).toEqual({ value: 'VIRKHAL PTE. LTD', operation: 'contains' })
     })
 
     it('extracts merchant from fund transfer with "to" pattern', () => {
-      const result = extractIdentifier(
-        'FUND TRANSFER OTHR - QS via PayNow-QR Code to R.K. FATHIMA',
-      )
+      const result = extractIdentifier('FUND TRANSFER OTHR - QS via PayNow-QR Code to R.K. FATHIMA')
       expect(result).toEqual({ value: 'R.K. FATHIMA', operation: 'contains' })
     })
 
     it('extracts merchant from Qashier POS description', () => {
-      const result = extractIdentifier(
-        'FAST PAYMENT OTHR-qsb-sqr-sg-12345 via PayNow-UEN to Qashier-SPRINGLE CAFE',
-      )
+      const result = extractIdentifier('FAST PAYMENT OTHR-qsb-sqr-sg-12345 via PayNow-UEN to Qashier-SPRINGLE CAFE')
       expect(result).toEqual({ value: 'Qashier-SPRINGLE CAFE', operation: 'contains' })
     })
 
@@ -161,10 +153,7 @@ describe('suggestRules', () => {
 
   it('returns both suggested (startsWith prefix) and exact (equals full desc) for prefix fallback', () => {
     const txn = makeTxn({ id: 't1', description: 'GRAB*FOOD 99283', source: 'DBS' })
-    const all = [
-      txn,
-      makeTxn({ id: 't2', description: 'GRAB*FOOD 71234', source: 'DBS' }),
-    ]
+    const all = [txn, makeTxn({ id: 't2', description: 'GRAB*FOOD 71234', source: 'DBS' })]
 
     const suggestions = suggestRules(txn, categoryId, all)
     expect(suggestions.length).toBe(2)
@@ -243,10 +232,7 @@ describe('suggestRules', () => {
       description: 'NETFLIX SUBSCRIPTION 12345',
       source: '' as never,
     })
-    const all = [
-      txn,
-      makeTxn({ id: 't2', description: 'NETFLIX SUBSCRIPTION 67890', source: '' as never }),
-    ]
+    const all = [txn, makeTxn({ id: 't2', description: 'NETFLIX SUBSCRIPTION 67890', source: '' as never })]
 
     const suggestions = suggestRules(txn, categoryId, all)
     // Both suggested (startsWith prefix) and exact (equals full desc) returned

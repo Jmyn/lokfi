@@ -58,8 +58,8 @@ program
   .option('--shift-days <n>', 'Days to shift dates forward', '7')
   .option('--seed <n>', 'RNG seed for amount fuzzing', '42')
   .action((opts: { shiftDays: string; seed: string }) => {
-    const shiftDays = parseInt(opts.shiftDays, 10)
-    const seed = parseInt(opts.seed, 10)
+    const shiftDays = Number.parseInt(opts.shiftDays, 10)
+    const seed = Number.parseInt(opts.seed, 10)
     let data = ''
     process.stdin.setEncoding('utf8')
     process.stdin.on('data', (chunk: string) => (data += chunk))
@@ -76,7 +76,7 @@ program
         const timePart = ts.slice(10)
         cols[0] = shiftDate(datePart, shiftDays) + timePart
         // Col 7: Native Amount — fuzz by ±15% with per-row seed offset
-        const native = parseFloat(cols[7] ?? '0')
+        const native = Number.parseFloat(cols[7] ?? '0')
         if (!isNaN(native) && native !== 0) {
           cols[7] = String(fuzzAmount(native, seed + i))
         }
@@ -95,4 +95,3 @@ const isMain =
 if (isMain) {
   program.parse(process.argv)
 }
-

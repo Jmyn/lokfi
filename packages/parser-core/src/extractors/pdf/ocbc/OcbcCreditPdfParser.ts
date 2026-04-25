@@ -1,6 +1,6 @@
-import { StatementParser, Statement, Transaction, ParseError } from '../../../types'
-import { normalizeOcrText } from '../ocrNormalizer'
 import { parseAmount } from '../../../parsers/generic/csvUtils'
+import { ParseError, type Statement, type StatementParser, type Transaction } from '../../../types'
+import { normalizeOcrText } from '../ocrNormalizer'
 
 /**
  * OCBC Credit Card Statement PDF Parser.
@@ -46,7 +46,10 @@ export class OcbcCreditPdfParser implements StatementParser {
     }
 
     const text = normalizeOcrText(rawText)
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+    const lines = text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0)
 
     // Extract account/card number (primary card — first match in header)
     const accountNo = this.extractAccountNo(lines)
@@ -93,7 +96,7 @@ export class OcbcCreditPdfParser implements StatementParser {
   private extractStatementYear(lines: string[]): number {
     for (const line of lines.slice(0, 30)) {
       const m = line.match(/\b\d{2}-\d{2}-(\d{4})\b/)
-      if (m) return parseInt(m[1]!, 10)
+      if (m) return Number.parseInt(m[1]!, 10)
     }
     return new Date().getFullYear()
   }
@@ -105,7 +108,7 @@ export class OcbcCreditPdfParser implements StatementParser {
   private extractStatementMonth(lines: string[]): number {
     for (const line of lines.slice(0, 30)) {
       const m = line.match(/\b\d{2}-(\d{2})-\d{4}\b/)
-      if (m) return parseInt(m[1]!, 10)
+      if (m) return Number.parseInt(m[1]!, 10)
     }
     return new Date().getMonth() + 1
   }
@@ -141,7 +144,10 @@ export class OcbcCreditPdfParser implements StatementParser {
     // Skip any header row within the table section
     while (i < lines.length) {
       const line = lines[i]!
-      if (this.isHeaderLine(line)) { i++; continue }
+      if (this.isHeaderLine(line)) {
+        i++
+        continue
+      }
       break
     }
 
@@ -151,7 +157,10 @@ export class OcbcCreditPdfParser implements StatementParser {
       // Stop at the true end of all transaction data
       if (this.isDocumentEnd(line)) break
       // Skip section separators (SUBTOTAL, per-card TOTAL) and keep scanning
-      if (this.isSectionEnd(line)) { i++; continue }
+      if (this.isSectionEnd(line)) {
+        i++
+        continue
+      }
 
       // Detect account switch: a line containing a card number starts a new card section
       const cardMatch = line.match(CARD_NUMBER_RE)
@@ -210,10 +219,7 @@ export class OcbcCreditPdfParser implements StatementParser {
    */
   private isSectionEnd(line: string): boolean {
     const lower = line.toLowerCase().trim()
-    return (
-      lower.includes('subtotal') ||
-      /^total\b/i.test(lower)
-    )
+    return lower.includes('subtotal') || /^total\b/i.test(lower)
   }
 
   private isContinuationLine(current: string, next: string): boolean {
@@ -231,13 +237,13 @@ export class OcbcCreditPdfParser implements StatementParser {
     line: string,
     stmtYear: number,
     stmtMonth: number,
-    _nextLine?: string,
+    _nextLine?: string
   ): Transaction | null {
     const dateMatch = line.match(DATE_RE)
     if (!dateMatch) return null
 
-    const day = parseInt(dateMatch[1]!, 10)
-    const month = parseInt(dateMatch[2]!, 10)
+    const day = Number.parseInt(dateMatch[1]!, 10)
+    const month = Number.parseInt(dateMatch[2]!, 10)
     if (day < 1 || day > 31 || month < 1 || month > 12) return null
 
     // Handle cross-year: if transaction month is after statement month, it's previous year
@@ -252,9 +258,7 @@ export class OcbcCreditPdfParser implements StatementParser {
     const rawAmounts = [...line.matchAll(/[\d,]+\.\d{2}/g)]
     if (rawAmounts.length === 0) return null
 
-    const amounts = rawAmounts
-      .map(m => parseAmount(m[0]!))
-      .filter((n): n is number => n !== null && n !== 0)
+    const amounts = rawAmounts.map((m) => parseAmount(m[0]!)).filter((n): n is number => n !== null && n !== 0)
 
     if (amounts.length === 0) return null
 

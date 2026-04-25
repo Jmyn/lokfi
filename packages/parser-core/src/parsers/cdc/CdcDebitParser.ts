@@ -1,20 +1,15 @@
 import Papa from 'papaparse'
-import { StatementParser, DebitStatement, Transaction, ParseError } from '../../types'
+import { type DebitStatement, ParseError, type StatementParser, type Transaction } from '../../types'
 
 export class CdcDebitParser implements StatementParser {
   detect(text: string): boolean {
     if (!text) return false
     const firstLine = text.split('\n')[0]?.trim() || ''
-    
+
     // Check for the presence of the most critical columns that identify a CDC statement
-    const requiredHeaders = [
-      'Timestamp (UTC)',
-      'Transaction Description',
-      'Native Amount',
-      'Transaction Kind'
-    ]
-    
-    return requiredHeaders.every(header => firstLine.includes(header))
+    const requiredHeaders = ['Timestamp (UTC)', 'Transaction Description', 'Native Amount', 'Transaction Kind']
+
+    return requiredHeaders.every((header) => firstLine.includes(header))
   }
 
   parse(text: string): DebitStatement {
@@ -31,7 +26,7 @@ export class CdcDebitParser implements StatementParser {
     }
 
     const transactions: Transaction[] = []
-    
+
     // Skip header row
     for (let i = 1; i < data.length; i++) {
       const row = data[i]
@@ -47,8 +42,8 @@ export class CdcDebitParser implements StatementParser {
 
       // Col 7: Native Amount
       const nativeAmountStr = row[7]?.replace(/,/g, '') // remove commas if any
-      const transactionValue = parseFloat(nativeAmountStr || '0')
-      
+      const transactionValue = Number.parseFloat(nativeAmountStr || '0')
+
       if (isNaN(transactionValue)) {
         continue // Skip invalid rows
       }

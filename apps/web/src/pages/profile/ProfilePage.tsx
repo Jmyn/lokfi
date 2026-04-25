@@ -1,9 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Download, AlertTriangle, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Download, Trash2, Upload } from 'lucide-react'
+import { useBackupWarning } from '../../hooks/useBackupWarning'
+import { StorageManager } from '../../lib/db/StorageManager'
 import { db } from '../../lib/db/db'
 import type { DbCustomParserProfile } from '../../lib/db/db'
-import { StorageManager } from '../../lib/db/StorageManager'
-import { useBackupWarning } from '../../hooks/useBackupWarning'
 
 export function ProfilePage() {
   const showWarning = useBackupWarning()
@@ -130,10 +130,7 @@ export function ProfilePage() {
               { label: 'Categories', value: categoriesCount !== undefined ? categoriesCount : '…' },
               {
                 label: 'Date range',
-                value:
-                  oldest && newest
-                    ? `${oldest.date.slice(0, 7)} → ${newest.date.slice(0, 7)}`
-                    : '—',
+                value: oldest && newest ? `${oldest.date.slice(0, 7)} → ${newest.date.slice(0, 7)}` : '—',
               },
             ].map(({ label, value }) => (
               <div
@@ -142,9 +139,7 @@ export function ProfilePage() {
                 style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}
               >
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">{label}</p>
-                <p className="font-mono text-base font-medium text-gray-900 dark:text-white">
-                  {value}
-                </p>
+                <p className="font-mono text-base font-medium text-gray-900 dark:text-white">{value}</p>
               </div>
             ))}
           </div>
@@ -185,7 +180,7 @@ export function ProfilePage() {
             </p>
           ) : (
             <ul className="space-y-2">
-              {customParsers.map(p => (
+              {customParsers.map((p) => (
                 <li
                   key={p.id}
                   className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
@@ -217,7 +212,11 @@ export function ProfilePage() {
           <div className="pt-1">
             <label
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg cursor-pointer hover:opacity-80 transition-opacity w-fit"
-              style={{ borderColor: 'var(--accent)', color: 'var(--accent)', backgroundColor: 'var(--accent-subtle)' }}
+              style={{
+                borderColor: 'var(--accent)',
+                color: 'var(--accent)',
+                backgroundColor: 'var(--accent-subtle)',
+              }}
             >
               <Upload className="w-4 h-4" />
               Import profile (JSON)
@@ -232,10 +231,7 @@ export function ProfilePage() {
         className="rounded-xl border overflow-hidden"
         style={{ borderColor: '#fca5a5', backgroundColor: 'var(--bg-sidebar)' }}
       >
-        <div
-          className="px-5 py-4 border-b"
-          style={{ borderColor: '#fca5a5' }}
-        >
+        <div className="px-5 py-4 border-b" style={{ borderColor: '#fca5a5' }}>
           <h2 className="text-sm font-semibold text-red-600 dark:text-red-400">Danger Zone</h2>
         </div>
         <div className="px-5 py-4 space-y-3">

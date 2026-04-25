@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { RuleSuggestion } from '../../lib/rules/suggestRules'
 import type { RuleCondition } from '../../lib/db/db'
+import type { RuleSuggestion } from '../../lib/rules/suggestRules'
 
 interface Props {
   suggestions: RuleSuggestion[]
@@ -32,13 +32,7 @@ function describeConditions(conditions: RuleCondition[]): string {
   return conditions.map(describeCondition).join(' · ')
 }
 
-export function RuleSuggestionBar({
-  suggestions,
-  categoryName,
-  onCreateRule,
-  onCustomize,
-  onDismiss,
-}: Props) {
+export function RuleSuggestionBar({ suggestions, categoryName, onCreateRule, onCustomize, onDismiss }: Props) {
   const [selected, setSelected] = useState<RuleSuggestion>(suggestions[0])
   const showPills = suggestions.length > 1
 
@@ -108,7 +102,9 @@ export function RuleSuggestionBar({
         {selected.previewDescriptions.length > 0 && (
           <span className="ml-3 text-xs text-gray-400 dark:text-gray-500 truncate max-w-sm">
             e.g. {selected.previewDescriptions.join(', ')}
-            {selected.matchCount > selected.previewDescriptions.length ? ` + ${selected.matchCount - selected.previewDescriptions.length} more` : ''}
+            {selected.matchCount > selected.previewDescriptions.length
+              ? ` + ${selected.matchCount - selected.previewDescriptions.length} more`
+              : ''}
           </span>
         )}
       </div>

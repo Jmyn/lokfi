@@ -10,3 +10,5 @@ statements/
 *.local.*
 .ignore
 *.bak
+
+.kilo

@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { GenericCsvParser } from './GenericCsvParser'
+import { describe, expect, it } from 'vitest'
 import { ParseError } from '../../types'
+import { GenericCsvParser } from './GenericCsvParser'
 
 describe('GenericCsvParser', () => {
   const parser = new GenericCsvParser()

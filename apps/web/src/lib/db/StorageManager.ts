@@ -17,7 +17,7 @@ export class StorageManager {
 
         const granted = await navigator.storage.persist()
         await db.settings.put({ key: 'storagePermission', value: granted ? 'granted' : 'denied' })
-        
+
         console.log(`[StorageManager] Persistence requested. Granted: ${granted}`)
       } catch (error) {
         console.error('[StorageManager] Failed to request storage persistence', error)

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import { useDashboard } from '../DashboardContext'
 import { fmt } from '../../../lib/format'
+import { useDashboard } from '../DashboardContext'
 
 interface KpiCardProps {
   label: string
@@ -15,25 +15,17 @@ function KpiCard({ label, value, sub, trend }: KpiCardProps) {
       className="flex flex-col gap-1 rounded-xl border p-5"
       style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
     >
-      <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-        {label}
-      </span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</span>
       <div className="flex items-baseline gap-2">
         <span className="font-mono text-2xl font-medium text-gray-900 dark:text-white">{value}</span>
         {trend && (
           <span
             className="text-xs font-medium"
             style={{
-              color:
-                trend.direction === 'up'
-                  ? '#ef4444'
-                  : trend.direction === 'down'
-                    ? '#16a34a'
-                    : '#9ca3af',
+              color: trend.direction === 'up' ? '#ef4444' : trend.direction === 'down' ? '#16a34a' : '#9ca3af',
             }}
           >
-            {trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '→'}{' '}
-            {trend.label}
+            {trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '→'} {trend.label}
           </span>
         )}
       </div>
@@ -66,9 +58,7 @@ export function KpiRow() {
       catMap.set(catId, (catMap.get(catId) ?? 0) + Math.abs(t.transactionValue))
     }
     const topCatEntry = [...catMap.entries()].sort((a, b) => b[1] - a[1])[0]
-    const topCat = topCatEntry
-      ? categories.find((c) => c.id === topCatEntry[0])
-      : null
+    const topCat = topCatEntry ? categories.find((c) => c.id === topCatEntry[0]) : null
 
     // Trend: compare first half vs second half of filtered period
     const sorted = [...expenses].sort((a, b) => a.date.localeCompare(b.date))
@@ -76,13 +66,7 @@ export function KpiRow() {
     const firstHalf = sorted.slice(0, mid).reduce((s, t) => s + Math.abs(t.transactionValue), 0)
     const secondHalf = sorted.slice(mid).reduce((s, t) => s + Math.abs(t.transactionValue), 0)
     const spendTrend =
-      firstHalf === 0
-        ? 'flat'
-        : secondHalf > firstHalf * 1.05
-          ? 'up'
-          : secondHalf < firstHalf * 0.95
-            ? 'down'
-            : 'flat'
+      firstHalf === 0 ? 'flat' : secondHalf > firstHalf * 1.05 ? 'up' : secondHalf < firstHalf * 0.95 ? 'down' : 'flat'
 
     const trendPct = firstHalf > 0 ? Math.abs(((secondHalf - firstHalf) / firstHalf) * 100) : 0
 
@@ -110,9 +94,7 @@ export function KpiRow() {
           value={fmt.format(stats.totalSpend)}
           sub={`across ${stats.monthCount} months`}
           trend={
-            stats.trendPct > 0
-              ? { direction: stats.spendTrend, label: `${stats.trendPct.toFixed(0)}%` }
-              : undefined
+            stats.trendPct > 0 ? { direction: stats.spendTrend, label: `${stats.trendPct.toFixed(0)}%` } : undefined
           }
         />
         <KpiCard
@@ -120,11 +102,7 @@ export function KpiRow() {
           value={stats.savingsRate > 0 ? `${stats.savingsRate.toFixed(1)}%` : 'N/A'}
           sub="income minus expenses"
         />
-        <KpiCard
-          label="Monthly average"
-          value={fmt.format(stats.avgMonthly)}
-          sub="expenses only"
-        />
+        <KpiCard label="Monthly average" value={fmt.format(stats.avgMonthly)} sub="expenses only" />
         <KpiCard
           label="Top category"
           value={stats.topCat?.name ?? '—'}

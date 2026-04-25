@@ -1,15 +1,8 @@
 import { useMemo } from 'react'
-import {
-  AreaChart,
-  Area,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import { useDashboard } from '../DashboardContext'
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { AXIS_TICK, CURSOR_STYLE, TOOLTIP_STYLE } from '../../../lib/charts/chartTheme'
 import { fmt, formatMonth } from '../../../lib/format'
-import { AXIS_TICK, TOOLTIP_STYLE, CURSOR_STYLE } from '../../../lib/charts/chartTheme'
+import { useDashboard } from '../DashboardContext'
 
 export function MonthlyTrendChart() {
   const { transactions } = useDashboard()
@@ -68,31 +61,14 @@ export function MonthlyTrendChart() {
               </linearGradient>
             </defs>
             <XAxis dataKey="month" tick={AXIS_TICK} axisLine={false} tickLine={false} />
-            <YAxis
-              tick={AXIS_TICK}
-              tickFormatter={(v) => `$${v}`}
-              axisLine={false}
-              tickLine={false}
-            />
+            <YAxis tick={AXIS_TICK} tickFormatter={(v) => `$${v}`} axisLine={false} tickLine={false} />
             <Tooltip
               formatter={(v: number, name: string) => [fmt.format(v), name === 'income' ? 'Income' : 'Expenses']}
               contentStyle={TOOLTIP_STYLE}
               cursor={CURSOR_STYLE}
             />
-            <Area
-              type="monotone"
-              dataKey="income"
-              stroke="#16a34a"
-              strokeWidth={2}
-              fill="url(#gradIncome)"
-            />
-            <Area
-              type="monotone"
-              dataKey="expenses"
-              stroke="#d97706"
-              strokeWidth={2}
-              fill="url(#gradExpenses)"
-            />
+            <Area type="monotone" dataKey="income" stroke="#16a34a" strokeWidth={2} fill="url(#gradIncome)" />
+            <Area type="monotone" dataKey="expenses" stroke="#d97706" strokeWidth={2} fill="url(#gradExpenses)" />
           </AreaChart>
         </ResponsiveContainer>
         <div className="flex items-center justify-center gap-6 mt-2 text-xs text-gray-500">

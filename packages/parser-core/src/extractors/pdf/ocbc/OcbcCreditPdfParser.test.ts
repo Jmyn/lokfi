@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { OcbcCreditPdfParser } from './OcbcCreditPdfParser'
 
 /**
@@ -30,10 +30,7 @@ TOTAL 121.40`
  * Stored as a separate file so it can be updated without touching test logic.
  * Personal data obfuscated: see __fixtures__/ocbc-credit-dec-25.txt.
  */
-const OCBC_DEC25_FIXTURE = readFileSync(
-  new URL('./__fixtures__/ocbc-credit-dec-25.txt', import.meta.url),
-  'utf-8',
-)
+const OCBC_DEC25_FIXTURE = readFileSync(new URL('./__fixtures__/ocbc-credit-dec-25.txt', import.meta.url), 'utf-8')
 
 describe('OcbcCreditPdfParser', () => {
   const parser = new OcbcCreditPdfParser()
@@ -109,7 +106,7 @@ describe('OcbcCreditPdfParser', () => {
       }
     })
 
-    it('LAST MONTH\'S BALANCE lines are not parsed as transactions', () => {
+    it("LAST MONTH'S BALANCE lines are not parsed as transactions", () => {
       const stmt = parser.parse(OCBC_DEC25_FIXTURE)
       for (const txn of stmt.transactions) {
         expect(txn.description).not.toMatch(/last month/i)
@@ -118,7 +115,7 @@ describe('OcbcCreditPdfParser', () => {
 
     it('supplementary card transactions are included (not dropped at SUBTOTAL)', () => {
       const stmt = parser.parse(OCBC_DEC25_FIXTURE)
-      const descriptions = stmt.transactions.map(t => t.description)
+      const descriptions = stmt.transactions.map((t) => t.description)
       // Supplementary card transactions
       expect(descriptions).toContain('CITY HOSPITAL SINGAPORE SGP')
       expect(descriptions).toContain('INTERNET SERVICE SINGAPORE SGP')
@@ -126,7 +123,7 @@ describe('OcbcCreditPdfParser', () => {
 
     it('OCBC 365 transactions across page break are included', () => {
       const stmt = parser.parse(OCBC_DEC25_FIXTURE)
-      const descriptions = stmt.transactions.map(t => t.description)
+      const descriptions = stmt.transactions.map((t) => t.description)
       expect(descriptions).toContain('LATE CHARGE REVERSAL')
       expect(descriptions).toContain('IPP ELECTRONICS 36M 026/036')
     })
@@ -141,7 +138,7 @@ describe('OcbcCreditPdfParser', () => {
 
     it('parenthesized amounts are parsed as negative (payments/credits)', () => {
       const stmt = parser.parse(OCBC_DEC25_FIXTURE)
-      const payment = stmt.transactions.find(t => t.description === 'PAYMENT BY INTERNET')
+      const payment = stmt.transactions.find((t) => t.description === 'PAYMENT BY INTERNET')
       expect(payment).toBeDefined()
       expect(payment!.transactionValue).toBeLessThan(0)
     })
@@ -149,7 +146,7 @@ describe('OcbcCreditPdfParser', () => {
     it('instalment plan transactions use the instalment amount, not the full purchase amount', () => {
       const stmt = parser.parse(OCBC_DEC25_FIXTURE)
       // Description is trimmed at the first amount ($2,000.00), giving "TRAVEL WALLET"
-      const travelWallet = stmt.transactions.find(t => t.description === 'TRAVEL WALLET')
+      const travelWallet = stmt.transactions.find((t) => t.description === 'TRAVEL WALLET')
       expect(travelWallet).toBeDefined()
       expect(travelWallet!.transactionValue).toBe(320)
     })
@@ -162,23 +159,23 @@ describe('OcbcCreditPdfParser', () => {
         expect(txn.accountNo).not.toBe('UNKNOWN-ACCOUNT')
       }
       // Three distinct accounts
-      const accounts = [...new Set(stmt.transactions.map(t => t.accountNo))]
+      const accounts = [...new Set(stmt.transactions.map((t) => t.accountNo))]
       expect(accounts).toHaveLength(3)
     })
 
     it('supplementary card transactions carry their own accountNo, not the primary card', () => {
       const stmt = parser.parse(OCBC_DEC25_FIXTURE)
-      const suppTxn = stmt.transactions.find(t => t.description === 'CITY HOSPITAL SINGAPORE SGP')
-      const primaryTxn = stmt.transactions.find(t => t.description === 'TRAVEL WALLET')
+      const suppTxn = stmt.transactions.find((t) => t.description === 'CITY HOSPITAL SINGAPORE SGP')
+      const primaryTxn = stmt.transactions.find((t) => t.description === 'TRAVEL WALLET')
       expect(suppTxn?.accountNo).not.toBe(primaryTxn?.accountNo)
     })
 
     it('dates are correctly constructed from DD/MM + statement year', () => {
       const stmt = parser.parse(OCBC_DEC25_FIXTURE)
       // stmtYear=2025, stmtMonth=12; all transaction months ≤ 12
-      const cashRebate = stmt.transactions.find(t => t.description === 'CASH REBATE')
+      const cashRebate = stmt.transactions.find((t) => t.description === 'CASH REBATE')
       expect(cashRebate?.date).toBe('2025-12-01')
-      const payment = stmt.transactions.find(t => t.description === 'PAYMENT BY INTERNET')
+      const payment = stmt.transactions.find((t) => t.description === 'PAYMENT BY INTERNET')
       expect(payment?.date).toBe('2025-11-10')
     })
   })

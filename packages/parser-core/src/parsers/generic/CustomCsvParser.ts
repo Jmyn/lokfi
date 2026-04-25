@@ -1,12 +1,12 @@
 import Papa from 'papaparse'
-import type { StatementParser, Statement, CustomParserProfile, ColumnRef } from '../../types'
+import type { ColumnRef, CustomParserProfile, Statement, StatementParser } from '../../types'
 import { ParseError } from '../../types'
-import { parseAmount, normalizeDate, computeHeaderFingerprint } from './csvUtils'
+import { computeHeaderFingerprint, normalizeDate, parseAmount } from './csvUtils'
 
 function resolveIndex(headers: string[], ref: ColumnRef): number {
   if (typeof ref === 'number') return ref
   const lower = (ref as string).toLowerCase()
-  return headers.findIndex(h => h.trim().toLowerCase() === lower)
+  return headers.findIndex((h) => h.trim().toLowerCase() === lower)
 }
 
 export class CustomCsvParser implements StatementParser {
@@ -15,7 +15,7 @@ export class CustomCsvParser implements StatementParser {
   detect(text: string): boolean {
     if (!text) return false
     const { data } = Papa.parse<string[]>(text, { skipEmptyLines: false })
-    const rows = (data as string[][]).filter(r => r.some(c => c.trim()))
+    const rows = (data as string[][]).filter((r) => r.some((c) => c.trim()))
     const headerRow = rows[this.profile.skipRows] ?? []
     const fingerprint = computeHeaderFingerprint([headerRow])
     return fingerprint === this.profile.headerFingerprint
@@ -27,15 +27,15 @@ export class CustomCsvParser implements StatementParser {
     const { data, errors } = Papa.parse<string[]>(text, { skipEmptyLines: false })
 
     // Filter out non-fatal delimiter detection warnings
-    const fatalErrors = errors.filter(e => e.type !== 'Delimiter')
+    const fatalErrors = errors.filter((e) => e.type !== 'Delimiter')
     if (fatalErrors.length > 0) {
       throw new ParseError(`CSV parse error: ${fatalErrors[0]?.message}`, 'generic')
     }
 
     // Filter empty rows first, then apply skipRows — same logic as detect() and the modal preview
-    const rows = (data as string[][]).filter(r => r.some(c => c.trim()))
+    const rows = (data as string[][]).filter((r) => r.some((c) => c.trim()))
     const headerRow = rows[skipRows] ?? []
-    const headers = headerRow.map(h => h.trim().toLowerCase())
+    const headers = headerRow.map((h) => h.trim().toLowerCase())
     const dataRows = rows.slice(skipRows + 1)
 
     const dateIdx = resolveIndex(headers, columnMap.date)
@@ -53,31 +53,39 @@ export class CustomCsvParser implements StatementParser {
     const transactions: Statement['transactions'] = []
 
     for (const row of dataRows) {
-      if (row.every(c => !c.trim())) continue
+      if (row.every((c) => !c.trim())) continue
 
       const dateRaw = row[dateIdx]?.trim()
       if (!dateRaw) continue
       const date = normalizeDate(dateRaw)
       if (!date) continue
 
-      const description = (descIdx !== -1 ? row[descIdx]?.trim() || 'Unknown' : 'Unknown')
-        .replace(/[\r\n]+/g, ' ')
+      const description = (descIdx !== -1 ? row[descIdx]?.trim() || 'Unknown' : 'Unknown').replace(/[\r\n]+/g, ' ')
 
       let transactionValue = 0
       let hasAmt = false
 
       if (amtIdx !== -1) {
         const parsed = parseAmount(row[amtIdx]?.trim() || '')
-        if (parsed !== null) { transactionValue = parsed; hasAmt = true }
+        if (parsed !== null) {
+          transactionValue = parsed
+          hasAmt = true
+        }
       } else {
         const wStr = debitIdx !== -1 ? row[debitIdx]?.trim() || '' : ''
         const dStr = creditIdx !== -1 ? row[creditIdx]?.trim() || '' : ''
         if (wStr) {
           const v = parseAmount(wStr)
-          if (v !== null) { transactionValue = -Math.abs(v); hasAmt = true }
+          if (v !== null) {
+            transactionValue = -Math.abs(v)
+            hasAmt = true
+          }
         } else if (dStr) {
           const v = parseAmount(dStr)
-          if (v !== null) { transactionValue = Math.abs(v); hasAmt = true }
+          if (v !== null) {
+            transactionValue = Math.abs(v)
+            hasAmt = true
+          }
         }
       }
 
