@@ -6,6 +6,7 @@ export interface Filters {
   sources: StatementSource[]
   accounts: string[]
   categoryId: string
+  searchQuery: string
 }
 
 export const defaultFilters: Filters = {
@@ -14,4 +15,5 @@ export const defaultFilters: Filters = {
   sources: [],
   accounts: [],
   categoryId: '',
+  searchQuery: '',
 }

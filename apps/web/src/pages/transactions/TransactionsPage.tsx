@@ -11,6 +11,7 @@ import { RuleSuggestionBar } from './RuleSuggestionBar'
 import { TransactionFilters } from './TransactionFilters'
 import { TransactionTable } from './TransactionTable'
 import { type Filters, defaultFilters } from './filterTypes'
+import type { SortConfig } from './TransactionTable'
 
 type SuggestionState = {
   txnId: string
@@ -31,6 +32,9 @@ export function TransactionsPage() {
   // Pagination state
   const [pageOffset, setPageOffset] = useState(0)
   const [filteredTotal, setFilteredTotal] = useState(0)
+
+  // Sort state
+  const [sort, setSort] = useState<SortConfig>({ column: 'date', direction: 'desc' })
 
   // Cache all transactions for suggestRules (only reload when categories/rules change)
   const allTxnsRef = useRef<DbTransaction[]>([])
@@ -69,7 +73,8 @@ export function TransactionsPage() {
     filters.dateTo !== '' ||
     filters.sources.length > 0 ||
     filters.accounts.length > 0 ||
-    filters.categoryId !== ''
+    filters.categoryId !== '' ||
+    filters.searchQuery !== ''
 
   function handleToggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -86,6 +91,11 @@ export function TransactionsPage() {
       if (allSelected) return new Set()
       return new Set(ids)
     })
+  }
+
+  function handleSortChange(newSort: SortConfig) {
+    setSort(newSort)
+    setPageOffset(0)
   }
 
   async function handleBulkApply() {
@@ -226,6 +236,8 @@ export function TransactionsPage() {
             }}
             totalFiltered={filteredTotal}
             onLoadMore={() => setPageOffset((o) => o + 100)}
+            sort={sort}
+            onSortChange={handleSortChange}
           />
         )}
       </div>

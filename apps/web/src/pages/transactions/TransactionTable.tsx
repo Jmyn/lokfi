@@ -9,6 +9,11 @@ import type { Filters } from './filterTypes'
 const fmt = new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD' })
 const PAGE_SIZE = 100
 
+export interface SortConfig {
+  column: 'date' | 'description' | 'amount' | 'category' | 'source' | 'account'
+  direction: 'asc' | 'desc'
+}
+
 interface TransactionTableProps {
   filters: Filters
   selectedIds: Set<string>
@@ -19,6 +24,8 @@ interface TransactionTableProps {
   onLoadedChange: (loaded: number, total: number, hasMore: boolean) => void
   totalFiltered: number
   onLoadMore: () => void
+  sort: SortConfig
+  onSortChange: (sort: SortConfig) => void
 }
 
 export function TransactionTable({
@@ -31,6 +38,8 @@ export function TransactionTable({
   onLoadedChange,
   totalFiltered,
   onLoadMore,
+  sort,
+  onSortChange,
 }: TransactionTableProps) {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -63,14 +72,46 @@ export function TransactionTable({
         })
       : accountFiltered
 
+    // Apply description search filter
+    const descriptionFiltered = filters.searchQuery
+      ? categoryFiltered.and((t) => t.description.toLowerCase().includes(filters.searchQuery.toLowerCase()))
+      : categoryFiltered
+
     // Get total count
-    const total = await categoryFiltered.count()
+    const total = await descriptionFiltered.count()
 
     // Paginate — fetch all filtered results then slice.
     // Dexie's offset() on chained .and() collections can return 0 rows unexpectedly,
     // so we fetch all results and paginate in JS instead.
-    const allFiltered = await categoryFiltered.toArray()
-    const rows = allFiltered.slice(pageOffset, pageOffset + PAGE_SIZE)
+    const allFiltered = await descriptionFiltered.toArray()
+
+    // Sort in-memory before slicing
+    const sorted = [...allFiltered].sort((a, b) => {
+      let cmp = 0
+      switch (sort.column) {
+        case 'date':
+          cmp = a.date.localeCompare(b.date)
+          break
+        case 'description':
+          cmp = a.description.localeCompare(b.description)
+          break
+        case 'amount':
+          cmp = a.transactionValue - b.transactionValue
+          break
+        case 'category':
+          cmp = (a.manualCategory ?? a.category ?? '').localeCompare(b.manualCategory ?? b.category ?? '')
+          break
+        case 'source':
+          cmp = a.source.localeCompare(b.source)
+          break
+        case 'account':
+          cmp = a.accountNo.localeCompare(b.accountNo)
+          break
+      }
+      return sort.direction === 'desc' ? -cmp : cmp
+    })
+
+    const rows = sorted.slice(pageOffset, pageOffset + PAGE_SIZE)
 
     // Report loaded/total/hasMore
     const loaded = rows.length
@@ -79,7 +120,7 @@ export function TransactionTable({
     onLoadedChange(pageOffset + loaded, total, more)
 
     return rows
-  }, [filters, pageOffset, onLoadedChange])
+  }, [filters, pageOffset, onLoadedChange, sort])
 
   if (!transactions) {
     return (
@@ -110,24 +151,45 @@ export function TransactionTable({
                 className="rounded accent-amber-600"
               />
             </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Date
-            </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Description
-            </th>
-            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Amount
-            </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Category
-            </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Source
-            </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Account
-            </th>
+            {(
+              [
+                { key: 'date', label: 'Date', align: 'left' },
+                { key: 'description', label: 'Description', align: 'left' },
+                { key: 'amount', label: 'Amount', align: 'right' },
+                { key: 'category', label: 'Category', align: 'left' },
+                { key: 'source', label: 'Source', align: 'left' },
+                { key: 'account', label: 'Account', align: 'left' },
+              ] as const
+            ).map((col) => {
+              const isActive = sort.column === col.key
+              const ariaSort = isActive ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'
+              return (
+                <th
+                  key={col.key}
+                  className={`px-3 py-2.5 text-xs font-semibold uppercase tracking-wider ${col.align === 'right' ? 'text-right' : 'text-left'} text-gray-500 dark:text-gray-400`}
+                >
+                  <button
+                    onClick={() => {
+                      if (isActive) {
+                        onSortChange({ column: col.key, direction: sort.direction === 'asc' ? 'desc' : 'asc' })
+                      } else {
+                        onSortChange({ column: col.key, direction: col.key === 'date' ? 'desc' : 'asc' })
+                      }
+                    }}
+                    className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    aria-label={`Sort by ${col.label} (${isActive ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'})`}
+                    aria-sort={ariaSort}
+                  >
+                    {col.label}
+                    {isActive && (
+                      <span className="text-xs">
+                        {sort.direction === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </button>
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody>

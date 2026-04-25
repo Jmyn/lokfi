@@ -38,7 +38,8 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
     filters.dateTo !== '' ||
     filters.sources.length > 0 ||
     filters.accounts.length > 0 ||
-    filters.categoryId !== ''
+    filters.categoryId !== '' ||
+    filters.searchQuery !== ''
 
   return (
     <div
@@ -138,6 +139,19 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
           })}
         </div>
       )}
+
+      {/* Search */}
+      <div className="flex items-center gap-1.5">
+        <input
+          type="search"
+          value={filters.searchQuery}
+          onChange={(e) => onChange({ ...filters, searchQuery: e.target.value })}
+          placeholder="Search description…"
+          aria-label="Search transactions by description"
+          className={inputCls}
+          style={inputStyle}
+        />
+      </div>
 
       {/* Separator */}
       <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
