@@ -1,3 +1,12 @@
+import type {
+  BrokerageAccount,
+  BrokerageCorpAction,
+  BrokerageCredentials,
+  BrokeragePosition,
+  BrokeragePositionExtension,
+  BrokerageSyncLog,
+  BrokerageTransaction,
+} from '@lokfi/brokerage-core'
 import type { CustomParserProfile, StatementSource } from '@lokfi/parser-core'
 import Dexie, { type Table } from 'dexie'
 import { type DbCategory, defaultCategories } from './seedCategories'
@@ -46,12 +55,22 @@ export interface DbBudget {
 }
 
 export class LokfiDatabase extends Dexie {
+  // Bank statement tables
   transactions!: Table<DbTransaction>
   rules!: Table<DbRule>
   categories!: Table<DbCategory>
   settings!: Table<DbSetting>
   customParsers!: Table<DbCustomParserProfile>
   budgets!: Table<DbBudget>
+
+  // Brokerage tables (v5)
+  brokeragePositions!: Table<BrokeragePosition>
+  brokeragePositionExtensions!: Table<BrokeragePositionExtension>
+  brokerageTransactions!: Table<BrokerageTransaction>
+  brokerageCorpActions!: Table<BrokerageCorpAction>
+  brokerageAccounts!: Table<BrokerageAccount>
+  brokerageSyncLog!: Table<BrokerageSyncLog>
+  brokerageCredentials!: Table<BrokerageCredentials>
 
   constructor() {
     super('lokfi')
@@ -77,6 +96,17 @@ export class LokfiDatabase extends Dexie {
     // v4 schema (adds budgets table for category spending limits)
     this.version(4).stores({
       budgets: 'id, categoryId',
+    })
+
+    // v5 schema (adds brokerage pipeline tables)
+    this.version(5).stores({
+      brokeragePositions: 'id',
+      brokeragePositionExtensions: '[positionId+key], positionId',
+      brokerageTransactions: 'id, orderId, source, symbol, executedAt',
+      brokerageCorpActions: 'id, source, symbol, type',
+      brokerageAccounts: 'id, source, currency',
+      brokerageSyncLog: '++id, source, category, lastSyncAt, status',
+      brokerageCredentials: 'id',
     })
 
     // Seed default categories on initial DB creation
