@@ -18,9 +18,6 @@ export async function applyRulesToImport(transactionIds: string[]): Promise<void
   // check many of them across the batch of transactions.
   const rules = await db.rules.orderBy('priority').toArray()
 
-  // Optimization: If no rules exist, there's nothing to evaluate.
-  if (rules.length === 0) return
-
   // Run updates in a single Dexie database transaction for performance and atomicity
   await db.transaction('rw', db.transactions, async () => {
     // We can fetch transactions in chunks if the array is large,
@@ -35,11 +32,17 @@ export async function applyRulesToImport(transactionIds: string[]): Promise<void
       // Tier 1 precedence: Manual category always wins, so skip rule eval
       if (txn.manualCategory) continue
 
-      // Tier 2 precedence: Evaluate general rules
-      const matchedCategory = evaluateRules(txn, rules)
+      // Tier 2 precedence: Evaluate general rules (if any exist)
+      let matchedCategory: string | null = null
+      if (rules.length > 0) {
+        matchedCategory = evaluateRules(txn, rules)
+      }
 
       if (matchedCategory) {
         updates.push({ id: txn.id, category: matchedCategory })
+      } else if (txn.transactionValue > 0) {
+        // Tier 3: Auto-assign Income category to positive-value (inflow) transactions
+        updates.push({ id: txn.id, category: 'cat_income' })
       }
     }
 
