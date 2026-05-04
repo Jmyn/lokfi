@@ -17,6 +17,9 @@ export const defaultDashboardFilters: DashboardFilters = {
   accounts: [],
 }
 
+/** Sentinel value for uncategorised transactions in the category filter */
+const UNCATEGORIZED = '__uncategorized__'
+
 // Persisted subset — only category/account selections are saved (dates are temporal)
 interface SavedFilterPrefs {
   categoryIds: string[]
@@ -117,8 +120,9 @@ export function DashboardFilterProvider({ children }: { children: ReactNode }) {
       if (filters.dateTo && t.date > filters.dateTo) return false
       if (!allAccountsSelected && !filters.accounts.includes(t.accountNo)) return false
       if (!allCategoriesSelected) {
-        const catId = t.manualCategory ?? t.category ?? ''
-        if (!filters.categoryIds.includes(catId)) return false
+        const catId = t.manualCategory ?? t.category
+        const effectiveCatId = catId || UNCATEGORIZED
+        if (!filters.categoryIds.includes(effectiveCatId)) return false
       }
       return true
     })

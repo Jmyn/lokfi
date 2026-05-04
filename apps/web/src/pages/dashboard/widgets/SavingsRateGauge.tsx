@@ -44,10 +44,10 @@ export function SavingsRateGauge() {
   const filled = rate >= 0 ? (rate / 100) * arcLength : 0
 
   return (
-    <section className="space-y-3">
+    <section className="flex flex-col gap-3 h-full md:row-span-2">
       <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">Savings Rate</h2>
       <div
-        className="rounded-xl border p-5 flex flex-col items-center"
+        className="rounded-xl border p-5 flex flex-col items-center justify-center flex-1"
         style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
       >
         <svg width="240" height="140" viewBox="0 0 240 140">
