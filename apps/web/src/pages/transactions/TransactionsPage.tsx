@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef, useState } from 'react'
+import { useUnifiedTransactions } from '../../lib/brokerage/unifiedTransactions'
 import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
 import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
@@ -8,6 +9,7 @@ import { type RuleSuggestion, suggestRules } from '../../lib/rules/suggestRules'
 import { RuleEditorModal } from '../rules/RuleEditorModal'
 import { CategoryCombobox } from './CategoryCombobox'
 import { RuleSuggestionBar } from './RuleSuggestionBar'
+import { SourceTypeTabs } from './SourceTypeTabs'
 import { TransactionFilters } from './TransactionFilters'
 import { TransactionTable } from './TransactionTable'
 import { type Filters, defaultFilters } from './filterTypes'
@@ -18,6 +20,8 @@ type SuggestionState = {
   categoryId: string
   categoryName: string
 }
+
+const PAGE_SIZE = 100
 
 export function TransactionsPage() {
   const [filters, setFilters] = useState<Filters>(defaultFilters)
@@ -30,7 +34,9 @@ export function TransactionsPage() {
 
   // Pagination state
   const [pageOffset, setPageOffset] = useState(0)
-  const [filteredTotal, setFilteredTotal] = useState(0)
+
+  // Unified data
+  const { rows, total, hasMore, isLoading } = useUnifiedTransactions(filters, pageOffset, PAGE_SIZE)
 
   // Cache all transactions for suggestRules (only reload when categories/rules change)
   const allTxnsRef = useRef<DbTransaction[]>([])
@@ -41,6 +47,7 @@ export function TransactionsPage() {
   // Reset page offset when filters change
   useEffect(() => {
     setPageOffset(0)
+    setSelectedIds(new Set())
   }, [filters])
 
   // Reload all transactions for suggestRules only when categories change
@@ -59,17 +66,32 @@ export function TransactionsPage() {
     })
   }, [])
 
-  const totalCount = useLiveQuery(() => db.transactions.count(), [])
   const uncategorisedCount = useLiveQuery(async () => {
-    return await db.transactions.filter((t) => !t.manualCategory && !t.category).count()
-  }, [])
+    if (filters.sourceType === 'brokerage') return 0
+    return db.transactions.filter((t) => !t.manualCategory && !t.category).count()
+  }, [filters.sourceType])
+
+  const hasAnyData = useLiveQuery(async () => {
+    if (filters.sourceType === 'brokerage') {
+      const [tc, cac] = await Promise.all([db.brokerageTransactions.count(), db.brokerageCorpActions.count()])
+      return tc + cac > 0
+    }
+    if (filters.sourceType === 'bank') return (await db.transactions.count()) > 0
+    const [bc, tc, cac] = await Promise.all([
+      db.transactions.count(),
+      db.brokerageTransactions.count(),
+      db.brokerageCorpActions.count(),
+    ])
+    return bc + tc + cac > 0
+  }, [filters.sourceType])
 
   const hasFilters =
     filters.dateFrom !== '' ||
     filters.dateTo !== '' ||
     filters.sources.length > 0 ||
     filters.accounts.length > 0 ||
-    filters.categoryId !== ''
+    filters.categoryId !== '' ||
+    filters.type !== ''
 
   function handleToggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -101,20 +123,13 @@ export function TransactionsPage() {
   }
 
   async function handleCategoryChanged(txn: DbTransaction, categoryId: string | undefined) {
-    // Skip if no category was set
     if (!categoryId) return
-    // Skip if the transaction already had a rule-assigned category (user is overriding)
     if (txn.category) return
-    // A new categorization clears any prior dismiss for this txn
     dismissedTxIds.current.delete(txn.id)
-
-    // Use cached allTransactions (only refreshed when categories change)
     const suggestions = suggestRules(txn, categoryId, allTxnsRef.current)
     if (suggestions.length === 0) return
-
     const category = categories?.find((c) => c.id === categoryId)
     const categoryName = category?.name ?? categoryId
-
     setSuggestionState({ txnId: txn.id, suggestions, categoryId, categoryName })
   }
 
@@ -125,11 +140,9 @@ export function TransactionsPage() {
 
   async function handleCreateRule(suggestion: RuleSuggestion) {
     if (!suggestionState) return
-
     const identifier = suggestion.conditions[0]?.value as string
     const categoryName = suggestionState.categoryName
     const ruleName = `${identifier} — ${categoryName}`
-
     const rule = {
       id: crypto.randomUUID(),
       name: ruleName,
@@ -138,15 +151,10 @@ export function TransactionsPage() {
       category: suggestionState.categoryId,
       createdAt: new Date().toISOString(),
     }
-
     await db.rules.put(rule)
-
     const allIds = (await db.transactions.toArray()).map((t) => t.id)
     await applyRulesToImport(allIds)
-
-    // Count how many got newly categorized (approximation via matchCount)
     const matchCount = suggestion.matchCount
-
     setSuggestionState(null)
     showToast(`Rule created — ${matchCount} transaction${matchCount !== 1 ? 's' : ''} categorized`)
   }
@@ -162,14 +170,34 @@ export function TransactionsPage() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  if (totalCount === 0) {
+  const selectedBankCount = selectedIds.size
+
+  // Empty state — no data at all in the selected source
+  if (!isLoading && hasAnyData === false) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center p-8 rounded-xl border max-w-sm" style={{ borderColor: 'var(--border)' }}>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">No transactions yet</p>
-          <Link to="/import" className="text-sm font-medium hover:underline" style={{ color: 'var(--accent)' }}>
-            Import a statement →
-          </Link>
+          {filters.sourceType === 'brokerage' ? (
+            <>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                No brokerage transactions yet. Sync your account to see trades and dividends.
+              </p>
+              <Link
+                to="/settings/brokerage"
+                className="text-sm font-medium hover:underline"
+                style={{ color: 'var(--accent)' }}
+              >
+                Brokerage settings →
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">No transactions yet</p>
+              <Link to="/import" className="text-sm font-medium hover:underline" style={{ color: 'var(--accent)' }}>
+                Import a statement →
+              </Link>
+            </>
+          )}
         </div>
       </div>
     )
@@ -181,51 +209,54 @@ export function TransactionsPage() {
       <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-baseline gap-3">
           <h1 className="font-serif text-xl text-gray-900 dark:text-white">Transactions</h1>
-          {totalCount !== undefined && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">{totalCount} total</span>
+          {!isLoading && <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">{total} total</span>}
+        </div>
+        <div className="flex items-center gap-3">
+          <SourceTypeTabs
+            value={filters.sourceType}
+            onChange={(sourceType) => setFilters((f) => ({ ...f, sourceType, categoryId: '', type: '' }))}
+          />
+          {uncategorisedCount !== undefined && uncategorisedCount > 0 && (
+            <button
+              onClick={() =>
+                setFilters((f) => ({
+                  ...f,
+                  categoryId: f.categoryId === '__uncategorised__' ? '' : '__uncategorised__',
+                }))
+              }
+              className="text-xs font-medium px-3 py-1.5 rounded-full border transition-colors"
+              style={{
+                color: 'var(--accent)',
+                borderColor: 'var(--accent)',
+                backgroundColor: filters.categoryId === '__uncategorised__' ? 'var(--accent-subtle)' : 'transparent',
+              }}
+            >
+              {uncategorisedCount} uncategorised
+            </button>
           )}
         </div>
-        {/* Uncategorised nudge */}
-        {uncategorisedCount !== undefined && uncategorisedCount > 0 && (
-          <button
-            onClick={() =>
-              setFilters((f) => ({
-                ...f,
-                categoryId: f.categoryId === '__uncategorised__' ? '' : '__uncategorised__',
-              }))
-            }
-            className="text-xs font-medium px-3 py-1.5 rounded-full border transition-colors"
-            style={{
-              color: 'var(--accent)',
-              borderColor: 'var(--accent)',
-              backgroundColor: filters.categoryId === '__uncategorised__' ? 'var(--accent-subtle)' : 'transparent',
-            }}
-          >
-            {uncategorisedCount} uncategorised
-          </button>
-        )}
       </div>
 
       <TransactionFilters filters={filters} onChange={setFilters} />
 
       <div className="flex-1 overflow-auto">
-        {totalCount !== undefined && totalCount > 0 && hasFilters && filteredTotal === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">Loading…</div>
+        ) : hasAnyData && total === 0 && hasFilters ? (
           <div className="flex items-center justify-center h-40">
             <p className="text-gray-400 dark:text-gray-500 text-sm">No transactions match your filters.</p>
           </div>
         ) : (
           <TransactionTable
-            filters={filters}
+            rows={rows}
             selectedIds={selectedIds}
             onToggleSelect={handleToggleSelect}
             onToggleAll={handleToggleAll}
             onCategoryChanged={handleCategoryChanged}
             pageOffset={pageOffset}
-            onLoadedChange={(_loaded, total, _more) => {
-              setFilteredTotal(total)
-            }}
-            totalFiltered={filteredTotal}
-            onLoadMore={() => setPageOffset((o) => o + 100)}
+            total={total}
+            hasMore={hasMore}
+            onLoadMore={() => setPageOffset((o) => o + PAGE_SIZE)}
           />
         )}
       </div>
@@ -240,13 +271,13 @@ export function TransactionsPage() {
           onCustomize={handleCustomize}
           onDismiss={handleDismiss}
         />
-      ) : selectedIds.size > 0 ? (
+      ) : selectedBankCount > 0 ? (
         <div
           className="sticky bottom-0 flex items-center gap-3 px-5 py-3 border-t shadow-lg"
           style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}
         >
           <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">
-            {selectedIds.size} selected · Categorise as:
+            {selectedBankCount} selected · Categorise as:
           </span>
           <CategoryCombobox value={bulkCategoryId} onChange={setBulkCategoryId} placeholder="Pick a category…" />
           <button

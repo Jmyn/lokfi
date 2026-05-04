@@ -299,19 +299,30 @@ A dedicated view for dividend tracking, integrated with the transactions table b
 
 ---
 
-## Summary of Files to Touch
+## Phase 1 Implementation Notes
+
+Phase 1 (completed) focuses on the **unified transaction view** and **brokerage settings** without adding a dedicated `/portfolio` page. The following decisions were made during implementation:
+
+- **No new table columns** — Symbol, quantity, and price are rendered inline in the Description column (e.g., `"BUY AAPL — 10 shares @ $185.00"`). This preserves information density and avoids breaking mobile layouts.
+- **Separate tables + view layer** — `db.transactions` (bank) and `db.brokerageTransactions` + `db.brokerageCorpActions` (brokerage) remain separate. The `useUnifiedTransactions` hook queries both, maps to `UnifiedTransactionRow`, merges, sorts by date descending, and paginates in JavaScript.
+- **Neutral amount color for BUY/SELL** — BUY/SELL amounts are rendered in neutral gray (not red/green) to signal they are asset reallocations, not spending/income. DIVIDEND is green, FEE is red.
+- **Contextual filters** — The filter bar adapts based on the active Source Type tab. Category dropdown is hidden for Brokerage; Type dropdown is hidden for Bank.
+- **Disabled interactions for brokerage rows** — Checkboxes, category editing, and rule suggestions are disabled/hidden for brokerage rows.
+- **Brokerage settings at `/settings/brokerage`** — A standalone settings page handles credential input, test connection, manual sync, configurable lookback days (default 90, stored in `db.settings`), sync status display, and disconnect.
+- **No navigation changes** — The Portfolio page and sidebar nav changes are deferred to Phase 2+. Users reach `/settings/brokerage` via the empty state link on the Brokerage tab or by direct URL.
+- **No FX rate conversion** — All amounts are shown in their original currency. No `fxRates` table was added.
+
+## Summary of Files Touched
 
 | File | Change |
 |------|--------|
-| `src/layouts/AppShell.tsx` | Add Portfolio to NAV_ITEMS |
-| `src/router.tsx` | Add `/portfolio` route |
-| `src/pages/portfolio/PortfolioPage.tsx` | Main tabbed shell |
-| `src/pages/portfolio/OverviewTab.tsx` | KPI + allocation + performance |
-| `src/pages/portfolio/HoldingsTab.tsx` | Holdings table with detail |
-| `src/pages/portfolio/TransactionsTab.tsx` | Filtered brokerage transactions |
-| `src/pages/portfolio/DividendsTab.tsx` | Dividend tracking view |
-| `src/pages/portfolio/CurrencySelector.tsx` | Shared dropdown component |
-| `src/lib/fx/rates.ts` | Frankfurter API client + cache |
-| `src/lib/db/db.ts` | Add `fxRates` table to schema |
-| `src/pages/transactions/TransactionTable.tsx` | Add Type, Symbol, Qty, Price columns; source icons |
-| `src/pages/transactions/TransactionFilters.tsx` | Add Source Type filter, Type filter |
+| `src/lib/brokerage/unifiedTransactions.ts` | New — `UnifiedTransactionRow` type, `fetchUnifiedRows`, `useUnifiedTransactions` hook |
+| `src/lib/brokerage/unifiedTransactions.test.ts` | New — unit tests for mapper functions and sorting |
+| `src/pages/transactions/filterTypes.ts` | Added `sourceType` and `type` to `Filters` |
+| `src/pages/transactions/SourceTypeTabs.tsx` | New — `All \| Bank \| Brokerage` tabs |
+| `src/pages/transactions/TransactionTable.tsx` | Accepts `UnifiedTransactionRow[]`; source icons, amount colors, disabled interactions |
+| `src/pages/transactions/TransactionFilters.tsx` | Contextual filters based on `sourceType` |
+| `src/pages/transactions/TransactionsPage.tsx` | Uses `useUnifiedTransactions`; source-aware counts; brokerage empty state |
+| `src/pages/settings/BrokerageSettingsPage.tsx` | New — credentials, test connection, sync, lookback days, disconnect |
+| `src/router.tsx` | Added `/settings/brokerage` route |
+| `src/layouts/AppShell.tsx` | No changes (nav deferred to Phase 2+) |
