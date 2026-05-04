@@ -1,5 +1,6 @@
 import { DashboardFilterProvider, useDashboard } from './DashboardContext'
 import { DashboardFilters } from './DashboardFilters'
+import { AverageIncome } from './widgets/AverageIncome'
 import { AverageSpending } from './widgets/AverageSpending'
 import { CategoryBreakdown } from './widgets/CategoryBreakdown'
 import { CategoryBudgetBars } from './widgets/CategoryBudgetBars'
@@ -38,6 +39,7 @@ function DashboardContent() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <SavingsRateGauge />
         <AverageSpending />
+        <AverageIncome />
       </div>
       <MonthlyTrendChart />
       <SpendingHeatmap />

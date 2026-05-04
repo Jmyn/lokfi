@@ -47,8 +47,8 @@ export function KpiRow() {
     const months = new Set(expenses.map((t) => t.date.slice(0, 7)))
     const avgMonthly = months.size > 0 ? totalSpend / months.size : 0
 
-    // Savings rate
-    const savingsRate = totalIncome > 0 ? ((totalIncome - totalSpend) / totalIncome) * 100 : 0
+    // Savings rate: null means no income data (vs 0% = income equals spend)
+    const savingsRate = totalIncome > 0 ? ((totalIncome - totalSpend) / totalIncome) * 100 : null
 
     // Top category
     const catMap = new Map<string, number>()
@@ -99,7 +99,7 @@ export function KpiRow() {
         />
         <KpiCard
           label="Savings rate"
-          value={stats.savingsRate > 0 ? `${stats.savingsRate.toFixed(1)}%` : 'N/A'}
+          value={stats.savingsRate !== null ? `${stats.savingsRate.toFixed(1)}%` : 'N/A'}
           sub="income minus expenses"
         />
         <KpiCard label="Monthly average" value={fmt.format(stats.avgMonthly)} sub="expenses only" />
