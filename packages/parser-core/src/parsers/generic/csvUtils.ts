@@ -114,10 +114,15 @@ export function normalizeDate(raw: string): string | null {
     if (m) return `${y}-${m}-${d!.padStart(2, '0')}`
   }
 
-  // Fallback: try native Date.parse (timezone-safe: treat as UTC noon)
+  // Fallback: try native Date.parse — extract local-timezone components
+  // so we don't get UTC date shifts (toISOString breaks for UTC+X offsets)
   const p = Date.parse(raw.trim())
   if (!isNaN(p)) {
-    return new Date(p).toISOString().split('T')[0]!
+    const d = new Date(p)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
   }
 
   return null
