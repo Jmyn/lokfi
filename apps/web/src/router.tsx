@@ -6,6 +6,7 @@ import { ImportPage } from './pages/import/ImportPage'
 import { LandingPage } from './pages/landing/LandingPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
 import { RulesPage } from './pages/rules/RulesPage'
+import { BrokerageSettingsPage } from './pages/settings/BrokerageSettingsPage'
 import { TransactionsPage } from './pages/transactions/TransactionsPage'
 
 const rootRoute = createRootRoute({
@@ -64,9 +65,22 @@ const rulesRoute = createRoute({
   component: RulesPage,
 })
 
+const brokerageSettingsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/settings/brokerage',
+  component: BrokerageSettingsPage,
+})
+
 const routeTree = rootRoute.addChildren([
   landingRoute,
-  shellRoute.addChildren([importRoute, transactionsRoute, dashboardRoute, profileRoute, rulesRoute]),
+  shellRoute.addChildren([
+    importRoute,
+    transactionsRoute,
+    dashboardRoute,
+    profileRoute,
+    rulesRoute,
+    brokerageSettingsRoute,
+  ]),
 ])
 
 export const router = createRouter({ routeTree })

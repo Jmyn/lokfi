@@ -1,11 +1,13 @@
-import type { StatementSource } from '@lokfi/parser-core'
+export type SourceType = 'all' | 'bank' | 'brokerage'
 
 export interface Filters {
   dateFrom: string
   dateTo: string
-  sources: StatementSource[]
+  sources: string[]
   accounts: string[]
   categoryId: string
+  sourceType: SourceType
+  type: string
 }
 
 export const defaultFilters: Filters = {
@@ -14,4 +16,6 @@ export const defaultFilters: Filters = {
   sources: [],
   accounts: [],
   categoryId: '',
+  sourceType: 'all',
+  type: '',
 }

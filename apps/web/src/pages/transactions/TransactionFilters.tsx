@@ -1,4 +1,3 @@
-import type { StatementSource } from '@lokfi/parser-core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db/db'
 
@@ -15,11 +14,26 @@ const inputCls =
 const inputStyle = { borderColor: 'var(--border)' }
 
 export function TransactionFilters({ filters, onChange }: TransactionFiltersProps) {
-  const sources = useLiveQuery(() => db.transactions.orderBy('source').uniqueKeys() as Promise<StatementSource[]>, [])
+  const allSources = useLiveQuery(async () => {
+    if (filters.sourceType === 'bank') {
+      return (await db.transactions.orderBy('source').uniqueKeys()) as string[]
+    }
+    if (filters.sourceType === 'brokerage') {
+      const txnSources = (await db.brokerageTransactions.orderBy('source').uniqueKeys()) as string[]
+      const caSources = (await db.brokerageCorpActions.orderBy('source').uniqueKeys()) as string[]
+      return Array.from(new Set([...txnSources, ...caSources]))
+    }
+    // all
+    const bankSources = (await db.transactions.orderBy('source').uniqueKeys()) as string[]
+    const txnSources = (await db.brokerageTransactions.orderBy('source').uniqueKeys()) as string[]
+    const caSources = (await db.brokerageCorpActions.orderBy('source').uniqueKeys()) as string[]
+    return Array.from(new Set([...bankSources, ...txnSources, ...caSources]))
+  }, [filters.sourceType])
+
   const accounts = useLiveQuery(() => db.transactions.orderBy('accountNo').uniqueKeys() as Promise<string[]>, [])
   const categories = useLiveQuery(() => db.categories.toArray(), [])
 
-  function toggleSource(source: StatementSource) {
+  function toggleSource(source: string) {
     const next = filters.sources.includes(source)
       ? filters.sources.filter((s) => s !== source)
       : [...filters.sources, source]
@@ -38,7 +52,12 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
     filters.dateTo !== '' ||
     filters.sources.length > 0 ||
     filters.accounts.length > 0 ||
-    filters.categoryId !== ''
+    filters.categoryId !== '' ||
+    filters.type !== ''
+
+  const showCategory = filters.sourceType !== 'brokerage'
+  const showType = filters.sourceType !== 'bank'
+  const showAccounts = filters.sourceType !== 'brokerage'
 
   return (
     <div
@@ -67,99 +86,122 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
         />
       </div>
 
-      {/* Separator */}
-      {sources && sources.length > 0 && <span className="text-gray-300 dark:text-gray-700 select-none">·</span>}
-
       {/* Source pills */}
-      {sources && sources.length > 0 && (
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Source</span>
-          {sources.map((source) => {
-            const active = filters.sources.includes(source)
-            return (
-              <button
-                key={source}
-                onClick={() => toggleSource(source)}
-                className="text-xs rounded-full px-3 py-1.5 border font-medium transition-colors"
-                style={
-                  active
-                    ? {
-                        backgroundColor: 'var(--accent)',
-                        borderColor: 'var(--accent)',
-                        color: '#fff',
-                      }
-                    : {
-                        backgroundColor: 'var(--bg)',
-                        borderColor: 'var(--border)',
-                        color: 'var(--tw-text-opacity, currentColor)',
-                      }
-                }
-              >
-                {source}
-              </button>
-            )
-          })}
-        </div>
+      {allSources && allSources.length > 0 && (
+        <>
+          <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Source</span>
+            {allSources.map((source) => {
+              const active = filters.sources.includes(source)
+              return (
+                <button
+                  key={source}
+                  onClick={() => toggleSource(source)}
+                  className="text-xs rounded-full px-3 py-1.5 border font-medium transition-colors"
+                  style={
+                    active
+                      ? {
+                          backgroundColor: 'var(--accent)',
+                          borderColor: 'var(--accent)',
+                          color: '#fff',
+                        }
+                      : {
+                          backgroundColor: 'var(--bg)',
+                          borderColor: 'var(--border)',
+                          color: 'var(--tw-text-opacity, currentColor)',
+                        }
+                  }
+                >
+                  {source}
+                </button>
+              )
+            })}
+          </div>
+        </>
       )}
-
-      {/* Separator */}
-      {(sources?.length || 0) > 0 || (accounts?.length || 0) > 0 ? (
-        <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
-      ) : null}
 
       {/* Account pills */}
-      {accounts && accounts.length > 0 && (
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Account</span>
-          {accounts.map((account) => {
-            const active = filters.accounts.includes(account)
-            return (
-              <button
-                key={account}
-                onClick={() => toggleAccount(account)}
-                className="text-xs rounded-full px-3 py-1.5 border font-medium transition-colors"
-                style={
-                  active
-                    ? {
-                        backgroundColor: 'var(--accent)',
-                        borderColor: 'var(--accent)',
-                        color: '#fff',
-                      }
-                    : {
-                        backgroundColor: 'var(--bg)',
-                        borderColor: 'var(--border)',
-                        color: 'var(--tw-text-opacity, currentColor)',
-                      }
-                }
-              >
-                {account}
-              </button>
-            )
-          })}
-        </div>
+      {showAccounts && accounts && accounts.length > 0 && (
+        <>
+          <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Account</span>
+            {accounts.map((account) => {
+              const active = filters.accounts.includes(account)
+              return (
+                <button
+                  key={account}
+                  onClick={() => toggleAccount(account)}
+                  className="text-xs rounded-full px-3 py-1.5 border font-medium transition-colors"
+                  style={
+                    active
+                      ? {
+                          backgroundColor: 'var(--accent)',
+                          borderColor: 'var(--accent)',
+                          color: '#fff',
+                        }
+                      : {
+                          backgroundColor: 'var(--bg)',
+                          borderColor: 'var(--border)',
+                          color: 'var(--tw-text-opacity, currentColor)',
+                        }
+                  }
+                >
+                  {account}
+                </button>
+              )
+            })}
+          </div>
+        </>
       )}
 
-      {/* Separator */}
-      <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
-
       {/* Category */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Category</span>
-        <select
-          value={filters.categoryId}
-          onChange={(e) => onChange({ ...filters, categoryId: e.target.value })}
-          className={inputCls}
-          style={inputStyle}
-        >
-          <option value="">All</option>
-          <option value="__uncategorised__">Uncategorised</option>
-          {categories?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {showCategory && (
+        <>
+          <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Category</span>
+            <select
+              value={filters.categoryId}
+              onChange={(e) => onChange({ ...filters, categoryId: e.target.value })}
+              className={inputCls}
+              style={inputStyle}
+            >
+              <option value="">All</option>
+              <option value="__uncategorised__">Uncategorised</option>
+              {categories?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
+
+      {/* Type */}
+      {showType && (
+        <>
+          <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Type</span>
+            <select
+              value={filters.type}
+              onChange={(e) => onChange({ ...filters, type: e.target.value })}
+              className={inputCls}
+              style={inputStyle}
+            >
+              <option value="">All</option>
+              <option value="BUY">Buy</option>
+              <option value="SELL">Sell</option>
+              <option value="DIVIDEND">Dividend</option>
+              <option value="FEE">Fee</option>
+              <option value="CORP ACTION">Corp Action</option>
+            </select>
+          </div>
+        </>
+      )}
 
       {/* Reset */}
       {hasActiveFilters && (

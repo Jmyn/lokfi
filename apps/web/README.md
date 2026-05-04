@@ -1,6 +1,13 @@
-# React + TypeScript + Vite
+# Lokfi Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Personal finance dashboard built with React + TypeScript + Vite.
+
+## Features
+
+- **Unified transaction view** — Bank transactions and brokerage data (trades, dividends, fees) are merged into a single timeline on `/transactions`. Switch between **All**, **Bank**, and **Brokerage** tabs. Brokerage rows are read-only and visually distinct (neutral gray for BUY/SELL, green for DIVIDEND, red for FEE).
+- **Brokerage settings** — Configure Tiger Brokers API credentials, test connectivity, trigger manual sync, and set historical lookback days at `/settings/brokerage`. Credentials are encrypted with AES-256-GCM via the Web Crypto API.
+- **Rule engine** — Auto-categorise bank transactions based on custom rules with priority ordering.
+- **PDF import** — Parse bank statements directly in the browser using `pdfjs-dist` in a Web Worker.
 
 Currently, two official plugins are available:
 

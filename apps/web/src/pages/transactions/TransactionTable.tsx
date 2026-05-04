@@ -1,94 +1,71 @@
-import { useLiveQuery } from 'dexie-react-hooks'
 import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
-import { db } from '../../lib/db/db'
+import type { UnifiedTransactionRow } from '../../lib/brokerage/unifiedTransactions'
 import type { DbTransaction } from '../../lib/db/db'
 import { CategoryBadge } from './CategoryBadge'
-import type { Filters } from './filterTypes'
 
-const fmt = new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD' })
-const PAGE_SIZE = 100
+const fmtCache = new Map<string, Intl.NumberFormat>()
+function getFormatter(currency: string): Intl.NumberFormat {
+  if (!fmtCache.has(currency)) {
+    fmtCache.set(currency, new Intl.NumberFormat('en-US', { style: 'currency', currency }))
+  }
+  return fmtCache.get(currency)!
+}
+
+function formatAmount(row: UnifiedTransactionRow): string {
+  const fmt = getFormatter(row.currency)
+  const abs = Math.abs(row.amount)
+  const sign = row.amount < 0 ? '−' : '+'
+  return `${sign}${fmt.format(abs)}`
+}
+
+function amountColorClass(row: UnifiedTransactionRow): string {
+  if (row.isBank) {
+    return row.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
+  }
+  switch (row.type) {
+    case 'DIVIDEND':
+      return 'text-emerald-600 dark:text-emerald-400'
+    case 'FEE':
+      return 'text-red-600 dark:text-red-400'
+    default:
+      return 'text-gray-500 dark:text-gray-400'
+  }
+}
+
+function formatSource(row: UnifiedTransactionRow): string {
+  const icon = row.isBank ? '🏦' : '📈'
+  return `${icon} ${row.source}`
+}
 
 interface TransactionTableProps {
-  filters: Filters
+  rows: UnifiedTransactionRow[]
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onToggleAll: (ids: string[]) => void
   onCategoryChanged?: (txn: DbTransaction, categoryId: string | undefined) => void
   pageOffset: number
-  onLoadedChange: (loaded: number, total: number, hasMore: boolean) => void
-  totalFiltered: number
+  total: number
+  hasMore: boolean
   onLoadMore: () => void
 }
 
 export function TransactionTable({
-  filters,
+  rows,
   selectedIds,
   onToggleSelect,
   onToggleAll,
   onCategoryChanged,
   pageOffset,
-  onLoadedChange,
-  totalFiltered,
+  total,
+  hasMore,
   onLoadMore,
 }: TransactionTableProps) {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [hasMore, setHasMore] = useState(false)
 
-  const transactions = useLiveQuery(async () => {
-    // Build the base query chain:
-    // Use indexed where() for date range (if available), then chain .and() for secondary filters.
-    // .and() always returns Collection, so subsequent .and() calls chain cleanly.
-    const baseQuery = filters.dateFrom
-      ? db.transactions.where('date').aboveOrEqual(filters.dateFrom)
-      : db.transactions.orderBy('date').reverse()
-
-    // Apply upper date bound
-    const dateFiltered = filters.dateTo ? baseQuery.and((t) => t.date <= filters.dateTo) : baseQuery
-
-    // Apply source filter
-    const sourceFiltered =
-      filters.sources.length > 0 ? dateFiltered.and((t) => filters.sources.includes(t.source)) : dateFiltered
-
-    // Apply account filter
-    const accountFiltered =
-      filters.accounts.length > 0 ? sourceFiltered.and((t) => filters.accounts.includes(t.accountNo)) : sourceFiltered
-
-    // Apply category filter (resolved: manualCategory ?? category)
-    const categoryFiltered = filters.categoryId
-      ? accountFiltered.and((t) => {
-          const resolved = t.manualCategory ?? t.category
-          return filters.categoryId === '__uncategorised__' ? !resolved : resolved === filters.categoryId
-        })
-      : accountFiltered
-
-    // Get total count
-    const total = await categoryFiltered.count()
-
-    // Paginate — fetch all filtered results then slice.
-    // Dexie's offset() on chained .and() collections can return 0 rows unexpectedly,
-    // so we fetch all results and paginate in JS instead.
-    const allFiltered = await categoryFiltered.toArray()
-    const rows = allFiltered.slice(pageOffset, pageOffset + PAGE_SIZE)
-
-    // Report loaded/total/hasMore
-    const loaded = rows.length
-    const more = pageOffset + loaded < total
-    setHasMore(more)
-    onLoadedChange(pageOffset + loaded, total, more)
-
-    return rows
-  }, [filters, pageOffset, onLoadedChange])
-
-  if (!transactions) {
-    return (
-      <div className="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">Loading…</div>
-    )
-  }
-
-  const allIds = transactions.map((t) => t.id)
-  const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
+  const selectableIds = rows.filter((t) => t.isBank).map((t) => t.id)
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id))
 
   return (
     <div className="overflow-x-auto relative">
@@ -106,7 +83,7 @@ export function TransactionTable({
               <input
                 type="checkbox"
                 checked={allSelected}
-                onChange={() => onToggleAll(allIds)}
+                onChange={() => onToggleAll(selectableIds)}
                 className="rounded accent-amber-600"
               />
             </th>
@@ -131,22 +108,19 @@ export function TransactionTable({
           </tr>
         </thead>
         <tbody>
-          {transactions.map((t, i) => {
-            const isNeg = t.transactionValue < 0
-            const amountStr = (isNeg ? '−' : '+') + fmt.format(Math.abs(t.transactionValue))
+          {rows.map((t, i) => {
             const isSelected = selectedIds.has(t.id)
             const isEven = i % 2 === 0
+            const isEditing = editingCategoryId === t.id
 
             return (
               <tr
                 key={t.id}
                 className={`border-b transition-colors ${
-                  editingCategoryId === t.id
-                    ? 'relative z-50 ring-2 ring-amber-500 shadow-xl rounded-md bg-white dark:bg-gray-800'
-                    : ''
+                  isEditing ? 'relative z-50 ring-2 ring-amber-500 shadow-xl rounded-md bg-white dark:bg-gray-800' : ''
                 }`}
                 style={
-                  editingCategoryId === t.id
+                  isEditing
                     ? undefined
                     : {
                         borderColor: 'var(--border)',
@@ -162,70 +136,77 @@ export function TransactionTable({
                   <input
                     type="checkbox"
                     checked={isSelected}
-                    onChange={() => onToggleSelect(t.id)}
-                    className="rounded accent-amber-600"
+                    disabled={!t.isBank}
+                    onChange={() => t.isBank && onToggleSelect(t.id)}
+                    className="rounded accent-amber-600 disabled:opacity-30"
                   />
                 </td>
                 <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono text-xs">
-                  {t.date}
+                  {t.date.slice(0, 10)}
                 </td>
                 <td
-                  className={`px-3 py-2.5 text-gray-900 dark:text-white max-w-xs ${editingCategoryId === t.id ? 'whitespace-normal break-words' : ''}`}
+                  className={`px-3 py-2.5 text-gray-900 dark:text-white max-w-xs ${isEditing ? 'whitespace-normal break-words' : ''}`}
                 >
                   <div className="flex items-center gap-1 group">
-                    <span className={editingCategoryId === t.id ? '' : 'truncate'}>{t.description}</span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(t.description)
-                        setCopiedId(t.id)
-                        setTimeout(() => setCopiedId(null), 1500)
-                      }}
-                      className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                      title="Copy description"
-                    >
-                      {copiedId === t.id ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-500" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5 text-gray-400" />
-                      )}
-                    </button>
+                    <span className={isEditing ? '' : 'truncate'}>{t.description}</span>
+                    {t.isBank && t.originalBank && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(t.description)
+                          setCopiedId(t.id)
+                          setTimeout(() => setCopiedId(null), 1500)
+                        }}
+                        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                        title="Copy description"
+                      >
+                        {copiedId === t.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-gray-400" />
+                        )}
+                      </button>
+                    )}
                   </div>
                 </td>
                 <td
-                  className={`px-3 py-2.5 text-right font-mono whitespace-nowrap text-xs font-medium ${
-                    isNeg ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
-                  }`}
+                  className={`px-3 py-2.5 text-right font-mono whitespace-nowrap text-xs font-medium tabular-nums ${amountColorClass(t)}`}
                 >
-                  {amountStr}
+                  {formatAmount(t)}
                 </td>
-                <td className={`px-3 py-2.5 ${editingCategoryId === t.id ? 'relative z-50' : ''}`}>
-                  <CategoryBadge
-                    transactionId={t.id}
-                    category={t.category}
-                    manualCategory={t.manualCategory}
-                    isEditing={editingCategoryId === t.id}
-                    onStartEdit={() => setEditingCategoryId(t.id)}
-                    onStopEdit={() => setEditingCategoryId(null)}
-                    onCategoryChanged={onCategoryChanged}
-                  />
+                <td className={`px-3 py-2.5 ${isEditing ? 'relative z-50' : ''}`}>
+                  {t.isBank && t.originalBank ? (
+                    <CategoryBadge
+                      transactionId={t.id}
+                      category={t.originalBank.category}
+                      manualCategory={t.originalBank.manualCategory}
+                      isEditing={isEditing}
+                      onStartEdit={() => setEditingCategoryId(t.id)}
+                      onStopEdit={() => setEditingCategoryId(null)}
+                      onCategoryChanged={onCategoryChanged}
+                    />
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-500 text-xs">—</span>
+                  )}
                 </td>
                 <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide">
-                  {t.source}
+                  {formatSource(t)}
                 </td>
-                <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs font-mono">{t.accountNo}</td>
+                <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs font-mono">
+                  {t.isBank && t.originalBank ? t.originalBank.accountNo : '—'}
+                </td>
               </tr>
             )
           })}
         </tbody>
       </table>
 
-      {/* Footer: showing count + load more */}
+      {/* Footer */}
       <div
         className="flex items-center justify-between px-4 py-2.5 border-t text-xs text-gray-400 dark:text-gray-500"
         style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
       >
         <span>
-          Showing {pageOffset + (transactions?.length ?? 0)} of {totalFiltered} transactions
+          Showing {pageOffset + rows.length} of {total} transactions
         </span>
         {hasMore && (
           <button
@@ -233,7 +214,7 @@ export function TransactionTable({
             className="text-xs font-medium px-3 py-1 rounded border transition-colors hover:border-amber-500 hover:text-amber-600"
             style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
           >
-            Load more ({totalFiltered - pageOffset - (transactions?.length ?? 0)} remaining)
+            Load more ({total - pageOffset - rows.length} remaining)
           </button>
         )}
       </div>
