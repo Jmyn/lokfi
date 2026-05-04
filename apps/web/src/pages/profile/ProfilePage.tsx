@@ -31,7 +31,9 @@ export function ProfilePage() {
       customParsers,
       budgets,
     }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: 'application/json',
+    })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -46,7 +48,9 @@ export function ProfilePage() {
   }
 
   function handleExportProfile(profile: DbCustomParserProfile) {
-    const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(profile, null, 2)], {
+      type: 'application/json',
+    })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -55,24 +59,107 @@ export function ProfilePage() {
     URL.revokeObjectURL(url)
   }
 
+  async function handleImportBackup(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    try {
+      const data = JSON.parse(text)
+      // Validate backup structure
+      if (
+        !data ||
+        typeof data !== 'object' ||
+        Array.isArray(data) ||
+        data.version !== 1 ||
+        !Array.isArray(data.transactions) ||
+        !Array.isArray(data.rules) ||
+        !Array.isArray(data.categories) ||
+        !Array.isArray(data.customParsers) ||
+        !Array.isArray(data.budgets)
+      ) {
+        alert(
+          'Invalid backup file: expected a full Lokfi backup JSON with version, ' +
+            'transactions, rules, categories, customParsers, and budgets.'
+        )
+        e.target.value = ''
+        return
+      }
+      const confirmed = window.confirm(
+        `This will replace all current data with the backup:\n` +
+          `• ${data.transactions.length} transaction(s)\n` +
+          `• ${data.rules.length} rule(s)\n` +
+          `• ${data.categories.length} categor(ies)\n` +
+          `• ${data.customParsers.length} parser profile(s)\n` +
+          `• ${data.budgets.length} budget(s)\n\n` +
+          `Current data will be overwritten. Are you sure?`
+      )
+      if (!confirmed) {
+        e.target.value = ''
+        return
+      }
+      // Clear existing data and import backup in a single transaction
+      await db.transaction('rw', [db.transactions, db.rules, db.categories, db.customParsers, db.budgets], async () => {
+        await Promise.all([
+          db.transactions.clear(),
+          db.rules.clear(),
+          db.categories.clear(),
+          db.customParsers.clear(),
+          db.budgets.clear(),
+        ])
+        if (data.transactions.length) await db.transactions.bulkAdd(data.transactions)
+        if (data.rules.length) await db.rules.bulkAdd(data.rules)
+        if (data.categories.length) await db.categories.bulkAdd(data.categories)
+        if (data.customParsers.length) await db.customParsers.bulkAdd(data.customParsers)
+        if (data.budgets.length) await db.budgets.bulkAdd(data.budgets)
+      })
+      alert('Backup imported successfully!')
+    } catch {
+      alert('Invalid backup file — could not parse JSON')
+    }
+    e.target.value = ''
+  }
+
   async function handleImportProfile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     const text = await file.text()
     try {
-      const profile = JSON.parse(text) as DbCustomParserProfile
-      // Minimal structural validation
+      const parsed = JSON.parse(text)
+      // Detect full backup JSON (wraps profiles in { version, customParsers: [...] })
       if (
-        typeof profile.headerFingerprint !== 'string' ||
-        !profile.headerFingerprint ||
-        typeof profile.columnMap !== 'object' ||
-        profile.columnMap === null ||
-        (profile.columnMap.amount === undefined &&
-          profile.columnMap.debit === undefined &&
-          profile.columnMap.credit === undefined) ||
-        profile.columnMap.date === undefined
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        parsed.version &&
+        Array.isArray(parsed.customParsers)
       ) {
-        alert('Invalid profile: missing required fields (headerFingerprint, columnMap.date, amount/debit/credit)')
+        alert(
+          'This is a full backup file. Use the "Import backup (JSON)" button ' + 'in the Data & Backup section instead.'
+        )
+        e.target.value = ''
+        return
+      }
+      const profile = parsed as DbCustomParserProfile
+      // Gather specific missing fields for a helpful error message
+      const missing: string[] = []
+      if (typeof profile.headerFingerprint !== 'string' || !profile.headerFingerprint) {
+        missing.push('headerFingerprint')
+      }
+      if (typeof profile.columnMap !== 'object' || profile.columnMap === null) {
+        missing.push('columnMap')
+      } else {
+        if (profile.columnMap.date === undefined) missing.push('columnMap.date')
+        if (profile.columnMap.description === undefined) missing.push('columnMap.description')
+        if (
+          profile.columnMap.amount === undefined &&
+          profile.columnMap.debit === undefined &&
+          profile.columnMap.credit === undefined
+        ) {
+          missing.push('columnMap.amount/debit/credit')
+        }
+      }
+      if (missing.length > 0) {
+        alert(`Invalid profile: missing required field(s): ${missing.join(', ')}`)
         e.target.value = ''
         return
       }
@@ -100,7 +187,10 @@ export function ProfilePage() {
       {/* Data & Backup card */}
       <div
         className="rounded-xl border overflow-hidden"
-        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+        style={{
+          borderColor: 'var(--border)',
+          backgroundColor: 'var(--bg-sidebar)',
+        }}
       >
         <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Data & Backup</h2>
@@ -125,9 +215,18 @@ export function ProfilePage() {
           {/* Data summary */}
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: 'Transactions', value: count !== undefined ? count : '…' },
-              { label: 'Rules', value: rulesCount !== undefined ? rulesCount : '…' },
-              { label: 'Categories', value: categoriesCount !== undefined ? categoriesCount : '…' },
+              {
+                label: 'Transactions',
+                value: count !== undefined ? count : '…',
+              },
+              {
+                label: 'Rules',
+                value: rulesCount !== undefined ? rulesCount : '…',
+              },
+              {
+                label: 'Categories',
+                value: categoriesCount !== undefined ? categoriesCount : '…',
+              },
               {
                 label: 'Date range',
                 value: oldest && newest ? `${oldest.date.slice(0, 7)} → ${newest.date.slice(0, 7)}` : '—',
@@ -136,7 +235,10 @@ export function ProfilePage() {
               <div
                 key={label}
                 className="rounded-lg border px-4 py-3"
-                style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}
+                style={{
+                  borderColor: 'var(--border)',
+                  backgroundColor: 'var(--bg)',
+                }}
               >
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">{label}</p>
                 <p className="font-mono text-base font-medium text-gray-900 dark:text-white">{value}</p>
@@ -144,23 +246,42 @@ export function ProfilePage() {
             ))}
           </div>
 
-          {/* Export button */}
-          <div className="pt-1">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              Downloads a JSON backup of all transactions, rules, and categories.
-            </p>
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg transition-colors hover:opacity-90"
-              style={{
-                borderColor: 'var(--accent)',
-                color: 'var(--accent)',
-                backgroundColor: 'var(--accent-subtle)',
-              }}
-            >
-              <Download className="w-4 h-4" />
-              Export backup (JSON)
-            </button>
+          {/* Export / Import buttons */}
+          <div className="pt-1 space-y-3">
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Downloads a JSON backup of all transactions, rules, and categories.
+              </p>
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg transition-colors hover:opacity-90"
+                style={{
+                  borderColor: 'var(--accent)',
+                  color: 'var(--accent)',
+                  backgroundColor: 'var(--accent-subtle)',
+                }}
+              >
+                <Download className="w-4 h-4" />
+                Export backup (JSON)
+              </button>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Restore from a previous backup. Current data will be overwritten.
+              </p>
+              <label
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg cursor-pointer hover:opacity-80 transition-opacity w-fit"
+                style={{
+                  borderColor: 'var(--accent)',
+                  color: 'var(--accent)',
+                  backgroundColor: 'var(--accent-subtle)',
+                }}
+              >
+                <Upload className="w-4 h-4" />
+                Import backup (JSON)
+                <input type="file" accept=".json" className="hidden" onChange={handleImportBackup} />
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -168,7 +289,10 @@ export function ProfilePage() {
       {/* Parser Profiles card */}
       <div
         className="rounded-xl border overflow-hidden"
-        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+        style={{
+          borderColor: 'var(--border)',
+          backgroundColor: 'var(--bg-sidebar)',
+        }}
       >
         <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Parser Profiles</h2>
@@ -184,7 +308,10 @@ export function ProfilePage() {
                 <li
                   key={p.id}
                   className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}
+                  style={{
+                    borderColor: 'var(--border)',
+                    backgroundColor: 'var(--bg)',
+                  }}
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-gray-800 dark:text-gray-100 truncate">{p.name}</p>
@@ -219,7 +346,7 @@ export function ProfilePage() {
               }}
             >
               <Upload className="w-4 h-4" />
-              Import profile (JSON)
+              Import parser profile (JSON)
               <input type="file" accept=".json" className="hidden" onChange={handleImportProfile} />
             </label>
           </div>
