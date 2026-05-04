@@ -1,5 +1,14 @@
 [
   {
+    "label": "Init new worktree",
+    "command": "node",
+    "args": ["--strip-types", ".zed/scripts/init-worktree.ts"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "hooks": ["create_worktree"],
+    "reveal": "no_focus",
+    "hide": "on_success"
+  },
+  {
     "label": "pnpm install in new worktree",
     "command": "pnpm",
     "args": ["install"],

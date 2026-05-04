@@ -1,0 +1,22 @@
+{
+  "formatter": {
+    "language_server": {
+      "name": "biome"
+    }
+  },
+  "code_actions_on_format": {
+    "source.fixAll.biome": true,
+    "source.organizeImports.biome": true
+  },
+  "languages": {
+    "JavaScript": {
+      "language_servers": ["biome", "tsx", "..."]
+    },
+    "TypeScript": {
+      "language_servers": ["biome", "tsx", "..."]
+    },
+    "TSX": {
+      "language_servers": ["biome", "tsx", "..."]
+    }
+  }
+}
