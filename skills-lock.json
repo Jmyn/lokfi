@@ -5,6 +5,18 @@
       "source": "anthropics/claude-code",
       "sourceType": "github",
       "computedHash": "e8118284a6365753790d44bb2758a6032b3af27fa84696428d9233f2be0f4e78"
+    },
+    "tigeropen": {
+      "source": "tigerfintech/tigeropen-skill",
+      "sourceType": "github",
+      "skillPath": "skills/tigeropen/SKILL.md",
+      "computedHash": "f0a8b9309bd7d06dc896e6d67c5006daca28adb110d02156a76826ff4dadc66d"
+    },
+    "tigeropen-typescript": {
+      "source": "tigerfintech/tigeropen-skill",
+      "sourceType": "github",
+      "skillPath": "skills/tigeropen-typescript/SKILL.md",
+      "computedHash": "77811b480825d3d475c2e0e227a728763d1627bce2139065af213d0db2c75fa2"
     }
   }
 }
