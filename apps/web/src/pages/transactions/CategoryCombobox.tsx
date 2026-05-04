@@ -15,7 +15,11 @@ interface CategoryComboboxProps {
 
 type ComboboxOption =
   | { type: 'clear'; id: string }
-  | { type: 'category'; id: string; category: { id: string; name: string; color: string } }
+  | {
+      type: 'category'
+      id: string
+      category: { id: string; name: string; color: string }
+    }
   | { type: 'create'; name: string }
 
 export function CategoryCombobox({
@@ -87,7 +91,13 @@ export function CategoryCombobox({
       const count = await db.categories.count()
       const color = CUSTOM_COLORS[count % CUSTOM_COLORS.length]
       const id = 'cat_' + crypto.randomUUID()
-      await db.categories.put({ id, name, color, icon: undefined, isIncome: false })
+      await db.categories.put({
+        id,
+        name,
+        color,
+        icon: undefined,
+        isIncome: false,
+      })
       onChange(id)
       setOpen(false)
       onClose?.()
@@ -160,7 +170,7 @@ export function CategoryCombobox({
 
       {open && (
         <div
-          className="absolute z-50 mt-1 w-56 rounded-lg border shadow-lg py-1 bg-white dark:bg-gray-900"
+          className="absolute top-full left-0 mt-1 w-56 rounded-lg border shadow-lg py-1 bg-white dark:bg-gray-900 z-[1000]"
           style={{ borderColor: 'var(--border)' }}
         >
           <div className="px-2 pb-1">
@@ -184,7 +194,7 @@ export function CategoryCombobox({
             />
           </div>
 
-          <div className="max-h-52 overflow-y-auto">
+          <div className="max-h-28 overflow-y-auto">
             {options.map((opt, index) => {
               const isHighlighted = index === highlightedIndex
               const baseClass = 'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-left '
