@@ -10,7 +10,7 @@ import {
   computeHeaderFingerprint,
   generateTransactionHash,
 } from '@lokfi/parser-core'
-import type { CustomParserProfile, Statement } from '@lokfi/parser-core'
+import type { CustomParserProfile, ParserEntry, Statement, StatementParser } from '@lokfi/parser-core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Papa from 'papaparse'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -55,6 +55,10 @@ export function ImportPage() {
     const predefined = new Set(PREDEFINED_SOURCES)
     return [...new Set(profiles.map((p) => p.source).filter((s) => !predefined.has(s as never)))]
   }, [profiles])
+
+  const availableParsers = useMemo<ParserEntry[]>(() => {
+    return registry.getAll()
+  }, [registry])
 
   // Compute all transaction hashes for the given successful items (same logic as handleImport)
   const computeHashes = useCallback((successItems: FileParseResult[]): string[] => {
@@ -107,14 +111,17 @@ export function ImportPage() {
     files.forEach(async (file) => {
       updateItem(file, { status: 'parsing' })
 
+      let parser: StatementParser | null = null
+      let pdfBuffer: ArrayBuffer | undefined
       try {
         const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
 
         if (isPdf) {
           // PDF: read as ArrayBuffer, extract text via worker, then parse
           const buffer = await file.arrayBuffer()
+          pdfBuffer = buffer
           const extractedText = await parsePdf(buffer)
-          const parser = registry.getParser(extractedText)
+          parser = registry.getParser(extractedText)
           if (!parser) throw new ParseError('No parser found for this PDF')
           const statement = parser.parse(extractedText)
 
@@ -123,15 +130,17 @@ export function ImportPage() {
             transactionCount: statement.transactions.length,
             statement,
             rawText: extractedText,
+            rawBuffer: buffer,
+            parserLabel: parser.label,
           })
         } else {
           // CSV/text: read as text directly
           const text = await file.text()
-          const parser = registry.getParser(text)
+          parser = registry.getParser(text)
           if (!parser) throw new ParseError('No parser found for this file')
           const statement = parser.parse(text)
 
-          // Check if a custom profile was matched (for badge display)
+          // Check if a custom profile was matched (for profileName backward compat)
           const { data } = Papa.parse<string[]>(text, { skipEmptyLines: true })
           const fingerprint = computeHeaderFingerprint(data as string[][])
           const matchedProfile = profiles.find((p) => p.headerFingerprint === fingerprint)
@@ -142,13 +151,65 @@ export function ImportPage() {
             statement,
             rawText: text,
             profileName: matchedProfile?.name,
+            parserLabel: parser.label,
           })
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
-        updateItem(file, { status: 'error', error: message })
+        updateItem(file, {
+          status: 'error',
+          error: message,
+          rawBuffer: pdfBuffer,
+          parserLabel: parser?.label,
+        })
       }
     })
+  }
+
+  async function handleChangeParser(item: FileParseResult, parser: StatementParser) {
+    updateItem(item.file, { status: 'parsing' })
+
+    let buffer: ArrayBuffer | undefined
+    try {
+      const isPdf = item.file.type === 'application/pdf' || item.file.name.toLowerCase().endsWith('.pdf')
+      let text: string
+
+      if (isPdf) {
+        buffer = item.rawBuffer ?? (await item.file.arrayBuffer())
+        text = await parsePdf(buffer)
+      } else {
+        text = item.rawText ?? (await item.file.text())
+      }
+
+      const statement = parser.parse(text)
+
+      // For CSV: check if the new parser matched a custom profile (profileName backward compat)
+      let matchedProfileName: string | undefined
+      if (!isPdf) {
+        const { data } = Papa.parse<string[]>(text, { skipEmptyLines: true })
+        const fingerprint = computeHeaderFingerprint(data as string[][])
+        const matchedProfile = profiles.find((p) => p.headerFingerprint === fingerprint)
+        matchedProfileName = matchedProfile?.name
+      }
+
+      updateItem(item.file, {
+        status: 'success',
+        transactionCount: statement.transactions.length,
+        statement,
+        rawText: text,
+        rawBuffer: buffer,
+        profileName: matchedProfileName,
+        parserLabel: parser.label,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      updateItem(item.file, {
+        status: 'error',
+        error: message,
+        rawBuffer: buffer,
+        parserLabel: parser.label,
+      })
+    }
   }
 
   async function handleImport() {
@@ -216,6 +277,7 @@ export function ImportPage() {
       statement,
       rawText: configuringItem.rawText,
       profileName: profile.name,
+      parserLabel: profile.name,
     })
     setConfiguringItem(null)
   }
@@ -240,7 +302,13 @@ export function ImportPage() {
           </p>
         </div>
         <UploadZone onFilesAdded={handleFilesAdded} />
-        <FileStatusList items={items} onConfigure={setConfiguringItem} onRemove={handleRemoveItem} />
+        <FileStatusList
+          items={items}
+          availableParsers={availableParsers}
+          onConfigure={setConfiguringItem}
+          onRemove={handleRemoveItem}
+          onChangeParser={handleChangeParser}
+        />
         {importError && <p className="text-sm text-red-600 dark:text-red-400 px-1">{importError}</p>}
         <ImportSummary results={items} dupStats={dupStats} onImport={handleImport} onClear={handleClear} />
       </div>
