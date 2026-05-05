@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type {
   BrokerageAccount,
-  BrokerageCorpAction,
   BrokerageCredentials,
   BrokeragePosition,
   BrokeragePositionExtension,
   BrokerageSyncLog,
   BrokerageTransaction,
-  CorpActionType,
   SecurityType,
   SyncCategory,
   SyncStatus,
@@ -87,58 +85,6 @@ describe('BrokerageTransaction', () => {
       executedAt: '2025-01-01T11:00:00.000Z',
     }
     expect(txn.commission).toBeUndefined()
-  })
-})
-
-describe('BrokerageCorpAction', () => {
-  it('creates DIVIDEND action', () => {
-    const action: BrokerageCorpAction = {
-      id: 'tiger_AAPL_DIVIDEND_2025-01-15',
-      source: 'tiger',
-      symbol: 'AAPL',
-      type: 'DIVIDEND',
-      amount: 24,
-      currency: 'USD',
-      exDate: '2025-02-07',
-      payDate: '2025-02-13',
-      appliedAt: '2025-02-13T00:00:00.000Z',
-    }
-    expect(action.type).toBe('DIVIDEND')
-    expect(action.amount).toBe(24)
-  })
-
-  it('creates SPLIT action', () => {
-    const action: BrokerageCorpAction = {
-      id: 'tiger_AAPL_SPLIT_2025-03-01',
-      source: 'tiger',
-      symbol: 'AAPL',
-      type: 'SPLIT',
-      amount: 4,
-      appliedAt: '2025-03-01T00:00:00.000Z',
-    }
-    expect(action.type).toBe('SPLIT')
-  })
-
-  it('creates RIGHTS action', () => {
-    const action: BrokerageCorpAction = {
-      id: 'tiger_ABC_RIGHTS_2025-04-01',
-      source: 'tiger',
-      symbol: 'ABC',
-      type: 'RIGHTS',
-      appliedAt: '2025-04-01T00:00:00.000Z',
-    }
-    expect(action.type).toBe('RIGHTS')
-  })
-
-  it('creates OTHER action', () => {
-    const action: BrokerageCorpAction = {
-      id: 'tiger_XYZ_OTHER_2025-05-01',
-      source: 'tiger',
-      symbol: 'XYZ',
-      type: 'OTHER',
-      appliedAt: '2025-05-01T00:00:00.000Z',
-    }
-    expect(action.type).toBe('OTHER')
   })
 })
 
@@ -234,18 +180,13 @@ describe('Type unions', () => {
     expect(actions).toHaveLength(2)
   })
 
-  it('CorpActionType covers all variants', () => {
-    const types: CorpActionType[] = ['DIVIDEND', 'SPLIT', 'RIGHTS', 'OTHER']
-    expect(types).toHaveLength(4)
-  })
-
   it('SyncStatus covers all states', () => {
     const statuses: SyncStatus[] = ['success', 'failure', 'in_progress']
     expect(statuses).toHaveLength(3)
   })
 
-  it('SyncCategory covers all four categories', () => {
-    const categories: SyncCategory[] = ['positions', 'transactions', 'corp_actions', 'account']
+  it('SyncCategory covers all categories', () => {
+    const categories: SyncCategory[] = ['positions', 'transactions', 'fund_details', 'account']
     expect(categories).toHaveLength(4)
   })
 })

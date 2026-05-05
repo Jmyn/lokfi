@@ -8,14 +8,14 @@
 // Types
 export type {
   BrokerageAccount,
-  BrokerageCorpAction,
   BrokerageCredentials,
+  BrokerageFundDetail,
   BrokeragePosition,
   BrokeragePositionExtension,
   BrokerageSource,
   BrokerageSyncLog,
   BrokerageTransaction,
-  CorpActionType,
+  FundDetailType,
   SecurityType,
   SyncCategory,
   SyncStatus,
@@ -23,4 +23,4 @@ export type {
 } from './types.js'
 
 // Provider interface
-export type { BrokerageProvider, BrokerageProviderConfig } from './provider.js'
+export type { BrokerageProvider, BrokerageProviderConfig, ProviderProgress } from './provider.js'

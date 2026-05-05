@@ -15,19 +15,29 @@ export type SecurityType = 'STK' | 'OPT' | 'FUT' | 'FOP' | 'CASH' | 'FUND' | 'WA
 /** Trade direction */
 export type TradeAction = 'BUY' | 'SELL'
 
-/** Corporate action type */
-export type CorpActionType = 'DIVIDEND' | 'SPLIT' | 'RIGHTS' | 'OTHER'
+/** Fund detail classified type for unified view */
+export type FundDetailType =
+  | 'DIVIDEND'
+  | 'DIVIDEND_TAX'
+  | 'TRADE'
+  | 'FEE'
+  | 'TRANSFER_IN'
+  | 'TRANSFER_OUT'
+  | 'REBATE'
+  | 'CURRENCY_EXCHANGE'
+  | 'DEPOSIT_WITHDRAWAL'
+  | 'UNKNOWN'
 
 /** Sync status for audit trail */
 export type SyncStatus = 'success' | 'failure' | 'in_progress'
 
 /** Sync category discriminator */
-export type SyncCategory = 'positions' | 'transactions' | 'corp_actions' | 'account'
+export type SyncCategory = 'positions' | 'transactions' | 'fund_details' | 'account'
 
 // ── Position ──────────────────────────────────────────────────────────────
 
 export interface BrokeragePosition {
-  /** Natural key: `${symbol}_${source}` */
+  /** Natural key: `${symbol}_${secType}_${source}` */
   id: string
   source: BrokerageSource
   symbol: string
@@ -41,6 +51,12 @@ export interface BrokeragePosition {
   unrealizedPnl?: number
   /** ISO-8601 timestamp of when this position was last fetched */
   updatedAt: string
+  /** Option/derivative: OCC option symbol (e.g. "CRWV  260508P00106000") */
+  identifier?: string
+  /** Option/derivative: contract multiplier (e.g. 100 for standard US equity) */
+  multiplier?: number
+  /** Option/derivative: provider-internal contract ID */
+  contractId?: number
 }
 
 /** EAV table for provider-specific position metadata */
@@ -68,22 +84,32 @@ export interface BrokerageTransaction {
   executedAt: string
 }
 
-// ── Corporate Action ─────────────────────────────────────────────────────
+// ── Fund Detail ───────────────────────────────────────────────────────────
 
-export interface BrokerageCorpAction {
-  /** Natural key: `${source}_${symbol}_${type}_${payDate || exDate}` */
+export interface BrokerageFundDetail {
+  /** Natural key: provider-native record ID prefixed with source */
   id: string
   source: BrokerageSource
-  symbol: string
-  type: CorpActionType
-  amount?: number
-  currency?: string
-  /** ISO-8601 ex-dividend date */
-  exDate?: string
-  /** ISO-8601 payment date */
-  payDate?: string
-  /** ISO-8601 when this was applied to the account */
-  appliedAt: string
+  /** Raw type string from the brokerage (e.g. "Commission", "Platform Fee") */
+  rawType: string
+  /** Classified type for the unified view */
+  classifiedType: FundDetailType
+  /** Extracted from desc for trades/dividends */
+  symbol?: string
+  /** Display name (e.g. "Broadcom") */
+  contractName?: string
+  amount: number
+  currency: string
+  /** Trade action (BUY/SELL) — only present when classifiedType is TRADE */
+  action?: TradeAction
+  /** Enriched from filled_orders — only present for TRADE records */
+  quantity?: number
+  price?: number
+  commission?: number
+  /** ISO-8601 business date */
+  businessDate: string
+  /** Segment type discriminator (e.g. 'SEC') */
+  segType?: string
 }
 
 // ── Account ───────────────────────────────────────────────────────────────
