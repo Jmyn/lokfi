@@ -1,4 +1,5 @@
-import type { Statement, Transaction } from '@lokfi/parser-core'
+import type { Statement, StatementParser, Transaction } from '@lokfi/parser-core'
+import type { ParserEntry } from '@lokfi/parser-core'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +10,22 @@ import { FileStatusList } from './FileStatusList'
 const mockFile = (name: string, size = 1024): File => {
   return { name, size } as unknown as File
 }
+
+/** Create a minimal mock parser entry. */
+function mockParserEntry(label: string): ParserEntry {
+  return {
+    label,
+    parser: { label, detect: vi.fn(), parse: vi.fn() } as unknown as StatementParser,
+  }
+}
+
+const DEFAULT_PARSERS: ParserEntry[] = [
+  mockParserEntry('My Custom Profile'),
+  mockParserEntry('CDC Debit'),
+  mockParserEntry('Generic CSV'),
+  mockParserEntry('OCBC Credit'),
+  mockParserEntry('Generic PDF'),
+]
 
 const mockTransaction = (overrides: Partial<Transaction> = {}): Transaction => ({
   date: '2024-01-15',
@@ -195,25 +212,20 @@ describe('formatDate', () => {
 // by rendering FileStatusList and inspecting the status text/icons rendered.
 
 describe('StatusBadge via FileStatusList', () => {
+  const badgeProps = {
+    availableParsers: DEFAULT_PARSERS,
+    onConfigure: vi.fn(),
+    onRemove: vi.fn(),
+    onChangeParser: vi.fn(),
+  }
+
   it('shows "Pending" with Clock icon for pending status', () => {
-    render(
-      <FileStatusList
-        items={[makeResult({ file: mockFile('test.pdf'), status: 'pending' })]}
-        onConfigure={vi.fn()}
-        onRemove={vi.fn()}
-      />
-    )
+    render(<FileStatusList items={[makeResult({ file: mockFile('test.pdf'), status: 'pending' })]} {...badgeProps} />)
     expect(screen.getByText('Pending')).toBeInTheDocument()
   })
 
   it('shows "Parsing…" with Loader2 icon for parsing status', () => {
-    render(
-      <FileStatusList
-        items={[makeResult({ file: mockFile('test.csv'), status: 'parsing' })]}
-        onConfigure={vi.fn()}
-        onRemove={vi.fn()}
-      />
-    )
+    render(<FileStatusList items={[makeResult({ file: mockFile('test.csv'), status: 'parsing' })]} {...badgeProps} />)
     expect(screen.getByText('Parsing…')).toBeInTheDocument()
   })
 
@@ -227,8 +239,7 @@ describe('StatusBadge via FileStatusList', () => {
             transactionCount: 0,
           }),
         ]}
-        onConfigure={vi.fn()}
-        onRemove={vi.fn()}
+        {...badgeProps}
       />
     )
     expect(screen.getByText('Done')).toBeInTheDocument()
@@ -238,8 +249,7 @@ describe('StatusBadge via FileStatusList', () => {
     render(
       <FileStatusList
         items={[makeResult({ file: mockFile('test.pdf'), status: 'error', error: 'fail' })]}
-        onConfigure={vi.fn()}
-        onRemove={vi.fn()}
+        {...badgeProps}
       />
     )
     expect(screen.getByText('Error')).toBeInTheDocument()
@@ -250,13 +260,16 @@ describe('StatusBadge via FileStatusList', () => {
 
 describe('FileStatusList', () => {
   const defaultProps = {
+    availableParsers: DEFAULT_PARSERS,
     onConfigure: vi.fn(),
     onRemove: vi.fn(),
+    onChangeParser: vi.fn(),
   }
 
   beforeEach(() => {
     defaultProps.onConfigure.mockClear()
     defaultProps.onRemove.mockClear()
+    defaultProps.onChangeParser.mockClear()
   })
 
   it('renders nothing when items is empty', () => {
@@ -342,7 +355,7 @@ describe('FileStatusList', () => {
     expect(toggle).toBeInTheDocument()
   })
 
-  it('shows yellow "Generic fallback" warning for success + generic source without profile', () => {
+  it('shows parser badge with "Generic CSV" when fallback parser is used', () => {
     render(
       <FileStatusList
         items={[
@@ -351,6 +364,7 @@ describe('FileStatusList', () => {
             status: 'success',
             transactionCount: 1,
             profileName: undefined,
+            parserLabel: 'Generic CSV',
             statement: mockStatement({ source: 'generic' }),
             rawText: 'date,description,amount\n2024-01-15,Test,10.00',
           }),
@@ -358,10 +372,10 @@ describe('FileStatusList', () => {
         {...defaultProps}
       />
     )
-    expect(screen.getByText(/Generic fallback/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Generic CSV' })).toBeInTheDocument()
   })
 
-  it('shows "Profile: XYZ" instead of warning when profile is set', () => {
+  it('shows parser badge with the profile name when profileName is set', () => {
     render(
       <FileStatusList
         items={[
@@ -370,14 +384,15 @@ describe('FileStatusList', () => {
             status: 'success',
             transactionCount: 1,
             profileName: 'My Bank',
+            parserLabel: 'My Bank',
             statement: mockStatement({ source: 'generic' }),
           }),
         ]}
         {...defaultProps}
       />
     )
-    expect(screen.getByText('Profile: My Bank')).toBeInTheDocument()
-    expect(screen.queryByText(/Generic fallback/i)).not.toBeInTheDocument()
+    // The parser badge is a button showing the label
+    expect(screen.getByRole('button', { name: 'My Bank' })).toBeInTheDocument()
   })
 
   it('clicking expand toggle shows all transactions', async () => {
@@ -501,5 +516,116 @@ describe('FileStatusList', () => {
     )
     // Should show 2 accounts label
     expect(screen.getByText('2 accounts')).toBeInTheDocument()
+  })
+
+  // ─── Parser Badge / Selector Tests ──────────────────────────────────────────
+
+  it('shows parser badge button when parserLabel is present', () => {
+    render(
+      <FileStatusList
+        items={[
+          makeResult({
+            file: mockFile('test.csv'),
+            status: 'success',
+            transactionCount: 5,
+            parserLabel: 'ocbc-nxt-main',
+            statement: mockStatement({ source: 'generic' }),
+          }),
+        ]}
+        {...defaultProps}
+      />
+    )
+    expect(screen.getByRole('button', { name: 'ocbc-nxt-main' })).toBeInTheDocument()
+  })
+
+  it('shows parser badge on error state when parserLabel is set', () => {
+    render(
+      <FileStatusList
+        items={[
+          makeResult({
+            file: mockFile('bad.csv'),
+            status: 'error',
+            error: 'Parsing failed',
+            parserLabel: 'Generic CSV',
+          }),
+        ]}
+        {...defaultProps}
+      />
+    )
+    // Badge should be visible so user can try a different parser
+    expect(screen.getByRole('button', { name: 'Generic CSV' })).toBeInTheDocument()
+  })
+
+  it('does not show parser badge during initial parsing (no parserLabel yet)', () => {
+    render(
+      <FileStatusList
+        items={[
+          makeResult({
+            file: mockFile('parsing.csv'),
+            status: 'parsing',
+          }),
+        ]}
+        {...defaultProps}
+      />
+    )
+    // No parser badge when we don't know the parser yet
+    expect(screen.getByText('Parsing…')).toBeInTheDocument()
+  })
+
+  it('opens dropdown on badge click, lists parsers, and calls onChangeParser on selection', async () => {
+    const user = userEvent.setup()
+    const item = makeResult({
+      file: mockFile('select.csv'),
+      status: 'success',
+      transactionCount: 3,
+      parserLabel: 'My Custom Profile',
+      statement: mockStatement({ source: 'generic' }),
+    })
+    render(<FileStatusList items={[item]} {...defaultProps} />)
+
+    // Click the parser badge to open dropdown
+    const badge = screen.getByRole('button', { name: 'My Custom Profile' })
+    await user.click(badge)
+
+    // Dropdown should show available parsers (the button renders its label text)
+    // The dropdown contains items with these labels
+    expect(screen.getByText('Custom Profiles')).toBeInTheDocument()
+    expect(screen.getByText('Built-in')).toBeInTheDocument()
+
+    // Click a different parser to trigger onChangeParser
+    const gsvBtn = screen.getByRole('button', { name: 'Generic CSV' })
+    await user.click(gsvBtn)
+
+    // Should call onChangeParser with the item and the Generic CSV parser
+    expect(defaultProps.onChangeParser).toHaveBeenCalledTimes(1)
+    expect(defaultProps.onChangeParser).toHaveBeenCalledWith(item, expect.objectContaining({ label: 'Generic CSV' }))
+  })
+
+  it('closes dropdown when clicking outside', async () => {
+    const user = userEvent.setup()
+    render(
+      <FileStatusList
+        items={[
+          makeResult({
+            file: mockFile('outside.csv'),
+            status: 'success',
+            transactionCount: 1,
+            parserLabel: 'Generic CSV',
+            statement: mockStatement({ source: 'generic' }),
+          }),
+        ]}
+        {...defaultProps}
+      />
+    )
+
+    // Open dropdown
+    const badge = screen.getByRole('button', { name: 'Generic CSV' })
+    await user.click(badge)
+    expect(screen.getByText('Built-in')).toBeInTheDocument()
+
+    // Click the badge again to toggle the dropdown closed
+    await user.click(badge)
+    // Dropdown content should be gone
+    expect(screen.queryByText('Built-in')).not.toBeInTheDocument()
   })
 })

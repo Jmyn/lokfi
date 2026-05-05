@@ -10,7 +10,11 @@ function resolveIndex(headers: string[], ref: ColumnRef): number {
 }
 
 export class CustomCsvParser implements StatementParser {
-  constructor(private profile: CustomParserProfile) {}
+  readonly label: string
+
+  constructor(private profile: CustomParserProfile) {
+    this.label = this.profile.name
+  }
 
   detect(text: string): boolean {
     if (!text) return false

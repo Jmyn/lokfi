@@ -35,6 +35,8 @@ export interface ConsolidatedTransaction extends Transaction {
  * For CSV-first phase, `text` is the raw CSV string.
  */
 export interface StatementParser {
+  /** Human-readable parser name for display in the UI (e.g. "ocbc-nxt-main", "OCBC Credit"). */
+  label: string
   detect(text: string): boolean // non-throwing, fast heuristic
   parse(text: string): Statement // throws ParseError on unexpected format
 }

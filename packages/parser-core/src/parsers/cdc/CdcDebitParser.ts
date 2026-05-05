@@ -2,6 +2,7 @@ import Papa from 'papaparse'
 import { type DebitStatement, ParseError, type StatementParser, type Transaction } from '../../types'
 
 export class CdcDebitParser implements StatementParser {
+  readonly label = 'CDC Debit'
   detect(text: string): boolean {
     if (!text) return false
     const firstLine = text.split('\n')[0]?.trim() || ''

@@ -1,6 +1,7 @@
-import type { Statement, Transaction } from '@lokfi/parser-core'
+import type { Statement, StatementParser, Transaction } from '@lokfi/parser-core'
+import type { ParserEntry } from '@lokfi/parser-core'
 import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Loader2, X, XCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export type FileParseStatus = 'pending' | 'parsing' | 'success' | 'error'
 
@@ -12,12 +13,18 @@ export interface FileParseResult {
   error?: string
   rawText?: string
   profileName?: string
+  /** Label of the parser used (e.g. "ocbc-nxt-main", "OCBC Credit"). Derived from StatementParser.label. */
+  parserLabel?: string
+  /** Raw ArrayBuffer for PDF files — needed for re-parsing with a different parser. */
+  rawBuffer?: ArrayBuffer
 }
 
 interface FileStatusListProps {
   items: FileParseResult[]
+  availableParsers: ParserEntry[]
   onConfigure: (item: FileParseResult) => void
   onRemove: (item: FileParseResult) => void
+  onChangeParser: (item: FileParseResult, parser: StatementParser) => void
 }
 
 // When adding a new parser, add its source key here so users see a human-readable label.
@@ -254,11 +261,137 @@ function StatusBadge({ status }: { status: FileParseStatus }) {
   )
 }
 
-export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListProps) {
+/** Labels of built-in (non-custom) parsers — used to group in the parser selector. */
+const BUILTIN_PARSER_LABELS = new Set(['CDC Debit', 'Generic CSV', 'Generic PDF', 'OCBC Credit'])
+
+// ─── Parser Badge with Dropdown Selector ─────────────────────────────────────
+
+function ParserBadge({
+  label,
+  availableParsers,
+  onSelect,
+  disabled,
+}: {
+  label: string
+  availableParsers: ParserEntry[]
+  onSelect: (parser: StatementParser) => void
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const customParsers = availableParsers.filter((p) => !BUILTIN_PARSER_LABELS.has(p.label))
+  const builtinParsers = availableParsers.filter((p) => BUILTIN_PARSER_LABELS.has(p.label))
+
+  function handleSelect(parser: StatementParser) {
+    setOpen(false)
+    onSelect(parser)
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        disabled={disabled}
+        className="flex items-center gap-1 text-xs font-medium rounded-md px-2 py-1
+          border border-gray-300 dark:border-gray-500
+          bg-white dark:bg-gray-700
+          text-gray-700 dark:text-gray-200
+          hover:bg-gray-100 dark:hover:bg-gray-600
+          transition-colors whitespace-nowrap"
+      >
+        {label}
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg shadow-lg
+            border border-gray-200 dark:border-gray-600
+            bg-white dark:bg-gray-800
+            overflow-hidden"
+        >
+          <div className="max-h-64 overflow-y-auto py-1">
+            {customParsers.length > 0 && (
+              <>
+                <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                  Custom Profiles
+                </div>
+                {customParsers.map((entry) => (
+                  <button
+                    key={entry.label}
+                    type="button"
+                    onClick={() => handleSelect(entry.parser)}
+                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors
+                      ${
+                        entry.label === label
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                      }`}
+                  >
+                    {entry.label}
+                  </button>
+                ))}
+                <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+              </>
+            )}
+            <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              Built-in
+            </div>
+            {builtinParsers.map((entry) => (
+              <button
+                key={entry.label}
+                type="button"
+                onClick={() => handleSelect(entry.parser)}
+                className={`w-full text-left px-3 py-1.5 text-sm transition-colors
+                  ${
+                    entry.label === label
+                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                  }`}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function FileStatusList({
+  items,
+  availableParsers,
+  onConfigure,
+  onRemove,
+  onChangeParser,
+}: FileStatusListProps) {
   if (items.length === 0) return null
 
   // Expand state per account (keyed by file name + file size + accountNo)
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
+  const prevLabelsRef = useRef('')
+
+  // Clear expanded accounts when a file's parser changes (new parser may produce different account numbers)
+  useEffect(() => {
+    const labels = items.map((i) => `${i.file.name}:${i.file.size}:${i.parserLabel}`).join('|')
+    if (prevLabelsRef.current && prevLabelsRef.current !== labels) {
+      setExpandedAccounts(new Set())
+    }
+    prevLabelsRef.current = labels
+  }, [items])
 
   const toggleAccount = (accountKey: string) => {
     setExpandedAccounts((prev) => {
@@ -288,19 +421,26 @@ export function FileStatusList({ items, onConfigure, onRemove }: FileStatusListP
               </div>
               <div className="ml-4 flex items-start gap-2 shrink-0">
                 <div className="flex flex-col items-end gap-0.5">
-                  <StatusBadge status={item.status} />
+                  {/* Parser badge + status row */}
+                  <div className="flex items-center gap-1.5">
+                    {(item.status === 'success' || item.status === 'error') && item.parserLabel && (
+                      <ParserBadge
+                        label={item.parserLabel}
+                        availableParsers={availableParsers}
+                        onSelect={(parser) => onChangeParser(item, parser)}
+                      />
+                    )}
+                    {item.status === 'parsing' && item.parserLabel && (
+                      <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400 whitespace-nowrap">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        {item.parserLabel}
+                      </span>
+                    )}
+                    <StatusBadge status={item.status} />
+                  </div>
                   {item.status === 'success' && item.transactionCount !== undefined && (
                     <span className="text-xs text-green-600 dark:text-green-400">
                       {item.transactionCount} transactions found
-                    </span>
-                  )}
-                  {item.status === 'success' && item.profileName && (
-                    <span className="text-xs text-blue-600 dark:text-blue-400">Profile: {item.profileName}</span>
-                  )}
-                  {item.status === 'success' && item.statement?.source === 'generic' && !item.profileName && (
-                    <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500 max-w-[200px] text-right">
-                      <AlertTriangle className="h-3 w-3 shrink-0" />
-                      Generic fallback — verify data
                     </span>
                   )}
                   {item.status === 'success' &&

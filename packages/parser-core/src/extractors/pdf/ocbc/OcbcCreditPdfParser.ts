@@ -28,6 +28,7 @@ const DATE_RE = /^(\d{1,2})\/(\d{2})\b/
 const AMOUNT_RE = /[(]?[$SGD]*\s*[\d,]+\.\d{2}[)]?/
 
 export class OcbcCreditPdfParser implements StatementParser {
+  readonly label = 'OCBC Credit PDF'
   detect(text: string): boolean {
     if (!text) return false
     const sample = text.slice(0, 3000).toLowerCase()
