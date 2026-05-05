@@ -1,5 +1,10 @@
 import type { StatementParser } from './types'
 
+export interface ParserEntry {
+  label: string
+  parser: StatementParser
+}
+
 export class ParserRegistry {
   private parsers: StatementParser[] = []
   private fallbackParser: StatementParser | null = null
@@ -26,5 +31,17 @@ export class ParserRegistry {
       }
     }
     return this.fallbackParser
+  }
+
+  /**
+   * Returns all registered parsers (including fallback) as labeled entries,
+   * in registration order, for building a parser selection UI.
+   */
+  getAll(): ParserEntry[] {
+    const entries: ParserEntry[] = this.parsers.map((p) => ({ label: p.label, parser: p }))
+    if (this.fallbackParser) {
+      entries.push({ label: this.fallbackParser.label, parser: this.fallbackParser })
+    }
+    return entries
   }
 }

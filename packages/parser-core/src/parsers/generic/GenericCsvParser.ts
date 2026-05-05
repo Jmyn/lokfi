@@ -76,6 +76,7 @@ function extractAccountNo(preHeaderRows: string[][]): string {
 // ---------------------------------------------------------------------------
 
 export class GenericCsvParser implements StatementParser {
+  readonly label = 'Generic CSV'
   detect(text: string): boolean {
     if (!text) return false
     const lines = text

@@ -30,6 +30,7 @@ const AMOUNT_PATTERNS = [
 ]
 
 export class GenericPdfParser implements StatementParser {
+  readonly label = 'Generic PDF'
   detect(text: string): boolean {
     if (!text) return false
     // Must have some date-like patterns and numeric content

@@ -14,6 +14,7 @@ export type {
 export { ParseError, PREDEFINED_SOURCES } from './types'
 export { generateTransactionHash } from './hashUtils'
 export { ParserRegistry } from './ParserRegistry'
+export type { ParserEntry } from './ParserRegistry'
 export { CdcDebitParser } from './parsers/cdc/CdcDebitParser'
 export { GenericCsvParser } from './parsers/generic/GenericCsvParser'
 export { CustomCsvParser } from './parsers/generic/CustomCsvParser'

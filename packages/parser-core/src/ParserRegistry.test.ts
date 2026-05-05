@@ -12,7 +12,7 @@ describe('ParserRegistry', () => {
 
   it('returns fallback when no parsers registered but fallback is set', () => {
     const registry = new ParserRegistry()
-    const mockFallback = { detect: () => true, parse: () => ({}) }
+    const mockFallback = { label: 'Fallback', detect: () => true, parse: () => ({}) }
     registry.registerFallback(mockFallback)
     expect(registry.getParser('anything')).toBe(mockFallback)
   })
@@ -44,10 +44,12 @@ describe('ParserRegistry', () => {
     const registry = new ParserRegistry()
 
     const firstParser = {
+      label: 'First',
       detect: (text: string) => text.includes('FIRST'),
       parse: () => ({}),
     }
     const secondParser = {
+      label: 'Second',
       detect: (text: string) => text.includes('SECOND'),
       parse: () => ({}),
     }
@@ -62,10 +64,12 @@ describe('ParserRegistry', () => {
     const registry = new ParserRegistry()
 
     const firstParser = {
+      label: 'First',
       detect: (text: string) => text.includes('NOTHERE'),
       parse: () => ({}),
     }
     const secondParser = {
+      label: 'Second',
       detect: (text: string) => text.includes('SECOND'),
       parse: () => ({}),
     }
@@ -81,7 +85,7 @@ describe('ParserRegistry', () => {
     const registry = new ParserRegistry()
     registry.register(new CdcDebitParser())
 
-    const mockFallback = { detect: () => true, parse: () => ({}) }
+    const mockFallback = { label: 'Fallback', detect: () => true, parse: () => ({}) }
     registry.registerFallback(mockFallback)
 
     const uobText = 'Transaction Date,Transaction Description,Balance\n2025-12-22,Test,-10'
@@ -92,7 +96,7 @@ describe('ParserRegistry', () => {
   // so any registered fallback is returned when no parser matches
   it('returns fallback regardless of its detect result when no parser matches', () => {
     const registry = new ParserRegistry()
-    const mockFallback = { detect: () => false, parse: () => ({}) }
+    const mockFallback = { label: 'Fallback', detect: () => false, parse: () => ({}) }
     registry.registerFallback(mockFallback)
 
     // Fallback is still returned even though detect() would return false
