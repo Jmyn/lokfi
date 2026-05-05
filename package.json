@@ -12,7 +12,10 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "lint:fix": "turbo lint:fix",
-    "test": "turbo test"
+    "test": "turbo test",
+    "dev:docs": "pnpm --filter @lokfi/docs dev",
+    "build:docs": "pnpm --filter @lokfi/docs build",
+    "build:deploy": "pnpm build && cp -r apps/docs/dist apps/web/dist/docs"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

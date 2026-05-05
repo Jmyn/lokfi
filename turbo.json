@@ -20,6 +20,15 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
+    },
+    "docs#build": {
+      "dependsOn": [],
+      "inputs": [".vitepress/**", "index.md", "guide/**", "reference/**", "public/**"],
+      "outputs": ["dist/**"]
+    },
+    "dev:docs": {
+      "cache": false,
+      "persistent": true
     }
   }
 }
