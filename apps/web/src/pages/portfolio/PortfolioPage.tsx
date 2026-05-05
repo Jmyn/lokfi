@@ -129,7 +129,7 @@ export function PortfolioPage() {
     <div className="max-w-5xl mx-auto px-5 py-8">
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="font-serif text-xl text-gray-900 dark:text-white">Portfolio</h1>
+        <h1 className="font-serif text-xl text-gray-900 dark:text-white">Investments</h1>
         <div className="flex items-center gap-3">
           {fxRates && preferredCurrency !== 'Original' && fxRates[preferredCurrency] && (
             <span className="text-xs text-gray-400 dark:text-gray-500" title={`Updated ${fxLastUpdated ?? 'unknown'}`}>
