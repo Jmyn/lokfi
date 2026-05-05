@@ -74,4 +74,4 @@ Lokfi is a labor of love. If you find it useful, consider supporting:
 
 ## 📜 License
 
-MIT © 2026 Jermyn Tanu (Jmyn)
+MIT © 2026 Jmyn
