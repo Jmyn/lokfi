@@ -1,0 +1,25 @@
+# Auto-detect text vs binary; normalize text to LF in the index
+* text=auto
+
+# Ensure source files always normalize to LF
+*.ts     text eol=lf
+*.tsx    text eol=lf
+*.js     text eol=lf
+*.mjs    text eol=lf
+*.css    text eol=lf
+*.html   text eol=lf
+*.json   text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+*.toml   text eol=lf
+
+# Markdown and docs
+*.md     text eol=lf
+*.txt    text eol=lf
+
+# Dotfiles
+*.gitignore text eol=lf
+*.example   text eol=lf
+
+# Binary files — never touch
+*.png    binary
