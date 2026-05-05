@@ -20,14 +20,14 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
     }
     if (filters.sourceType === 'brokerage') {
       const txnSources = (await db.brokerageTransactions.orderBy('source').uniqueKeys()) as string[]
-      const caSources = (await db.brokerageCorpActions.orderBy('source').uniqueKeys()) as string[]
-      return Array.from(new Set([...txnSources, ...caSources]))
+      const fdSources = (await db.brokerageFundDetails.orderBy('source').uniqueKeys()) as string[]
+      return Array.from(new Set([...txnSources, ...fdSources]))
     }
     // all
     const bankSources = (await db.transactions.orderBy('source').uniqueKeys()) as string[]
     const txnSources = (await db.brokerageTransactions.orderBy('source').uniqueKeys()) as string[]
-    const caSources = (await db.brokerageCorpActions.orderBy('source').uniqueKeys()) as string[]
-    return Array.from(new Set([...bankSources, ...txnSources, ...caSources]))
+    const fdSources = (await db.brokerageFundDetails.orderBy('source').uniqueKeys()) as string[]
+    return Array.from(new Set([...bankSources, ...txnSources, ...fdSources]))
   }, [filters.sourceType])
 
   const accounts = useLiveQuery(() => db.transactions.orderBy('accountNo').uniqueKeys() as Promise<string[]>, [])

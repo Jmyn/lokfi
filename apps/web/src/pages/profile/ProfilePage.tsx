@@ -24,7 +24,7 @@ export function ProfilePage() {
       brokeragePositions,
       brokeragePositionExtensions,
       brokerageTransactions,
-      brokerageCorpActions,
+      brokerageFundDetails,
       brokerageAccounts,
       brokerageSyncLog,
       brokerageCredentials,
@@ -37,13 +37,13 @@ export function ProfilePage() {
       db.brokeragePositions.toArray(),
       db.brokeragePositionExtensions.toArray(),
       db.brokerageTransactions.toArray(),
-      db.brokerageCorpActions.toArray(),
+      db.brokerageFundDetails.toArray(),
       db.brokerageAccounts.toArray(),
       db.brokerageSyncLog.toArray(),
       db.brokerageCredentials.toArray(),
     ])
     const data = {
-      version: 2,
+      version: 3,
       exportedAt: new Date().toISOString(),
       transactions,
       rules,
@@ -53,7 +53,7 @@ export function ProfilePage() {
       brokeragePositions,
       brokeragePositionExtensions,
       brokerageTransactions,
-      brokerageCorpActions,
+      brokerageFundDetails,
       brokerageAccounts,
       brokerageSyncLog,
       brokerageCredentials,
@@ -92,12 +92,12 @@ export function ProfilePage() {
     const text = await file.text()
     try {
       const data = JSON.parse(text)
-      // Validate basic backup structure (version 1 or 2)
+      // Validate basic backup structure (version 1, 2, or 3)
       if (
         !data ||
         typeof data !== 'object' ||
         Array.isArray(data) ||
-        (data.version !== 1 && data.version !== 2) ||
+        ![1, 2, 3].includes(data.version) ||
         !Array.isArray(data.transactions) ||
         !Array.isArray(data.rules) ||
         !Array.isArray(data.categories) ||
@@ -105,19 +105,18 @@ export function ProfilePage() {
         !Array.isArray(data.budgets)
       ) {
         alert(
-          'Invalid backup file: expected a Lokfi backup JSON (v1 or v2) with ' +
+          'Invalid backup file: expected a Lokfi backup JSON (v1, v2, or v3) with ' +
             'transactions, rules, categories, customParsers, and budgets.'
         )
         e.target.value = ''
         return
       }
-      // Version 2 must include all brokerage arrays
+      // Version 2 must include all brokerage arrays (except brokerageFundDetails which is new in v3)
       if (
         data.version === 2 &&
         (!Array.isArray(data.brokeragePositions) ||
           !Array.isArray(data.brokeragePositionExtensions) ||
           !Array.isArray(data.brokerageTransactions) ||
-          !Array.isArray(data.brokerageCorpActions) ||
           !Array.isArray(data.brokerageAccounts) ||
           !Array.isArray(data.brokerageSyncLog) ||
           !Array.isArray(data.brokerageCredentials))
@@ -129,7 +128,18 @@ export function ProfilePage() {
         e.target.value = ''
         return
       }
-      const hasBrokerage = data.version === 2
+
+      // Version 3 must include brokerageFundDetails
+      if (data.version === 3 && !Array.isArray(data.brokerageFundDetails)) {
+        alert(
+          'Invalid v3 backup file: missing brokerageFundDetails array. ' +
+            'The backup appears to be incomplete or corrupted.'
+        )
+        e.target.value = ''
+        return
+      }
+      const hasBrokerage = data.version >= 2
+      const fundDetailsCount = Array.isArray(data.brokerageFundDetails) ? data.brokerageFundDetails.length : 0
       const confirmed = window.confirm(
         `This will replace all current data with the backup:\n` +
           `• ${data.transactions.length} transaction(s)\n` +
@@ -141,7 +151,7 @@ export function ProfilePage() {
             ? `• ${data.brokeragePositions.length} brokerage position(s)\n` +
               `• ${data.brokerageTransactions.length} brokerage trade(s)\n` +
               `• ${data.brokerageAccounts.length} brokerage account(s)\n` +
-              `• ${data.brokerageCorpActions.length} corp action(s)\n` +
+              (fundDetailsCount > 0 ? `• ${fundDetailsCount} fund detail(s)\n` : '') +
               `• ${data.brokerageCredentials.length} credential(s) (encrypted)\n`
             : `• (no brokerage data in backup)\n`) +
           `Current data will be overwritten. Are you sure?`
@@ -160,7 +170,7 @@ export function ProfilePage() {
             db.brokeragePositions,
             db.brokeragePositionExtensions,
             db.brokerageTransactions,
-            db.brokerageCorpActions,
+            db.brokerageFundDetails,
             db.brokerageAccounts,
             db.brokerageSyncLog,
             db.brokerageCredentials,
@@ -179,7 +189,7 @@ export function ProfilePage() {
                 db.brokeragePositions.clear(),
                 db.brokeragePositionExtensions.clear(),
                 db.brokerageTransactions.clear(),
-                db.brokerageCorpActions.clear(),
+                db.brokerageFundDetails.clear(),
                 db.brokerageAccounts.clear(),
                 db.brokerageSyncLog.clear(),
                 db.brokerageCredentials.clear(),
@@ -199,7 +209,7 @@ export function ProfilePage() {
           // Remaining brokerage tables have no dependencies — parallelize
           await Promise.all([
             data.brokerageTransactions.length && db.brokerageTransactions.bulkAdd(data.brokerageTransactions),
-            data.brokerageCorpActions.length && db.brokerageCorpActions.bulkAdd(data.brokerageCorpActions),
+            data.brokerageFundDetails?.length && db.brokerageFundDetails.bulkAdd(data.brokerageFundDetails),
             data.brokerageAccounts.length && db.brokerageAccounts.bulkAdd(data.brokerageAccounts),
             data.brokerageSyncLog.length && db.brokerageSyncLog.bulkAdd(data.brokerageSyncLog),
             data.brokerageCredentials.length && db.brokerageCredentials.bulkAdd(data.brokerageCredentials),

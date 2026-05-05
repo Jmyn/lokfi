@@ -169,21 +169,29 @@ export interface TigerAssetSegment {
   buyingPower?: number
 }
 
-// ── Corporate Action (fund_detail with fund_type=CORPORATE_ACTION) ────────
+// TigerCorpAction removed — superseded by TigerFundDetail (see below)
 
-export interface TigerCorpAction {
+// ── Fund Detail (fund_detail with fund_type=ALL) ──────────────────────────
+
+export interface TigerFundDetail {
   /** Fund change record ID */
   id?: number
   account: string
   currency?: string
   amount?: number
-  /** Description (e.g. "AAPL Dividend") */
+  /** Description (e.g. "Buy-AVGO", "XDTE-DIVIDEND", "Funds Transfer In") */
   desc?: string
-  /** Business date of the action */
+  /** Fund type string (e.g. "Trade", "Commission", "Dividend", "Dividend Tax") */
+  type?: string
+  /** Contract/company display name */
+  contractName?: string
+  /** Segment type (e.g. 'SEC') */
+  segType?: string
+  /** Business date (ISO-8601 date string) */
   businessDate?: string
-  /** Fund type: 7 = CORPORATE_ACTION */
-  fundType?: string
-  /** Transaction time (ISO-8601 or timestamp) */
+  /** Last update timestamp (epoch seconds) */
+  updatedAt?: number
+  /** Transaction timestamp (epoch seconds) */
   transactionTime?: number
 }
 

@@ -7,7 +7,7 @@
 
 import type {
   BrokerageAccount,
-  BrokerageCorpAction,
+  BrokerageFundDetail,
   BrokeragePosition,
   BrokeragePositionExtension,
   BrokerageSyncLog,
@@ -24,6 +24,13 @@ export class DexieSyncAdapter implements SyncDatabase {
   }
 
   async upsertPositions(positions: BrokeragePosition[]): Promise<void> {
+    if (positions.length === 0) return
+    const source = positions[0].source
+    // Clear old positions for this source first so orphaned records from
+    // previous ID formats (e.g. old `${symbol}_${source}` without secType)
+    // don't linger alongside the new `${symbol}_${secType}_${source}` keys.
+    // Note: source is not indexed on brokeragePositions, so use filter() instead of where()
+    await this.db.brokeragePositions.filter((p) => p.source === source).delete()
     await this.db.brokeragePositions.bulkPut(positions)
   }
 
@@ -45,9 +52,9 @@ export class DexieSyncAdapter implements SyncDatabase {
     await this.db.brokerageTransactions.bulkPut(transactions)
   }
 
-  async appendCorpActions(actions: BrokerageCorpAction[]): Promise<void> {
+  async appendFundDetails(actions: BrokerageFundDetail[]): Promise<void> {
     if (actions.length === 0) return
-    await this.db.brokerageCorpActions.bulkPut(actions)
+    await this.db.brokerageFundDetails.bulkPut(actions)
   }
 
   async upsertAccounts(accounts: BrokerageAccount[]): Promise<void> {

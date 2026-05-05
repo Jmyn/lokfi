@@ -10,6 +10,8 @@ import {
   TigerProvider,
 } from '../../lib/brokerage'
 import type { TigerClientConfig } from '../../lib/brokerage'
+import { SyncProgressBar } from '../../lib/brokerage/SyncProgressBar'
+import type { SyncProgress } from '../../lib/brokerage/sync-orchestrator'
 import { db } from '../../lib/db/db'
 
 const PRESETS = [30, 90, 180, 365]
@@ -25,6 +27,7 @@ export function BrokerageSettingsPage() {
   const [hasCredentials, setHasCredentials] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [syncProgress, setSyncProgress] = useState<SyncProgress[]>([])
 
   const credManager = useMemo(() => new CredentialManager(new DexieCredentialStore(db)), [])
 
@@ -79,6 +82,22 @@ export function BrokerageSettingsPage() {
       showError('Enter your passphrase to test the connection')
       return
     }
+
+    // Auto-save if credentials are filled in but not yet stored
+    if (!hasCredentials) {
+      if (!credentials.tigerId || !credentials.privateKey || !credentials.account) {
+        showError('Please fill in all fields first')
+        return
+      }
+      try {
+        await credManager.store(SOURCE, credentials, passphrase)
+        setHasCredentials(true)
+      } catch (err) {
+        showError(err instanceof Error ? err.message : 'Failed to save credentials')
+        return
+      }
+    }
+
     setTesting(true)
     setError(null)
     try {
@@ -111,8 +130,25 @@ export function BrokerageSettingsPage() {
       showError('Enter your passphrase to sync')
       return
     }
+
+    // Auto-save if credentials are filled in but not yet stored
+    if (!hasCredentials) {
+      if (!credentials.tigerId || !credentials.privateKey || !credentials.account) {
+        showError('Please fill in all fields first')
+        return
+      }
+      try {
+        await credManager.store(SOURCE, credentials, passphrase)
+        setHasCredentials(true)
+      } catch (err) {
+        showError(err instanceof Error ? err.message : 'Failed to save credentials')
+        return
+      }
+    }
+
     setSyncing(true)
     setError(null)
+    setSyncProgress([])
     try {
       const stored = await credManager.retrieve(SOURCE, passphrase)
       if (!stored) {
@@ -126,7 +162,12 @@ export function BrokerageSettingsPage() {
       }
       const provider = new TigerProvider({ config })
       const adapter = new DexieSyncAdapter(db)
-      const orchestrator = new SyncOrchestrator({ provider, database: adapter, lookbackDays })
+      const orchestrator = new SyncOrchestrator({
+        provider,
+        database: adapter,
+        lookbackDays,
+        onProgress: (p) => setSyncProgress((prev) => [...prev, p]),
+      })
       await orchestrator.sync()
       showSuccess('Sync completed')
     } catch (err) {
@@ -142,7 +183,7 @@ export function BrokerageSettingsPage() {
     try {
       await credManager.remove(SOURCE)
       await db.brokerageTransactions.clear()
-      await db.brokerageCorpActions.clear()
+      await db.brokerageFundDetails.clear()
       await db.brokeragePositions.clear()
       await db.brokeragePositionExtensions.clear()
       await db.brokerageAccounts.clear()
@@ -257,7 +298,7 @@ export function BrokerageSettingsPage() {
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                 {hasCredentials
                   ? 'Enter your passphrase to test the connection or sync.'
-                  : 'Used to encrypt your credentials. You&apos;ll need this every time you sync.'}
+                  : 'Used to encrypt your credentials. You will need this every time you sync.'}
               </p>
             </div>
           </div>
@@ -353,6 +394,9 @@ export function BrokerageSettingsPage() {
             </button>
           )}
         </div>
+
+        {/* Sync progress */}
+        <SyncProgressBar progress={syncProgress} syncing={syncing} />
 
         {/* Sync status */}
         {lastSyncByCategory.size > 0 && (

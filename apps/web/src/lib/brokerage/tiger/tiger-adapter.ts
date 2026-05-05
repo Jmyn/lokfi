@@ -7,16 +7,16 @@
 
 import type {
   BrokerageAccount,
-  BrokerageCorpAction,
+  BrokerageFundDetail,
   BrokeragePosition,
   BrokerageTransaction,
-  CorpActionType,
+  FundDetailType,
   TradeAction,
 } from '@lokfi/brokerage-core'
 import type {
   TigerAsset,
   TigerAssetSegment,
-  TigerCorpAction,
+  TigerFundDetail,
   TigerOrder,
   TigerOrderTransaction,
   TigerPosition,
@@ -28,17 +28,27 @@ export const SOURCE = 'tiger'
 // ── Position ──────────────────────────────────────────────────────────────
 
 export function adaptPosition(raw: TigerPosition): BrokeragePosition {
+  const secType = (raw.secType || 'STK') as BrokeragePosition['secType']
+  // For derivatives, include the OCC identifier in the ID to disambiguate
+  // multiple contracts on the same underlying (e.g. GRAB OPT $4 vs $4.50).
+  const id = raw.identifier
+    ? `${raw.secType}_${raw.identifier.replace(/\s+/g, '_')}_${SOURCE}`
+    : `${raw.symbol}_${secType}_${SOURCE}`
   return {
-    id: `${raw.symbol}_${SOURCE}`,
+    id,
     source: SOURCE,
     symbol: raw.symbol,
     name: raw.name,
-    secType: (raw.secType || 'STK') as BrokeragePosition['secType'],
+    secType,
     currency: raw.currency || 'USD',
     quantity: raw.position,
     avgCost: raw.averageCost,
     marketValue: raw.marketValue,
     unrealizedPnl: raw.unrealizedPnl,
+    // Option/derivative fields (only present for OPT, FUT, etc.)
+    identifier: raw.identifier,
+    multiplier: raw.multiplier,
+    contractId: raw.contractId,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -121,26 +131,183 @@ export function adaptAssetSegment(segment: TigerAssetSegment, currency: string):
   }
 }
 
-// ── Corporate Action ──────────────────────────────────────────────────────
+// ── Fund Detail → BrokerageFundDetail ─────────────────────────────────────
 
 /**
- * Adapt Tiger fund_detail records with fund_type=CORPORATE_ACTION
- * into normalized corp actions. Parses the description string to
- * determine action type (dividend, split, rights, or other).
+ * Static mapping of Tiger fund_detail `type` strings to `FundDetailType`.
+ * Exact-match map — entries here take priority over prefix/pattern matching.
  */
-export function adaptCorpAction(raw: TigerCorpAction): BrokerageCorpAction | null {
-  const date = raw.businessDate || new Date().toISOString().slice(0, 10)
+const FUND_TYPE_MAP: Record<string, FundDetailType> = {
+  Dividend: 'DIVIDEND',
+  'Dividend Tax': 'DIVIDEND_TAX',
+  Trade: 'TRADE',
+  Commission: 'FEE',
+  'Platform Fee': 'FEE',
+  'Settlement Fee': 'FEE',
+  GST: 'FEE',
+  'Trading Activity Fee': 'FEE',
+  'SEC Fee': 'FEE',
+  'Option Regulatory Fee': 'FEE',
+  'Clearing Fee': 'FEE',
+  'Funds Transfer In': 'TRANSFER_IN',
+  'Funds Transfer Out': 'TRANSFER_OUT',
+  'Campaign Subsidy': 'REBATE',
+  Deposit: 'DEPOSIT_WITHDRAWAL',
+}
+
+/** Track already-logged unknown types to avoid console spam on repeated syncs */
+const warnedTypes = new Set<string>()
+
+/**
+ * Classify a Tiger fund_detail `type` string into a FundDetailType.
+ *
+ * Matching order:
+ *   1. Exact match in FUND_TYPE_MAP (fast path)
+ *   2. Prefix / regex pattern match (handles variants)
+ *   3. Fallback to `UNKNOWN` with a one-time warning per type
+ */
+export function classifyFundType(rawType?: string): FundDetailType {
+  if (!rawType) return 'UNKNOWN'
+
+  // 1. Exact match
+  const mapped = FUND_TYPE_MAP[rawType]
+  if (mapped) return mapped
+
+  // 2. Prefix / pattern matches
+  if (rawType.startsWith('Currency Exchange')) return 'CURRENCY_EXCHANGE'
+  if (/^(Deposit|Withdrawal)/i.test(rawType)) return 'DEPOSIT_WITHDRAWAL'
+
+  // 3. Unknown — log once per type, classify as UNKNOWN
+  if (!warnedTypes.has(rawType)) {
+    warnedTypes.add(rawType)
+    console.warn(`[tiger-adapter] Unknown fund_detail type: "${rawType}" — classifying as UNKNOWN`)
+  }
+  return 'UNKNOWN'
+}
+
+/**
+ * Extract the stock symbol from a fund detail description.
+ * Descriptions follow the pattern "Action-SYMBOL" (e.g. "Buy-AVGO")
+ * or "SYMBOL-DIVIDEND" (e.g. "XDTE-DIVIDEND").
+ */
+export function extractSymbolFromDesc(desc?: string): string {
+  if (!desc) return ''
+  // Try "Buy-AVGO" pattern first (prefix-action)
+  const actionMatch = desc.trim().match(/^(?:Buy|Sell)-(\S+)/i)
+  if (actionMatch) return actionMatch[1].toUpperCase()
+  // Fall back to first segment split by '-' (e.g. "XDTE-DIVIDEND" → "XDTE")
+  const segments = desc.trim().split('-')
+  return segments[0] ? segments[0].toUpperCase() : ''
+}
+
+/**
+ * Extract trade action (Buy/Sell) from a fund detail description.
+ * Returns undefined if the description does not start with a recognised prefix.
+ */
+export function extractActionFromDesc(desc?: string): TradeAction | undefined {
+  if (!desc) return undefined
+  const match = desc.trim().match(/^(Buy|Sell)/i)
+  if (!match) return undefined
+  const upper = match[1].toUpperCase()
+  if (upper === 'SELL') return 'SELL'
+  return 'BUY'
+}
+
+/**
+ * Adapt a raw TigerFundDetail record into a normalized BrokerageFundDetail.
+ * Returns null if the record is unparseable (no id, no business date).
+ */
+export function adaptFundDetail(raw: TigerFundDetail): BrokerageFundDetail | null {
+  if (raw.id === undefined || raw.id === null) return null
+  if (!raw.businessDate) return null
+
+  const classifiedType = classifyFundType(raw.type)
+  const symbol = extractSymbolFromDesc(raw.desc)
+  const action = classifyFundType(raw.type) === 'TRADE' ? extractActionFromDesc(raw.desc) : undefined
 
   return {
-    id: `${SOURCE}_${date}_${raw.id ?? raw.desc ?? ''}`,
+    id: `${SOURCE}_fund_${raw.id}`,
     source: SOURCE,
-    symbol: '', // Not available in fund_detail — derived from desc
-    type: classifyCorpAction(raw.desc),
-    amount: raw.amount,
-    currency: raw.currency,
-    payDate: date,
-    appliedAt: raw.transactionTime ? new Date(raw.transactionTime * 1000).toISOString() : new Date().toISOString(),
+    rawType: raw.type ?? 'UNKNOWN',
+    classifiedType,
+    symbol: symbol || undefined,
+    contractName: raw.contractName,
+    amount: raw.amount ?? 0,
+    currency: raw.currency || 'USD',
+    action,
+    quantity: undefined,
+    price: undefined,
+    commission: undefined,
+    businessDate: raw.businessDate,
+    segType: raw.segType,
   }
+}
+
+// ── Trade Enrichment ──────────────────────────────────────────────────────
+
+/**
+ * Enrich a TRADE fund_detail record with quantity, price, and commission
+ * from matching filled orders.
+ *
+ * Matching strategy (most → least reliable):
+ * 1. Match by symbol + date + action (single match → use it)
+ * 2. Multiple matches → select closest amount match
+ * 3. No match → return unenriched
+ */
+export function enrichTradeFundDetail(
+  fd: BrokerageFundDetail,
+  filledOrders: BrokerageTransaction[]
+): BrokerageFundDetail {
+  if (fd.classifiedType !== 'TRADE') return fd
+  if (!fd.symbol || !fd.action) return fd
+
+  const fdDate = fd.businessDate.slice(0, 10)
+
+  // Find filled orders matching symbol + date + action
+  const matches = filledOrders.filter((o) => {
+    const oDate = o.executedAt.slice(0, 10)
+    return o.symbol === fd.symbol && oDate === fdDate && o.action === fd.action
+  })
+
+  if (matches.length === 0) {
+    console.debug(`[tiger-adapter] Unmatched trade fund detail: ${fd.symbol} ${fd.action} on ${fdDate}`)
+    return fd
+  }
+
+  // Single match — use it directly
+  if (matches.length === 1) {
+    const order = matches[0]
+    return {
+      ...fd,
+      quantity: order.quantity,
+      price: order.price,
+      commission: order.commission,
+    }
+  }
+
+  // Multiple matches — select closest amount match
+  const fdAbsAmount = Math.abs(fd.amount)
+  let bestMatch = matches[0]
+  let bestDiff = Math.abs(Math.abs(orderGrossAmount(matches[0])) - fdAbsAmount)
+
+  for (let i = 1; i < matches.length; i++) {
+    const diff = Math.abs(Math.abs(orderGrossAmount(matches[i])) - fdAbsAmount)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      bestMatch = matches[i]
+    }
+  }
+
+  return {
+    ...fd,
+    quantity: bestMatch.quantity,
+    price: bestMatch.price,
+    commission: bestMatch.commission,
+  }
+}
+
+function orderGrossAmount(order: BrokerageTransaction): number {
+  return order.quantity * order.price + (order.commission ?? 0)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -149,13 +316,4 @@ function normalizeAction(action: string): TradeAction {
   const upper = action.toUpperCase()
   if (upper === 'SELL' || upper === 'SHORT') return 'SELL'
   return 'BUY'
-}
-
-function classifyCorpAction(desc?: string): CorpActionType {
-  if (!desc) return 'OTHER'
-  const lower = desc.toLowerCase()
-  if (lower.includes('dividend') || lower.includes('div')) return 'DIVIDEND'
-  if (lower.includes('split')) return 'SPLIT'
-  if (lower.includes('right')) return 'RIGHTS'
-  return 'OTHER'
 }

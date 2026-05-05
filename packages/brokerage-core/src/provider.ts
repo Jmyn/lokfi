@@ -11,11 +11,18 @@
 
 import type {
   BrokerageAccount,
-  BrokerageCorpAction,
+  BrokerageFundDetail,
   BrokeragePosition,
   BrokerageSource,
   BrokerageTransaction,
 } from './types.js'
+
+/**
+ * Callback for sub-method progress updates (e.g. pagination, rate-limit pauses).
+ * Invoked by the provider during long-running fetch operations so the UI can
+ * display granular status messages.
+ */
+export type ProviderProgress = (message: string) => void
 
 export interface BrokerageProvider {
   /** Unique identifier for this brokerage (e.g. 'tiger', 'ibkr', 'crypto_com') */
@@ -27,8 +34,10 @@ export interface BrokerageProvider {
   /**
    * Fetch current positions (holdings).
    * Returns an empty array if no positions exist.
+   *
+   * @param onProgress - Optional callback for sub-method progress updates
    */
-  fetchPositions(): Promise<BrokeragePosition[]>
+  fetchPositions(onProgress?: ProviderProgress): Promise<BrokeragePosition[]>
 
   /**
    * Fetch filled order history since a given date.
@@ -36,22 +45,26 @@ export interface BrokerageProvider {
    * the orchestrator will dedupe by orderId.
    *
    * @param since - Earliest date to fetch transactions from
+   * @param onProgress - Optional callback for sub-method progress updates
    */
-  fetchTransactions(since: Date): Promise<BrokerageTransaction[]>
+  fetchTransactions(since: Date, onProgress?: ProviderProgress): Promise<BrokerageTransaction[]>
 
   /**
-   * Fetch corporate actions (dividends, splits, rights) applied to the account.
+   * Fetch fund details (cash ledger — dividends, fees, trades, transfers, rebates).
    * Returns empty array if the provider does not expose this data.
    *
-   * @param since - Earliest date to fetch actions from
+   * @param since - Earliest date to fetch fund details from
+   * @param onProgress - Optional callback for sub-category progress updates (e.g. pagination)
    */
-  fetchCorpActions(since: Date): Promise<BrokerageCorpAction[]>
+  fetchFundDetails(since: Date, onProgress?: ProviderProgress): Promise<BrokerageFundDetail[]>
 
   /**
    * Fetch account summary — cash balance, net liquidation per currency segment.
    * Returns an array with one entry per currency segment (e.g. one for USD, one for SGD).
+   *
+   * @param onProgress - Optional callback for sub-method progress updates
    */
-  fetchAccount(): Promise<BrokerageAccount[]>
+  fetchAccount(onProgress?: ProviderProgress): Promise<BrokerageAccount[]>
 
   /**
    * Lightweight connectivity check — confirms auth works without fetching

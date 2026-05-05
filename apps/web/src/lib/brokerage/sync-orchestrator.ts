@@ -9,7 +9,7 @@
 
 import type {
   BrokerageAccount,
-  BrokerageCorpAction,
+  BrokerageFundDetail,
   BrokeragePosition,
   BrokeragePositionExtension,
   BrokerageSyncLog,
@@ -27,8 +27,8 @@ export interface SyncDatabase {
   upsertPositionExtensions(extensions: BrokeragePositionExtension[]): Promise<void>
   /** Append transactions (never overwrite) */
   appendTransactions(transactions: BrokerageTransaction[]): Promise<void>
-  /** Append corporate actions (never overwrite) */
-  appendCorpActions(actions: BrokerageCorpAction[]): Promise<void>
+  /** Append fund details (never overwrite) */
+  appendFundDetails(actions: BrokerageFundDetail[]): Promise<void>
   /** Replace account records (one per source+currency) */
   upsertAccounts(accounts: BrokerageAccount[]): Promise<void>
   /** Insert sync log entry (auto-increment id) */
@@ -40,9 +40,9 @@ export interface SyncDatabase {
 /** Rate limit tiers matching Tiger OpenAPI documentation */
 const RATE_LIMITS: Record<string, number> = {
   positions: 1100, // Medium tier: 60/min → ~1.1s between requests
-  transactions: 600, // High tier: 120/min → 600ms (used more aggressively)
-  account: 1100, // Medium tier
-  corp_actions: 1100, // Medium tier
+  transactions: 600, // High tier: 120/min → 600ms
+  account: 1100, // Medium tier: 60/min → ~1.1s
+  fund_details: 6100, // Low tier: 10/min → 6.1s between requests
 }
 
 /**
@@ -55,17 +55,52 @@ const MAX_RETRIES = 1
  */
 const BASE_BACKOFF_MS = 1000
 
+/**
+ * Create a progress callback that forwards provider-level messages
+ * to the orchestrator's onProgress callback.
+ */
+function makeProgress(
+  onProgress: ((progress: SyncProgress) => void) | undefined,
+  category: SyncCategory
+): (message: string) => void {
+  return (message: string) => {
+    onProgress?.({
+      category,
+      completed: 0,
+      total: 0,
+      completedAt: new Date().toISOString(),
+      message,
+    })
+  }
+}
+
 export interface SyncOrchestratorOptions {
   provider: BrokerageProvider
   database: SyncDatabase
   /** Transaction/corp action lookback window (days). Default: 90 */
   lookbackDays?: number
+  /** Called after each category completes with progress info */
+  onProgress?: (progress: SyncProgress) => void
+}
+
+/** Progress event emitted by the orchestrator during sync */
+export interface SyncProgress {
+  category: SyncCategory
+  completed: number
+  total: number
+  /** ISO timestamp when this event was emitted */
+  completedAt: string
+  /** Error message if this category failed, undefined on success */
+  error?: string
+  /** Sub-category progress message (e.g. pagination status) */
+  message?: string
 }
 
 export class SyncOrchestrator {
   private provider: BrokerageProvider
   private db: SyncDatabase
   private lookbackDays: number
+  private onProgress?: (progress: SyncProgress) => void
 
   // Track the last request timestamp per category for basic rate limiting
   private lastRequestTime: Map<SyncCategory, number> = new Map()
@@ -74,6 +109,7 @@ export class SyncOrchestrator {
     this.provider = options.provider
     this.db = options.database
     this.lookbackDays = options.lookbackDays ?? 90
+    this.onProgress = options.onProgress
   }
 
   /**
@@ -81,18 +117,41 @@ export class SyncOrchestrator {
    * Categories fail independently — if one fails, others continue.
    */
   async sync(categories?: SyncCategory[]): Promise<void> {
-    const toSync = categories ?? (['positions', 'transactions', 'corp_actions', 'account'] as SyncCategory[])
+    const toSync = categories ?? (['positions', 'transactions', 'fund_details', 'account'] as SyncCategory[])
     const since = new Date()
     since.setDate(since.getDate() - this.lookbackDays)
+
+    let completed = 0
+    const total = toSync.length
 
     // Execute categories sequentially to respect rate limits.
     // Each category is independently wrapped in error isolation.
     for (const category of toSync) {
+      let error: string | undefined
+
+      // Emit start-of-category progress
+      this.onProgress?.({
+        category,
+        completed,
+        total,
+        completedAt: new Date().toISOString(),
+      })
+
       try {
         await this.syncCategory(category, since)
       } catch (err) {
         // Error already logged in syncCategory. Continue to next category.
         console.error(`[SyncOrchestrator] Category "${category}" failed, continuing:`, err)
+        error = err instanceof Error ? err.message : String(err)
+      } finally {
+        completed++
+        this.onProgress?.({
+          category,
+          completed,
+          total,
+          completedAt: new Date().toISOString(),
+          error,
+        })
       }
     }
   }
@@ -106,7 +165,7 @@ export class SyncOrchestrator {
     const result: Record<SyncCategory, { lastSyncAt: string | null; status: SyncStatus | null }> = {
       positions: { lastSyncAt: null, status: null },
       transactions: { lastSyncAt: null, status: null },
-      corp_actions: { lastSyncAt: null, status: null },
+      fund_details: { lastSyncAt: null, status: null },
       account: { lastSyncAt: null, status: null },
     }
 
@@ -145,8 +204,8 @@ export class SyncOrchestrator {
         case 'transactions':
           await this.syncTransactionsWithRetry(since)
           break
-        case 'corp_actions':
-          await this.syncCorpActionsWithRetry(since)
+        case 'fund_details':
+          await this.syncFundDetailsWithRetry(since)
           break
         case 'account':
           await this.syncAccountWithRetry()
@@ -178,32 +237,32 @@ export class SyncOrchestrator {
 
   private async syncPositionsWithRetry(): Promise<void> {
     await this.withRetry(async () => {
-      const positions = await this.provider.fetchPositions()
+      const positions = await this.provider.fetchPositions(makeProgress(this.onProgress, 'positions'))
       await this.db.upsertPositions(positions)
     })
   }
 
   private async syncTransactionsWithRetry(since: Date): Promise<void> {
     await this.withRetry(async () => {
-      const transactions = await this.provider.fetchTransactions(since)
+      const transactions = await this.provider.fetchTransactions(since, makeProgress(this.onProgress, 'transactions'))
       if (transactions.length > 0) {
         await this.db.appendTransactions(transactions)
       }
     })
   }
 
-  private async syncCorpActionsWithRetry(since: Date): Promise<void> {
+  private async syncFundDetailsWithRetry(since: Date): Promise<void> {
     await this.withRetry(async () => {
-      const actions = await this.provider.fetchCorpActions(since)
-      if (actions.length > 0) {
-        await this.db.appendCorpActions(actions)
+      const fundDetails = await this.provider.fetchFundDetails(since, makeProgress(this.onProgress, 'fund_details'))
+      if (fundDetails.length > 0) {
+        await this.db.appendFundDetails(fundDetails)
       }
     })
   }
 
   private async syncAccountWithRetry(): Promise<void> {
     await this.withRetry(async () => {
-      const accounts = await this.provider.fetchAccount()
+      const accounts = await this.provider.fetchAccount(makeProgress(this.onProgress, 'account'))
       await this.db.upsertAccounts(accounts)
     })
   }

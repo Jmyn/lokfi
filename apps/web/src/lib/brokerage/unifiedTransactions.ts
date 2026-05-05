@@ -1,10 +1,25 @@
-import type { BrokerageCorpAction, BrokerageTransaction } from '@lokfi/brokerage-core'
+import type { BrokerageFundDetail, BrokerageTransaction } from '@lokfi/brokerage-core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { Filters } from '../../pages/transactions/filterTypes'
 import { type DbTransaction, db } from '../db/db'
 
 /** Brokerage-specific row types displayed in the unified view */
-export type BrokerageRowType = 'BUY' | 'SELL' | 'DIVIDEND' | 'FEE' | 'SPLIT' | 'RIGHTS' | 'OTHER' | 'CORP ACTION'
+export type BrokerageRowType =
+  | 'BUY'
+  | 'SELL'
+  | 'DIVIDEND'
+  | 'FEE'
+  | 'SPLIT'
+  | 'RIGHTS'
+  | 'OTHER'
+  | 'DIVIDEND_TAX'
+  | 'TRANSFER_IN'
+  | 'TRANSFER_OUT'
+  | 'DEPOSIT'
+  | 'WITHDRAWAL'
+  | 'CURRENCY_EXCHANGE'
+  | 'UNKNOWN'
+  | 'REBATE'
 
 /** Common row shape for both bank and brokerage transactions in the UI */
 export interface UnifiedTransactionRow {
@@ -23,7 +38,7 @@ export interface UnifiedTransactionRow {
   /** Original bank record — present only when `isBank` is true */
   originalBank?: DbTransaction
   /** Original brokerage record — present only when `isBank` is false */
-  originalBrokerage?: BrokerageTransaction | BrokerageCorpAction
+  originalBrokerage?: BrokerageTransaction | BrokerageFundDetail
 }
 
 // ── Formatting helpers ──────────────────────────────────────────────────────
@@ -100,37 +115,218 @@ export function mapBrokerageTransaction(t: BrokerageTransaction): UnifiedTransac
   return rows
 }
 
-/** Map a BrokerageCorpAction to one or more UnifiedTransactionRows */
-export function mapCorpAction(a: BrokerageCorpAction): UnifiedTransactionRow[] {
+/** Map a BrokerageFundDetail to one or more UnifiedTransactionRows */
+export function mapFundDetail(d: BrokerageFundDetail): UnifiedTransactionRow[] {
   const rows: UnifiedTransactionRow[] = []
-  const date = a.appliedAt || a.payDate || a.exDate || '1970-01-01T00:00:00Z'
+  const date = d.businessDate.length === 10 ? `${d.businessDate}T00:00:00Z` : d.businessDate
 
-  if (a.type === 'DIVIDEND' && a.amount !== undefined) {
-    rows.push({
-      id: `ca-${a.id}`,
-      source: a.source,
-      date,
-      description: `${a.symbol} Dividend — ${fmtCurrency(a.amount, a.currency ?? 'USD')}`,
-      amount: a.amount,
-      currency: a.currency ?? 'USD',
-      type: 'DIVIDEND',
-      symbol: a.symbol,
-      isBank: false,
-      originalBrokerage: a,
-    })
-  } else {
-    rows.push({
-      id: `ca-${a.id}`,
-      source: a.source,
-      date,
-      description: `${a.symbol} ${a.type}${a.amount ? ` — ${fmtCurrency(a.amount, a.currency ?? 'USD')}` : ''}`,
-      amount: a.amount ?? 0,
-      currency: a.currency ?? 'USD',
-      type: a.type === 'OTHER' ? 'CORP ACTION' : a.type,
-      symbol: a.symbol,
-      isBank: false,
-      originalBrokerage: a,
-    })
+  switch (d.classifiedType) {
+    case 'DIVIDEND': {
+      rows.push({
+        id: `fd-${d.id}`,
+        source: d.source,
+        date,
+        description: `${d.symbol || ''} Dividend — ${fmtCurrency(d.amount, d.currency)}`,
+        amount: d.amount,
+        currency: d.currency,
+        type: 'DIVIDEND',
+        symbol: d.symbol,
+        isBank: false,
+        originalBrokerage: d,
+      })
+      break
+    }
+
+    case 'DIVIDEND_TAX': {
+      const isRefund = d.amount > 0
+      rows.push({
+        id: `fd-${d.id}`,
+        source: d.source,
+        date,
+        description: isRefund
+          ? `${d.symbol || ''} Dividend Tax refund (return of capital) — ${fmtCurrency(Math.abs(d.amount), d.currency)}`
+          : `${d.symbol || ''} Dividend Tax withheld — ${fmtCurrency(Math.abs(d.amount), d.currency)}`,
+        amount: d.amount,
+        currency: d.currency,
+        type: 'DIVIDEND_TAX',
+        symbol: d.symbol,
+        isBank: false,
+        originalBrokerage: d,
+      })
+      break
+    }
+
+    case 'TRADE': {
+      if (d.quantity !== undefined && d.price !== undefined && d.action) {
+        // Enriched trade — show as BUY/SELL row with per-share detail
+        const gross = d.quantity * d.price
+        const comm = d.commission ?? 0
+        const total = d.action === 'BUY' ? -(gross + comm) : gross - comm
+        rows.push({
+          id: `fd-${d.id}`,
+          source: d.source,
+          date,
+          description: `${d.action} ${d.symbol || ''} — ${d.quantity} shares @ ${fmtCurrency(d.price, d.currency)}`,
+          amount: total,
+          currency: d.currency,
+          type: d.action,
+          symbol: d.symbol,
+          quantity: d.quantity,
+          price: d.price,
+          isBank: false,
+          originalBrokerage: d,
+        })
+      } else {
+        // Unenriched trade — show as TRADE row with total only
+        rows.push({
+          id: `fd-${d.id}`,
+          source: d.source,
+          date,
+          description: `Trade ${d.symbol || ''} — ${fmtCurrency(Math.abs(d.amount), d.currency)}`,
+          amount: d.amount,
+          currency: d.currency,
+          type: d.action ?? 'BUY',
+          symbol: d.symbol,
+          isBank: false,
+          originalBrokerage: d,
+        })
+      }
+      break
+    }
+
+    case 'FEE': {
+      rows.push({
+        id: `fd-${d.id}`,
+        source: d.source,
+        date,
+        description: `${d.rawType}${d.symbol ? ` (${d.symbol})` : ''} — ${fmtCurrency(Math.abs(d.amount), d.currency)}`,
+        amount: -Math.abs(d.amount), // Fees are always outflows
+        currency: d.currency,
+        type: 'FEE',
+        symbol: d.symbol,
+        isBank: false,
+        originalBrokerage: d,
+      })
+      break
+    }
+
+    case 'TRANSFER_IN': {
+      rows.push({
+        id: `fd-${d.id}`,
+        source: d.source,
+        date,
+        description: `Funds Transfer In — ${fmtCurrency(d.amount, d.currency)}`,
+        amount: d.amount,
+        currency: d.currency,
+        type: 'TRANSFER_IN',
+        symbol: d.symbol,
+        isBank: false,
+        originalBrokerage: d,
+      })
+      break
+    }
+
+    case 'TRANSFER_OUT': {
+      rows.push({
+        id: `fd-${d.id}`,
+        source: d.source,
+        date,
+        description: `Funds Transfer Out — ${fmtCurrency(Math.abs(d.amount), d.currency)}`,
+        amount: d.amount, // Already negative from broker
+        currency: d.currency,
+        type: 'TRANSFER_OUT',
+        symbol: d.symbol,
+        isBank: false,
+        originalBrokerage: d,
+      })
+      break
+    }
+
+    case 'DEPOSIT_WITHDRAWAL': {
+      const isDeposit = d.amount > 0
+      rows.push({
+        id: `fd-${d.id}`,
+        source: d.source,
+        date,
+        description: isDeposit
+          ? `Deposit — ${fmtCurrency(d.amount, d.currency)}`
+          : `Withdrawal — ${fmtCurrency(Math.abs(d.amount), d.currency)}`,
+        amount: d.amount,
+        currency: d.currency,
+        type: isDeposit ? 'DEPOSIT' : 'WITHDRAWAL',
+        symbol: d.symbol,
+        isBank: false,
+        originalBrokerage: d,
+      })
+      break
+    }
+
+    case 'CURRENCY_EXCHANGE': {
+      const fxDesc = d.rawType.includes('Base Currency')
+        ? `Currency Conversion (→ Base) — ${fmtCurrency(Math.abs(d.amount), d.currency)}`
+        : `Currency Conversion (→ Quotation) — ${fmtCurrency(Math.abs(d.amount), d.currency)}`
+      rows.push({
+        id: `fd-${d.id}`,
+        source: d.source,
+        date,
+        description: fxDesc,
+        amount: d.amount,
+        currency: d.currency,
+        type: 'CURRENCY_EXCHANGE',
+        symbol: d.symbol,
+        isBank: false,
+        originalBrokerage: d,
+      })
+      break
+    }
+
+    case 'UNKNOWN': {
+      rows.push({
+        id: `fd-${d.id}`,
+        source: d.source,
+        date,
+        description: `Unclassified (${d.rawType}) — ${fmtCurrency(Math.abs(d.amount), d.currency)}`,
+        amount: d.amount,
+        currency: d.currency,
+        type: 'UNKNOWN',
+        symbol: d.symbol,
+        isBank: false,
+        originalBrokerage: d,
+      })
+      break
+    }
+
+    case 'REBATE': {
+      rows.push({
+        id: `fd-${d.id}`,
+        source: d.source,
+        date,
+        description: `Rebate (${d.rawType}) — ${fmtCurrency(d.amount, d.currency)}`,
+        amount: d.amount,
+        currency: d.currency,
+        type: 'REBATE',
+        isBank: false,
+        originalBrokerage: d,
+      })
+      break
+    }
+
+    default: {
+      // CORP_ACTION or any future unhandled type — generic row
+      rows.push({
+        id: `fd-${d.id}`,
+        source: d.source,
+        date,
+        description: `${d.classifiedType}${d.symbol ? ` (${d.symbol})` : ''} — ${fmtCurrency(Math.abs(d.amount), d.currency)}`,
+        amount: d.amount,
+        currency: d.currency,
+        type: d.classifiedType,
+        symbol: d.symbol,
+        isBank: false,
+        originalBrokerage: d,
+      })
+      break
+    }
   }
 
   return rows
@@ -165,6 +361,8 @@ function filterBrokerageRow(row: UnifiedTransactionRow, filters: Filters): boole
   if (filters.dateTo && dateOnly > filters.dateTo) return false
   if (filters.sources.length > 0 && !filters.sources.includes(row.source)) return false
   if (filters.type && row.type !== filters.type) return false
+  // Bank-specific filters (accounts, categoryId) don't apply to brokerage rows
+  // DIVIDEND_TAX, TRANSFER_IN, REBATE, FEE don't have symbol-specific filtering
   return true
 }
 
@@ -210,6 +408,7 @@ export async function fetchUnifiedRows(filters: Filters): Promise<{ rows: Unifie
 
   // Brokerage
   if (filters.sourceType === 'all' || filters.sourceType === 'brokerage') {
+    // Filled orders that produce standalone BUY/SELL rows
     const txns = await db.brokerageTransactions.toArray()
     for (const t of txns) {
       for (const row of mapBrokerageTransaction(t)) {
@@ -219,9 +418,10 @@ export async function fetchUnifiedRows(filters: Filters): Promise<{ rows: Unifie
       }
     }
 
-    const actions = await db.brokerageCorpActions.toArray()
-    for (const a of actions) {
-      for (const row of mapCorpAction(a)) {
+    // Fund details
+    const fundDetails = await db.brokerageFundDetails.toArray()
+    for (const fd of fundDetails) {
+      for (const row of mapFundDetail(fd)) {
         if (filterBrokerageRow(row, filters)) {
           brokerageRows.push(row)
         }
@@ -239,7 +439,7 @@ export async function fetchUnifiedRows(filters: Filters): Promise<{ rows: Unifie
  * React hook that returns a reactive, paginated slice of unified transactions.
  *
  * Queries `db.transactions` (bank) and `db.brokerageTransactions` +
- * `db.brokerageCorpActions` (brokerage), merges them into a common row shape,
+ * `db.brokerageFundDetails` (brokerage), merges them into a common row shape,
  * sorts by date descending, and slices for pagination.
  *
  * Brokerage tables are queried lazily — only when `sourceType` is `"all"` or

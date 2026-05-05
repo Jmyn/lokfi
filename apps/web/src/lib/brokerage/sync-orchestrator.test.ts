@@ -15,7 +15,7 @@ function createMockProvider(overrides?: Partial<BrokerageProvider>): BrokeragePr
     displayName: 'Mock Broker',
     fetchPositions: vi.fn().mockResolvedValue([]),
     fetchTransactions: vi.fn().mockResolvedValue([]),
-    fetchCorpActions: vi.fn().mockResolvedValue([]),
+    fetchFundDetails: vi.fn().mockResolvedValue([]),
     fetchAccount: vi.fn().mockResolvedValue([]),
     validateConnection: vi.fn().mockResolvedValue(true),
     ...overrides,
@@ -30,7 +30,7 @@ function createMockDatabase(): SyncDatabase {
     upsertPositions: vi.fn().mockResolvedValue(undefined),
     upsertPositionExtensions: vi.fn().mockResolvedValue(undefined),
     appendTransactions: vi.fn().mockResolvedValue(undefined),
-    appendCorpActions: vi.fn().mockResolvedValue(undefined),
+    appendFundDetails: vi.fn().mockResolvedValue(undefined),
     upsertAccounts: vi.fn().mockResolvedValue(undefined),
     insertSyncLog: vi.fn().mockImplementation((log: BrokerageSyncLog) => {
       logs.push(log)
@@ -79,7 +79,7 @@ describe('SyncOrchestrator', () => {
 
       expect(categories).toContain('positions')
       expect(categories).toContain('transactions')
-      expect(categories).toContain('corp_actions')
+      expect(categories).toContain('fund_details')
       expect(categories).toContain('account')
     })
   })
@@ -99,7 +99,7 @@ describe('SyncOrchestrator', () => {
 
       expect(categories).toContain('positions')
       expect(categories).not.toContain('transactions')
-      expect(categories).not.toContain('corp_actions')
+      expect(categories).not.toContain('fund_details')
       expect(categories).not.toContain('account')
     })
   })

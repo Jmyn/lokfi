@@ -50,7 +50,7 @@ These credentials are encrypted with a user-supplied passphrase using Web Crypto
 2. Go to **Developer Center → My Apps** → create an application → upload your RSA public key
 3. API access is activated immediately — no endpoint-specific permissions required
 
-The `fund_details` (corporate actions) endpoint is included in standard OpenAPI access. No separate activation needed.
+The `fund_details` (fund details / corporate actions) endpoint is included in standard OpenAPI access. No separate activation needed.
 
 ## API Endpoints Used (Read-Only)
 
@@ -63,7 +63,7 @@ All endpoints are accessed via `POST https://openapi.tigerfintech.com/gateway` w
 | Order transactions | `order_transactions` | `account`, `id` (orderId) |
 | Account assets | `assets` | `account` |
 | Prime assets | `prime_assets` | `account` |
-| Corporate actions | `fund_details` | `account`, `fund_type: "CORPORATE_ACTION"`, `seg_types: ["SEC"]`, `start_date`, `end_date` |
+| Fund details | `fund_details` | `account`, `fund_type: "ALL"`, `seg_types: ["SEC"]`, `start_date`, `end_date` |
 
 ## Rate Limits
 
@@ -72,33 +72,34 @@ Tiger enforces per-method tiered rate limits on a 60-second rolling window:
 | Tier | Limit | Methods |
 |---|---|---|
 | High | 120 req/min | Order queries, trading |
-| **Medium** | **60 req/min** | **Positions, assets, fund details** |
-| Low | 10 req/min | Market status, symbol info |
+| **Medium** | **60 req/min** | **Positions, assets** |
+| **Low** | **10 req/min** | **Fund details**, market status, symbol info |
 
 Lokfi's sync orchestrator implements tier-aware throttling:
-- **Medium-tier** (positions, assets, corp actions): 1100ms between requests
+- **Medium-tier** (positions, assets, account): 1100ms between requests
+- **Low-tier** (fund details): 6100ms between requests
 - **High-tier** (orders, transactions): 600ms between requests
 
 Exceeding limits persistently may result in your `tiger_id` being blacklisted automatically. Contact Tiger support for higher limits.
 
-## Corporate Actions
+## Fund Details
 
 ### What's Available
 
-Tiger's standard OpenAPI provides account-level corporate action history via the `fund_details` endpoint. Each record includes:
+Tiger's standard OpenAPI provides account-level cash ledger history via the `fund_details` endpoint with `fund_type: 'ALL'`. This returns 13 distinct transaction types including trades, dividends, dividend tax, fees (Commission, Platform Fee, GST, SEC Fee, etc.), transfers, and rebates. Each record includes:
 
-- `amount` — value of the action (dividend payout, etc.)
+- `amount` — value of the fund change (positive = inflow, negative = outflow)
 - `currency` — USD, SGD, HKD, etc.
-- `desc` — description (e.g. "XDTE-DIVIDEND", "MSTY-DIVIDEND")
+- `desc` — description (e.g. "Buy-AVGO", "XDTE-DIVIDEND", "Funds Transfer In")
 - `businessDate` — Tiger-defined business date when the action was applied
 - `segType` — `SEC` (securities) or `FUT` (futures)
-- `type` — fund type label
+- `type` — fund type label (e.g. "Trade", "Dividend", "Dividend Tax", "Commission", "Platform Fee")
 
-**Correct parameter format** (based on Tiger's official Python/Java SDK docs):
+**Correct parameter format** (fund_type: 'ALL' for complete cash ledger):
 
 ```json
 {
-  "fund_type": "CORPORATE_ACTION",
+  "fund_type": "ALL",
   "seg_types": ["SEC"],
   "start_date": "2026-02-01",
   "end_date": "2026-05-01",
@@ -106,13 +107,22 @@ Tiger's standard OpenAPI provides account-level corporate action history via the
 }
 ```
 
-Key: `seg_types` is an **array of strings** using Tiger's enum values `SEC`/`FUT` (not `S`/`C`), and `fund_type` is the **string** `"CORPORATE_ACTION"` (not the integer `7`).
+Key: `seg_types` is an **array of strings** using Tiger's enum values `SEC`/`FUT` (not `S`/`C`), and `fund_type` is the **string** `"ALL"` for the complete cash ledger. Pagination is driven by the `pageCount` field in Tiger's response metadata. The first request (page 1) reveals the total number of pages; subsequent requests fetch pages 2 through `pageCount`. A 6100ms delay is applied between pages to respect the Low-tier rate limit (10 req/min). Records are deduplicated by `id` as a safety net in case the API returns overlapping data across pages.
 
-### What's NOT Available via Standard API
+### Type Classification
 
-The standard API provides fund-change records (dividend receipts, fee debits) but does **not** include structured metadata like ex-date, pay-date, or symbol-level corporate action details. This structured data is available through the **Enterprise API** (`GET /corp-actions`) but that endpoint requires OAuth2 token authentication — a separate authorization tier.
+The adapter maps Tiger `type` strings to normalized `FundDetailType` values:
 
-The Tiger provider maps `fund_details` records to normalized `BrokerageCorpAction` entries with best-effort type classification (dividend/split/rights/other) based on the description text. For detailed corporate action tracking, upgrading to the Enterprise API tier would be needed.
+| Tiger type | Classified As |
+|---|---|
+| Dividend | DIVIDEND |
+| Dividend Tax | DIVIDEND_TAX |
+| Trade | TRADE |
+| Commission, Platform Fee, GST, SEC Fee, etc. | FEE |
+| Funds Transfer In | TRANSFER_IN |
+| Campaign Subsidy | REBATE |
+
+Trade records are enriched with quantity/price data from `filled_orders` by matching symbol, date, and action. Unenriched trade records still appear in the unified view with the total amount only.
 
 ## Market/Account Segmentation
 
@@ -148,7 +158,7 @@ The script will:
 2. **Positions** — displays all current holdings with P&L breakdown
 3. **Account summary** — cash balance, net liquidation by currency segment
 4. **Recent orders** — last 30 days of filled orders
-5. **Corporate actions** — last 90 days of dividends/splits
+5. **Fund details** — last 90 days of fund detail records (dividends, fees, trades, transfers, rebates)
 
 ### What success looks like
 
@@ -177,8 +187,8 @@ Tiger OpenAPI — Connection Verification
 ✓ Fetched 3 filled order(s)
 ...
 
-─── 5. Corporate Actions ─────────────────────────────────────
-✓ Fetched 1 corporate action(s)
+─── 5. Fund Details ─────────────────────────────────────────
+✓ Fetched 12 fund detail record(s)
   2025-03-15  AAPL Dividend  $24.00
 
 ─── Result ───────────────────────────────────────────────────
@@ -192,7 +202,7 @@ Tiger OpenAPI — Connection Verification
 | `Authentication failed` | Key is PKCS1 — convert to PKCS8: `openssl pkcs8 -topk8 -inform PEM -outform PEM -in key.pem -out key_pkcs8.pem -nocrypt` |
 | `API error [-1]` | `tiger_id` or account number is wrong, or public key not uploaded in Developer Center |
 | `HTTP 403` | OpenAPI access not activated — visit `developer.tigerbrokers.com.sg` |
-| `Corporate actions unavailable` | `fund_details` endpoint requires specific account permissions |
+| `Fund details unavailable` | `fund_details` endpoint requires specific account permissions |
 
 ## Validation (Programmatic)
 

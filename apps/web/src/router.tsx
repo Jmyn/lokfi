@@ -4,6 +4,7 @@ import { AppShell } from './layouts/AppShell'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { ImportPage } from './pages/import/ImportPage'
 import { LandingPage } from './pages/landing/LandingPage'
+import { PortfolioPage } from './pages/portfolio/PortfolioPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
 import { RulesPage } from './pages/rules/RulesPage'
 import { BrokerageSettingsPage } from './pages/settings/BrokerageSettingsPage'
@@ -33,6 +34,12 @@ const shellRoute = createRoute({
       <Outlet />
     </AppShell>
   ),
+})
+
+const portfolioRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/portfolio',
+  component: PortfolioPage,
 })
 
 const importRoute = createRoute({
@@ -74,6 +81,7 @@ const brokerageSettingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   landingRoute,
   shellRoute.addChildren([
+    portfolioRoute,
     importRoute,
     transactionsRoute,
     dashboardRoute,
