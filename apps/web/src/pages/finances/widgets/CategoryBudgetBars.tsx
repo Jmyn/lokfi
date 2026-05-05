@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { db } from '../../../lib/db/db'
 import { fmt } from '../../../lib/format'
-import { useDashboard } from '../DashboardContext'
+import { useFinances } from '../FinancesContext'
 
 export function CategoryBudgetBars() {
-  const { transactions, categories, budgets } = useDashboard()
+  const { transactions, categories, budgets } = useFinances()
   const [editingCatId, setEditingCatId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
 

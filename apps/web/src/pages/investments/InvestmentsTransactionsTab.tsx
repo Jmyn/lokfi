@@ -122,7 +122,7 @@ function useDividendBankLinks(dividendRows: UnifiedTransactionRow[]): Map<string
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export function PortfolioTransactionsTab() {
+export function InvestmentsTransactionsTab() {
   const navigate = useNavigate()
 
   const { rows, total } = useLiveQuery(

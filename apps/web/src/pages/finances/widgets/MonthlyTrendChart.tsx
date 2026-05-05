@@ -2,10 +2,10 @@ import { useMemo } from 'react'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AXIS_TICK, CURSOR_STYLE, TOOLTIP_STYLE } from '../../../lib/charts/chartTheme'
 import { fmt, formatMonth } from '../../../lib/format'
-import { useDashboard } from '../DashboardContext'
+import { useFinances } from '../FinancesContext'
 
 export function MonthlyTrendChart() {
-  const { transactions } = useDashboard()
+  const { transactions } = useFinances()
 
   const data = useMemo(() => {
     const monthMap = new Map<string, { income: number; expenses: number }>()

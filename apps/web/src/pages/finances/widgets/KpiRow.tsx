@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { fmt } from '../../../lib/format'
-import { useDashboard } from '../DashboardContext'
+import { useFinances } from '../FinancesContext'
 
 interface KpiCardProps {
   label: string
@@ -35,7 +35,7 @@ function KpiCard({ label, value, sub, trend }: KpiCardProps) {
 }
 
 export function KpiRow() {
-  const { transactions, categories } = useDashboard()
+  const { transactions, categories } = useFinances()
 
   const stats = useMemo(() => {
     const expenses = transactions.filter((t) => t.transactionValue < 0)

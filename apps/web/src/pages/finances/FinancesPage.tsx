@@ -1,5 +1,5 @@
-import { DashboardFilterProvider, useDashboard } from './DashboardContext'
-import { DashboardFilters } from './DashboardFilters'
+import { FinancesFilterProvider, useFinances } from './FinancesContext'
+import { FinancesFilters } from './FinancesFilters'
 import { AverageIncome } from './widgets/AverageIncome'
 import { AverageSpending } from './widgets/AverageSpending'
 import { CategoryBreakdown } from './widgets/CategoryBreakdown'
@@ -10,8 +10,8 @@ import { SavingsRateGauge } from './widgets/SavingsRateGauge'
 import { SpendingHeatmap } from './widgets/SpendingHeatmap'
 import { TopMerchants } from './widgets/TopMerchants'
 
-function DashboardContent() {
-  const { isLoading, transactions } = useDashboard()
+function FinancesContent() {
+  const { isLoading, transactions } = useFinances()
 
   if (isLoading) {
     return (
@@ -22,7 +22,7 @@ function DashboardContent() {
   if (transactions.length === 0) {
     return (
       <div className="space-y-6 p-6 max-w-6xl">
-        <DashboardFilters />
+        <FinancesFilters />
         <div className="flex flex-col items-center justify-center py-20">
           <p className="text-gray-500 dark:text-gray-400">
             No transactions match your filters. Try adjusting or clearing them.
@@ -34,7 +34,7 @@ function DashboardContent() {
 
   return (
     <div className="space-y-6 p-6 max-w-6xl">
-      <DashboardFilters />
+      <FinancesFilters />
       <KpiRow />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <SavingsRateGauge />
@@ -52,10 +52,10 @@ function DashboardContent() {
   )
 }
 
-export function DashboardPage() {
+export function FinancesPage() {
   return (
-    <DashboardFilterProvider>
-      <DashboardContent />
-    </DashboardFilterProvider>
+    <FinancesFilterProvider>
+      <FinancesContent />
+    </FinancesFilterProvider>
   )
 }

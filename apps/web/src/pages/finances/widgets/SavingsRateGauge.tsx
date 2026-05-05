@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { fmt } from '../../../lib/format'
-import { useDashboard } from '../DashboardContext'
+import { useFinances } from '../FinancesContext'
 
 export function SavingsRateGauge() {
-  const { transactions } = useDashboard()
+  const { transactions } = useFinances()
 
   const { rate, totalIncome, totalExpenses, color, label } = useMemo(() => {
     let income = 0

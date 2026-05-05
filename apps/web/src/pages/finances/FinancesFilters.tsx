@@ -1,4 +1,4 @@
-import { useDashboard } from './DashboardContext'
+import { useFinances } from './FinancesContext'
 
 const inputCls =
   'text-xs border rounded-full px-3 py-1.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-0'
@@ -44,8 +44,8 @@ const PRESETS: { label: string; from: () => string; to: () => string }[] = [
   },
 ]
 
-export function DashboardFilters() {
-  const { filters, setFilters, categories, allTransactions } = useDashboard()
+export function FinancesFilters() {
+  const { filters, setFilters, categories, allTransactions } = useFinances()
 
   const accounts = [...new Set(allTransactions.map((t) => t.accountNo))].sort()
 

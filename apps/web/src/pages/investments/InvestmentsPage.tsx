@@ -18,13 +18,13 @@ import { CurrencySelector } from './CurrencySelector'
 import { DividendsTab } from './DividendsTab'
 import { HoldingsTab } from './HoldingsTab'
 import { OverviewTab } from './OverviewTab'
-import { PortfolioTabs } from './PortfolioTabs'
-import { PortfolioTransactionsTab } from './PortfolioTransactionsTab'
+import { InvestmentsTabs } from './InvestmentsTabs'
+import { InvestmentsTransactionsTab } from './InvestmentsTransactionsTab'
 import { type CurrencyOption, getPreferredCurrency, setPreferredCurrency } from './currencyPreference'
 
 const SOURCE = 'tiger'
 
-export function PortfolioPage() {
+export function InvestmentsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const searchParams = new URLSearchParams(location.search)
@@ -60,7 +60,7 @@ export function PortfolioPage() {
   }, [])
 
   function setTab(newTab: string) {
-    navigate({ to: '/portfolio', search: { tab: newTab } })
+    navigate({ to: '/investments', search: { tab: newTab } })
   }
 
   async function handleCurrencyChange(currency: CurrencyOption) {
@@ -239,7 +239,7 @@ export function PortfolioPage() {
       )}
 
       {/* Tabs */}
-      <PortfolioTabs activeTab={activeTab} onTabChange={setTab} />
+      <InvestmentsTabs activeTab={activeTab} onTabChange={setTab} />
 
       {/* Tab content */}
       <div className="mt-6">
@@ -259,7 +259,7 @@ export function PortfolioPage() {
             fxError={fxError}
           />
         )}
-        {activeTab === 'transactions' && <PortfolioTransactionsTab />}
+        {activeTab === 'transactions' && <InvestmentsTransactionsTab />}
         {activeTab === 'dividends' && (
           <DividendsTab
             preferredCurrency={preferredCurrency}

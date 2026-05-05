@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { fmt } from '../../../lib/format'
-import { useDashboard } from '../DashboardContext'
+import { useFinances } from '../FinancesContext'
 
 const CELL = 14
 const GAP = 2
@@ -25,7 +25,7 @@ interface TooltipData {
 }
 
 export function SpendingHeatmap() {
-  const { transactions, filters } = useDashboard()
+  const { transactions, filters } = useFinances()
   const [tooltip, setTooltip] = useState<TooltipData | null>(null)
 
   const { cells, weeks, maxSpend, monthLabels } = useMemo(() => {

@@ -3,14 +3,14 @@ import { type ReactNode, createContext, useCallback, useContext, useEffect, useM
 import { type DbBudget, type DbTransaction, db } from '../../lib/db/db'
 import type { DbCategory } from '../../lib/db/seedCategories'
 
-export interface DashboardFilters {
+export interface FinancesFilters {
   dateFrom: string
   dateTo: string
   categoryIds: string[]
   accounts: string[]
 }
 
-export const defaultDashboardFilters: DashboardFilters = {
+export const defaultFinancesFilters: FinancesFilters = {
   dateFrom: '',
   dateTo: '',
   categoryIds: [],
@@ -42,9 +42,9 @@ function savePrefs(prefs: SavedFilterPrefs): void {
   db.settings.put({ key: SETTINGS_KEY, value: JSON.stringify(prefs) })
 }
 
-interface DashboardContextValue {
-  filters: DashboardFilters
-  setFilters: (f: DashboardFilters) => void
+interface FinancesContextValue {
+  filters: FinancesFilters
+  setFilters: (f: FinancesFilters) => void
   transactions: DbTransaction[]
   allTransactions: DbTransaction[]
   categories: DbCategory[]
@@ -52,16 +52,16 @@ interface DashboardContextValue {
   isLoading: boolean
 }
 
-const DashboardCtx = createContext<DashboardContextValue | null>(null)
+const FinancesCtx = createContext<FinancesContextValue | null>(null)
 
-export function useDashboard(): DashboardContextValue {
-  const ctx = useContext(DashboardCtx)
-  if (!ctx) throw new Error('useDashboard must be used within DashboardFilterProvider')
+export function useFinances(): FinancesContextValue {
+  const ctx = useContext(FinancesCtx)
+  if (!ctx) throw new Error('useFinances must be used within FinancesFilterProvider')
   return ctx
 }
 
-export function DashboardFilterProvider({ children }: { children: ReactNode }) {
-  const [filters, setFiltersRaw] = useState<DashboardFilters>(defaultDashboardFilters)
+export function FinancesFilterProvider({ children }: { children: ReactNode }) {
+  const [filters, setFiltersRaw] = useState<FinancesFilters>(defaultFinancesFilters)
 
   const allTransactions = useLiveQuery(() => db.transactions.toArray(), [])
   const categories = useLiveQuery(() => db.categories.toArray(), [])
@@ -69,7 +69,7 @@ export function DashboardFilterProvider({ children }: { children: ReactNode }) {
 
   // Persist category/account selections when they change (debounced)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const setFilters = useCallback((next: DashboardFilters) => {
+  const setFilters = useCallback((next: FinancesFilters) => {
     setFiltersRaw(next)
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
@@ -130,7 +130,7 @@ export function DashboardFilterProvider({ children }: { children: ReactNode }) {
 
   const isLoading = !allTransactions || !categories || !budgets
 
-  const value: DashboardContextValue = {
+  const value: FinancesContextValue = {
     filters,
     setFilters,
     transactions: transactions ?? [],
@@ -140,5 +140,5 @@ export function DashboardFilterProvider({ children }: { children: ReactNode }) {
     isLoading,
   }
 
-  return <DashboardCtx.Provider value={value}>{children}</DashboardCtx.Provider>
+  return <FinancesCtx.Provider value={value}>{children}</FinancesCtx.Provider>
 }

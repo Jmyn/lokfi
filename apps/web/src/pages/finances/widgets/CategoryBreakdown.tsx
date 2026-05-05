@@ -3,10 +3,10 @@ import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recha
 import { CATEGORY_PALETTE } from '../../../lib/charts/chartPalette'
 import { LEGEND_STYLE, TOOLTIP_STYLE } from '../../../lib/charts/chartTheme'
 import { fmt } from '../../../lib/format'
-import { useDashboard } from '../DashboardContext'
+import { useFinances } from '../FinancesContext'
 
 export function CategoryBreakdown() {
-  const { transactions, categories } = useDashboard()
+  const { transactions, categories } = useFinances()
 
   const catData = useMemo(() => {
     const catMap = new Map<string, number>()

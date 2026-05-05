@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { fmt } from '../../../lib/format'
-import { useDashboard } from '../DashboardContext'
+import { useFinances } from '../FinancesContext'
 
 // Noise words to strip from descriptions when extracting merchant names
 // Reuses the same set from suggestRules.ts conceptually
@@ -63,7 +63,7 @@ interface MerchantData {
 }
 
 export function TopMerchants() {
-  const { transactions } = useDashboard()
+  const { transactions } = useFinances()
 
   const merchants = useMemo(() => {
     const map = new Map<string, MerchantData>()

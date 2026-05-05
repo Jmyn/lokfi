@@ -9,7 +9,7 @@ export type CurrencyOption = (typeof CURRENCIES)[number]
  * @returns Preferred currency option
  */
 export async function getPreferredCurrency(): Promise<CurrencyOption> {
-  const s = await db.settings.get('portfolio:preferredCurrency')
+  const s = await db.settings.get('investments:preferredCurrency')
   const val = s?.value as CurrencyOption
   return CURRENCIES.includes(val) ? val : 'SGD'
 }
@@ -19,7 +19,7 @@ export async function getPreferredCurrency(): Promise<CurrencyOption> {
  * @param currency - Currency option to save
  */
 export async function setPreferredCurrency(currency: CurrencyOption): Promise<void> {
-  await db.settings.put({ key: 'portfolio:preferredCurrency', value: currency })
+  await db.settings.put({ key: 'investments:preferredCurrency', value: currency })
 }
 
 export { CURRENCIES }

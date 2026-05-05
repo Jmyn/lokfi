@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { fmt } from '../../../lib/format'
-import { useDashboard } from '../DashboardContext'
+import { useFinances } from '../FinancesContext'
 
 type Period = 'daily' | 'weekly' | 'monthly'
 
 export function AverageSpending() {
-  const { transactions } = useDashboard()
+  const { transactions } = useFinances()
   const [period, setPeriod] = useState<Period>('monthly')
 
   const { avg, periodCount } = useMemo(() => {

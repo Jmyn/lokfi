@@ -23,8 +23,8 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Finances', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'Investments', path: '/portfolio', icon: TrendingUp },
+  { label: 'Finances', path: '/finances', icon: LayoutDashboard },
+  { label: 'Investments', path: '/investments', icon: TrendingUp },
   { label: 'Import', path: '/import', icon: Upload },
   { label: 'Transactions', path: '/transactions', icon: List },
   { label: 'Rules', path: '/rules', icon: Wand2 },

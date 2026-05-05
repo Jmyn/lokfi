@@ -5,12 +5,12 @@ const TABS = [
   { id: 'dividends', label: 'Dividends' },
 ] as const
 
-interface PortfolioTabsProps {
+interface InvestmentsTabsProps {
   activeTab: string
   onTabChange: (tab: string) => void
 }
 
-export function PortfolioTabs({ activeTab, onTabChange }: PortfolioTabsProps) {
+export function InvestmentsTabs({ activeTab, onTabChange }: InvestmentsTabsProps) {
   return (
     <div className="border-b overflow-x-auto" style={{ borderColor: 'var(--border)' }}>
       <div className="flex gap-1 min-w-max">
