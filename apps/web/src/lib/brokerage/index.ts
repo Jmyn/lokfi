@@ -22,7 +22,7 @@ export type {
   TigerOrder,
   TigerOrderTransaction,
   TigerAsset,
-  TigerCorpAction,
+  TigerFundDetail,
   TigerApiRequest,
   TigerApiResponse,
   TigerMarket,
@@ -35,7 +35,7 @@ export { CredentialManager } from './credential-manager'
 export type { CredentialStore } from './credential-manager'
 
 export { SyncOrchestrator } from './sync-orchestrator'
-export type { SyncOrchestratorOptions, SyncDatabase } from './sync-orchestrator'
+export type { SyncOrchestratorOptions, SyncDatabase, SyncProgress } from './sync-orchestrator'
 
 export { DexieSyncAdapter } from './dexie-sync-adapter'
 export { DexieCredentialStore } from './dexie-credential-store'

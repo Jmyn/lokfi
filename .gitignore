@@ -12,3 +12,4 @@ statements/
 *.bak
 
 .kilo
+.playwright-cli

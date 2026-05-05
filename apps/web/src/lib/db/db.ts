@@ -1,7 +1,7 @@
 import type {
   BrokerageAccount,
-  BrokerageCorpAction,
   BrokerageCredentials,
+  BrokerageFundDetail,
   BrokeragePosition,
   BrokeragePositionExtension,
   BrokerageSyncLog,
@@ -47,6 +47,12 @@ export interface DbSetting {
 
 export type DbCustomParserProfile = CustomParserProfile
 
+export interface FxRateRecord {
+  date: string // 'YYYY-MM-DD'
+  base: string
+  rates: Record<string, number>
+}
+
 export interface DbBudget {
   id: string
   categoryId: string
@@ -67,10 +73,11 @@ export class LokfiDatabase extends Dexie {
   brokeragePositions!: Table<BrokeragePosition>
   brokeragePositionExtensions!: Table<BrokeragePositionExtension>
   brokerageTransactions!: Table<BrokerageTransaction>
-  brokerageCorpActions!: Table<BrokerageCorpAction>
+  brokerageFundDetails!: Table<BrokerageFundDetail>
   brokerageAccounts!: Table<BrokerageAccount>
   brokerageSyncLog!: Table<BrokerageSyncLog>
   brokerageCredentials!: Table<BrokerageCredentials>
+  fxRates!: Table<FxRateRecord>
 
   constructor() {
     super('lokfi')
@@ -103,10 +110,19 @@ export class LokfiDatabase extends Dexie {
       brokeragePositions: 'id',
       brokeragePositionExtensions: '[positionId+key], positionId',
       brokerageTransactions: 'id, orderId, source, symbol, executedAt',
-      brokerageCorpActions: 'id, source, symbol, type',
       brokerageAccounts: 'id, source, currency',
       brokerageSyncLog: '++id, source, category, lastSyncAt, status',
       brokerageCredentials: 'id',
+    })
+
+    // v6 schema (adds fxRates table for currency conversion)
+    this.version(6).stores({
+      fxRates: '[date+base]',
+    })
+
+    // v7 schema (adds brokerageFundDetails table for unified fund details)
+    this.version(7).stores({
+      brokerageFundDetails: 'id, source, classifiedType, symbol, businessDate',
     })
 
     // Seed default categories on initial DB creation

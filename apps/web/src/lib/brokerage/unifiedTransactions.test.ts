@@ -1,7 +1,7 @@
-import type { BrokerageCorpAction, BrokerageTransaction } from '@lokfi/brokerage-core'
+import type { BrokerageFundDetail, BrokerageTransaction } from '@lokfi/brokerage-core'
 import { describe, expect, it } from 'vitest'
 import type { DbTransaction } from '../db/db'
-import { mapBankTransaction, mapBrokerageTransaction, mapCorpAction } from './unifiedTransactions'
+import { mapBankTransaction, mapBrokerageTransaction, mapFundDetail } from './unifiedTransactions'
 
 describe('mapBankTransaction', () => {
   it('maps a bank transaction correctly', () => {
@@ -78,38 +78,152 @@ describe('mapBrokerageTransaction', () => {
   })
 })
 
-describe('mapCorpAction', () => {
-  it('maps a DIVIDEND corp action', () => {
-    const a: BrokerageCorpAction = {
-      id: 'ca-1',
+describe('mapFundDetail', () => {
+  it('maps a DIVIDEND', () => {
+    const d: BrokerageFundDetail = {
+      id: 'tiger_fund_1',
       source: 'tiger',
+      rawType: 'Dividend',
+      classifiedType: 'DIVIDEND',
       symbol: 'AAPL',
-      type: 'DIVIDEND',
       amount: 12.5,
       currency: 'USD',
-      payDate: '2024-03-20',
-      appliedAt: '2024-03-20T12:00:00Z',
+      businessDate: '2024-03-20',
     }
-    const rows = mapCorpAction(a)
+    const rows = mapFundDetail(d)
     expect(rows).toHaveLength(1)
     expect(rows[0]!.type).toBe('DIVIDEND')
     expect(rows[0]!.amount).toBe(12.5)
-    expect(rows[0]!.description).toBe('AAPL Dividend — $12.50')
+    expect(rows[0]!.description).toContain('AAPL Dividend')
   })
 
-  it('maps a SPLIT corp action', () => {
-    const a: BrokerageCorpAction = {
-      id: 'ca-2',
+  it('maps a DIVIDEND_TAX withheld (negative amount)', () => {
+    const d: BrokerageFundDetail = {
+      id: 'tiger_fund_1',
       source: 'tiger',
-      symbol: 'AAPL',
-      type: 'SPLIT',
-      appliedAt: '2024-03-21T08:00:00Z',
+      rawType: 'Dividend Tax',
+      classifiedType: 'DIVIDEND_TAX',
+      symbol: 'XDTE',
+      amount: -28.24,
+      currency: 'USD',
+      businessDate: '2024-03-20',
     }
-    const rows = mapCorpAction(a)
+    const rows = mapFundDetail(d)
     expect(rows).toHaveLength(1)
-    expect(rows[0]!.type).toBe('SPLIT')
-    expect(rows[0]!.amount).toBe(0)
-    expect(rows[0]!.description).toBe('AAPL SPLIT')
+    expect(rows[0]!.type).toBe('DIVIDEND_TAX')
+    expect(rows[0]!.amount).toBe(-28.24)
+    expect(rows[0]!.description).toContain('Dividend Tax withheld')
+  })
+
+  it('maps a DIVIDEND_TAX refund (positive amount)', () => {
+    const d: BrokerageFundDetail = {
+      id: 'tiger_fund_1',
+      source: 'tiger',
+      rawType: 'Dividend Tax',
+      classifiedType: 'DIVIDEND_TAX',
+      symbol: 'XDTE',
+      amount: 5.0,
+      currency: 'USD',
+      businessDate: '2024-03-20',
+    }
+    const rows = mapFundDetail(d)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.type).toBe('DIVIDEND_TAX')
+    expect(rows[0]!.amount).toBe(5.0)
+    expect(rows[0]!.description).toContain('refund (return of capital)')
+  })
+
+  it('maps a TRADE enriched', () => {
+    const d: BrokerageFundDetail = {
+      id: 'tiger_fund_1',
+      source: 'tiger',
+      rawType: 'Trade',
+      classifiedType: 'TRADE',
+      symbol: 'AVGO',
+      action: 'BUY',
+      quantity: 10,
+      price: 200.88,
+      commission: 1.99,
+      amount: -2008.8,
+      currency: 'USD',
+      businessDate: '2024-03-20',
+    }
+    const rows = mapFundDetail(d)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.type).toBe('BUY')
+    expect(rows[0]!.symbol).toBe('AVGO')
+    expect(rows[0]!.quantity).toBe(10)
+    expect(rows[0]!.price).toBe(200.88)
+  })
+
+  it('maps a TRADE unenriched', () => {
+    const d: BrokerageFundDetail = {
+      id: 'tiger_fund_1',
+      source: 'tiger',
+      rawType: 'Trade',
+      classifiedType: 'TRADE',
+      symbol: 'AVGO',
+      amount: -2008.8,
+      currency: 'USD',
+      businessDate: '2024-03-20',
+    }
+    const rows = mapFundDetail(d)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.type).toBe('BUY')
+    expect(rows[0]!.amount).toBe(-2008.8)
+    expect(rows[0]!.description).toContain('Trade AVGO')
+  })
+
+  it('maps a FEE', () => {
+    const d: BrokerageFundDetail = {
+      id: 'tiger_fund_1',
+      source: 'tiger',
+      rawType: 'Platform Fee',
+      classifiedType: 'FEE',
+      symbol: 'AVGO',
+      amount: -1.99,
+      currency: 'USD',
+      businessDate: '2024-03-20',
+    }
+    const rows = mapFundDetail(d)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.type).toBe('FEE')
+    expect(rows[0]!.amount).toBe(-1.99)
+    expect(rows[0]!.description).toContain('Platform Fee')
+  })
+
+  it('maps a TRANSFER_IN', () => {
+    const d: BrokerageFundDetail = {
+      id: 'tiger_fund_1',
+      source: 'tiger',
+      rawType: 'Transfer',
+      classifiedType: 'TRANSFER_IN',
+      amount: 20.29,
+      currency: 'USD',
+      businessDate: '2024-03-20',
+    }
+    const rows = mapFundDetail(d)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.type).toBe('TRANSFER_IN')
+    expect(rows[0]!.amount).toBe(20.29)
+    expect(rows[0]!.description).toContain('Funds Transfer In')
+  })
+
+  it('maps a REBATE', () => {
+    const d: BrokerageFundDetail = {
+      id: 'tiger_fund_1',
+      source: 'tiger',
+      rawType: 'Campaign Subsidy',
+      classifiedType: 'REBATE',
+      amount: 0.5,
+      currency: 'USD',
+      businessDate: '2024-03-20',
+    }
+    const rows = mapFundDetail(d)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.type).toBe('REBATE')
+    expect(rows[0]!.amount).toBe(0.5)
+    expect(rows[0]!.description).toContain('Rebate')
   })
 })
 
@@ -136,16 +250,18 @@ describe('date sorting', () => {
       currency: 'USD',
       executedAt: '2024-03-15T12:00:00Z',
     }
-    const dividend: BrokerageCorpAction = {
+    const dividend: BrokerageFundDetail = {
       id: 'd1',
       source: 'tiger',
+      rawType: 'Dividend',
+      classifiedType: 'DIVIDEND',
       symbol: 'X',
-      type: 'DIVIDEND',
       amount: 5,
-      appliedAt: '2024-03-12T00:00:00Z',
+      currency: 'USD',
+      businessDate: '2024-03-12',
     }
 
-    const rows = [mapBankTransaction(bank), ...mapBrokerageTransaction(brokerage), ...mapCorpAction(dividend)]
+    const rows = [mapBankTransaction(bank), ...mapBrokerageTransaction(brokerage), ...mapFundDetail(dividend)]
     rows.sort((a, b) => b.date.localeCompare(a.date))
 
     expect(rows[0]!.date).toBe('2024-03-15T12:00:00Z')

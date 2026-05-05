@@ -9,11 +9,11 @@
 
 import type {
   BrokerageAccount,
-  BrokerageCorpAction,
+  BrokerageFundDetail,
   BrokeragePosition,
   BrokerageTransaction,
 } from '@lokfi/brokerage-core'
-import type { BrokerageProvider } from '@lokfi/brokerage-core'
+import type { BrokerageProvider, ProviderProgress } from '@lokfi/brokerage-core'
 
 const SOURCE = 'cdc'
 
@@ -21,26 +21,19 @@ export class CdcStubProvider implements BrokerageProvider {
   readonly source = SOURCE
   readonly displayName = 'Crypto.com'
 
-  async fetchPositions(): Promise<BrokeragePosition[]> {
-    // Real implementation would call CDC Exchange API:
-    // GET /v1/private/get-account-summary
+  async fetchPositions(_onProgress?: ProviderProgress): Promise<BrokeragePosition[]> {
     return []
   }
 
-  async fetchTransactions(since: Date): Promise<BrokerageTransaction[]> {
-    // Real implementation: GET /v1/private/get-trades
-    void since // intentionally unused in stub
+  async fetchTransactions(_since: Date, _onProgress?: ProviderProgress): Promise<BrokerageTransaction[]> {
     return []
   }
 
-  async fetchCorpActions(since: Date): Promise<BrokerageCorpAction[]> {
-    // Crypto.com does not have traditional corporate actions
-    void since
+  async fetchFundDetails(_since: Date, _onProgress?: ProviderProgress): Promise<BrokerageFundDetail[]> {
     return []
   }
 
-  async fetchAccount(): Promise<BrokerageAccount[]> {
-    // Real implementation: GET /v1/private/get-account-summary
+  async fetchAccount(_onProgress?: ProviderProgress): Promise<BrokerageAccount[]> {
     return []
   }
 

@@ -73,16 +73,16 @@ export function TransactionsPage() {
 
   const hasAnyData = useLiveQuery(async () => {
     if (filters.sourceType === 'brokerage') {
-      const [tc, cac] = await Promise.all([db.brokerageTransactions.count(), db.brokerageCorpActions.count()])
-      return tc + cac > 0
+      const [tc, fdc] = await Promise.all([db.brokerageTransactions.count(), db.brokerageFundDetails.count()])
+      return tc + fdc > 0
     }
     if (filters.sourceType === 'bank') return (await db.transactions.count()) > 0
-    const [bc, tc, cac] = await Promise.all([
+    const [bc, tc, fdc] = await Promise.all([
       db.transactions.count(),
       db.brokerageTransactions.count(),
-      db.brokerageCorpActions.count(),
+      db.brokerageFundDetails.count(),
     ])
-    return bc + tc + cac > 0
+    return bc + tc + fdc > 0
   }, [filters.sourceType])
 
   const hasFilters =

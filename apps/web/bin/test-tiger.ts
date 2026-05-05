@@ -22,7 +22,7 @@
 import 'dotenv/config'
 import * as fs from 'node:fs'
 import { TigerAuthError, TigerHttpClient, TigerHttpError } from '../src/lib/brokerage/tiger/tiger-http-client'
-import type { TigerAsset, TigerCorpAction, TigerOrder, TigerPosition } from '../src/lib/brokerage/tiger/tiger-types'
+import type { TigerAsset, TigerFundDetail, TigerOrder, TigerPosition } from '../src/lib/brokerage/tiger/tiger-types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -183,16 +183,47 @@ async function main(): Promise<void> {
   section('2. Positions')
 
   try {
-    const positions = unwrapItems(
-      await client.execute<ItemResponse<TigerPosition>>({
-        method: 'positions',
-        bizContent: biz(),
-      })
-    )
+    const rawResponse = await client.execute<unknown>({
+      method: 'positions',
+      bizContent: biz(),
+    })
+
+    // ── DEBUG: Dump raw response shape ──────────────────────────────────
+    console.log(`\n  ${bold(yellow('RAW RESPONSE DEBUG'))}`)
+    console.log(`  ${yellow(`typeof rawResponse: ${typeof rawResponse}`)}`)
+    console.log(`  ${yellow(`isArray: ${Array.isArray(rawResponse)}`)}`)
+    if (rawResponse && typeof rawResponse === 'object') {
+      const keys = Object.keys(rawResponse as Record<string, unknown>)
+      console.log(`  ${yellow(`keys: [${keys.join(', ')}]`)}`)
+      for (const k of keys) {
+        const val = (rawResponse as Record<string, unknown>)[k]
+        console.log(
+          `  ${yellow(`  ${k}: typeof=${typeof val}, isArray=${Array.isArray(val)}, length=${(val as unknown[])?.length ?? 'N/A'}`)}`
+        )
+      }
+    }
+    fs.writeFileSync('tiger-positions-raw.json', JSON.stringify(rawResponse, null, 2))
+    console.log(`  ${yellow('Full raw response written to tiger-positions-raw.json')}\n`)
+
+    // ── End debug ───────────────────────────────────────────────────────
+
+    const positions = unwrapItems(rawResponse as ItemResponse<TigerPosition>)
     console.log(check(`Fetched ${bold(String(positions.length))} position(s)`))
 
     if (positions.length > 0 && positions.length < 500) {
+      // Debug: print each position's secType + symbol + option fields
+      console.log(`\n  ${bold('secType debug:')}`)
+      for (const p of positions) {
+        const isOpt = p.secType === 'OPT'
+        const extra = isOpt
+          ? `  identifier=${yellow(p.identifier ?? '(none)')}  contractId=${p.contractId ?? '(none)'}  multiplier=${p.multiplier ?? '(none)'}`
+          : ''
+        console.log(
+          `  secType=${yellow((p.secType || '(none)').padEnd(6))}  symbol=${yellow(p.symbol.padEnd(24))}  qty=${String(p.position).padStart(8)}  currency=${p.currency || 'USD'}${extra}`
+        )
+      }
       console.log()
+
       // Table header
       console.log(
         `  ${bold('Symbol'.padEnd(12))} ${bold('Qty'.padStart(10))} ${bold('AvgCost'.padStart(12))} ${bold('MktVal'.padStart(14))} ${bold('P&L'.padStart(12))} ${bold('P&L%'.padStart(8))}  ${bold('Currency')}`
@@ -314,9 +345,9 @@ async function main(): Promise<void> {
     console.log(fail(`Failed to fetch orders: ${err instanceof Error ? err.message : String(err)}`))
   }
 
-  // ── Step 5: Corporate Actions ─────────────────────────────────────────
+  // ── Step 5: Fund Details ───────────────────────────────────────────
 
-  section('5. Corporate Actions (last 90 days)')
+  section('5. Fund Details (last 90 days)')
 
   try {
     const since = new Date()
@@ -325,10 +356,10 @@ async function main(): Promise<void> {
     const end = new Date().toISOString().slice(0, 10)
 
     const actions = unwrapItems(
-      await client.execute<ItemResponse<TigerCorpAction>>({
+      await client.execute<ItemResponse<TigerFundDetail>>({
         method: 'fund_details',
         bizContent: biz({
-          fund_type: 'CORPORATE_ACTION',
+          fund_type: 'ALL',
           seg_types: ['SEC'],
           start_date: start,
           end_date: end,
@@ -336,9 +367,9 @@ async function main(): Promise<void> {
         }),
       })
     )
-
+    fs.writeFileSync('fund_details.json', JSON.stringify(actions))
     if (actions.length > 0) {
-      console.log(check(`Fetched ${bold(String(actions.length))} corporate action(s)`))
+      console.log(check(`Fetched ${bold(String(actions.length))} fund detail record(s)`))
       console.log()
       for (const a of actions) {
         console.log(
@@ -346,11 +377,11 @@ async function main(): Promise<void> {
         )
       }
     } else {
-      console.log(dim('   No corporate actions in this period.'))
+      console.log(dim('   No fund detail records in this period.'))
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.log(yellow(`⚠ Corporate actions unavailable: ${msg}`))
+    console.log(yellow(`⚠ Fund details unavailable: ${msg}`))
     console.log(dim('   The fund_details endpoint returns "server error" (code 1) for this'))
     console.log(dim('   account. This may require additional permissions from Tiger.'))
   }

@@ -5,6 +5,7 @@ Personal finance dashboard built with React + TypeScript + Vite.
 ## Features
 
 - **Unified transaction view** — Bank transactions and brokerage data (trades, dividends, fees) are merged into a single timeline on `/transactions`. Switch between **All**, **Bank**, and **Brokerage** tabs. Brokerage rows are read-only and visually distinct (neutral gray for BUY/SELL, green for DIVIDEND, red for FEE).
+- **Portfolio hub** — Tabbed `/portfolio` page with Overview (KPI cards, asset allocation donut chart, currency breakdown, performance sparkline), Holdings (grouped positions table with P&L), Transactions (enhanced unified view with Type/Symbol/Qty/Price columns), and Dividends (YTD summary, monthly bar chart, yield-on-cost). Supports currency conversion via cached FX rates.
 - **Brokerage settings** — Configure Tiger Brokers API credentials, test connectivity, trigger manual sync, and set historical lookback days at `/settings/brokerage`. Credentials are encrypted with AES-256-GCM via the Web Crypto API.
 - **Rule engine** — Auto-categorise bank transactions based on custom rules with priority ordering.
 - **PDF import** — Parse bank statements directly in the browser using `pdfjs-dist` in a Web Worker.

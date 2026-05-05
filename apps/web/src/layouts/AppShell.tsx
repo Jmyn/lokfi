@@ -1,5 +1,17 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import { LayoutDashboard, List, type LucideIcon, Moon, Pin, PinOff, Sun, Upload, User, Wand2 } from 'lucide-react'
+import {
+  LayoutDashboard,
+  List,
+  type LucideIcon,
+  Moon,
+  Pin,
+  PinOff,
+  Sun,
+  TrendingUp,
+  Upload,
+  User,
+  Wand2,
+} from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useState } from 'react'
 import { Toaster } from 'sonner'
@@ -12,6 +24,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { label: 'Portfolio', path: '/portfolio', icon: TrendingUp },
   { label: 'Import', path: '/import', icon: Upload },
   { label: 'Transactions', path: '/transactions', icon: List },
   { label: 'Rules', path: '/rules', icon: Wand2 },
