@@ -1,5 +1,6 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
+  BookOpen,
   LayoutDashboard,
   List,
   type LucideIcon,
@@ -146,6 +147,15 @@ export function AppShell({ children }: AppShellProps) {
               </span>
             )}
           </button>
+
+          {/* Docs */}
+          <a
+            href="/docs"
+            className="flex items-center h-10 px-4 gap-3 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            <BookOpen size={17} className="shrink-0" />
+            {expanded && <span className="text-sm font-medium whitespace-nowrap">Docs</span>}
+          </a>
 
           {/* Profile */}
           <Link

@@ -1,5 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { BookOpen } from 'lucide-react'
 import { useEffect } from 'react'
 import { db } from '../../lib/db/db'
 
@@ -48,6 +49,13 @@ export function LandingPage() {
         <p className="mt-6 text-xs text-gray-400 dark:text-gray-500">
           No accounts, no cloud. Everything stays on your device.
         </p>
+        <a
+          href="/docs"
+          className="mt-4 inline-flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        >
+          <BookOpen size={12} />
+          Documentation
+        </a>
       </div>
     </div>
   )
