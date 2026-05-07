@@ -156,6 +156,7 @@ export function BrokerageSettingsPage() {
           db.brokeragePositions,
           db.brokeragePositionExtensions,
           db.brokerageAccounts,
+          db.brokerageSyncLog,
         ],
         async () => {
           await db.brokerageTransactions.clear()
