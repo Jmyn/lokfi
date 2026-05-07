@@ -182,6 +182,58 @@ function HoldingsTable({
     })
   }
 
+  // Pagination
+  const [page, setPage] = useState(0)
+  const perPage = 100
+
+  // Sorting
+  type HoldSortKey = 'symbol' | 'qty' | 'avgCost' | 'mktPrice' | 'mktValue' | 'pnl'
+  const [sortKey, setSortKey] = useState<HoldSortKey | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function handleSort(key: HoldSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'symbol' ? 'asc' : 'desc')
+    }
+    setPage(0)
+  }
+
+  // Sorted data
+  const sortedPositions = (() => {
+    if (!sortKey) return positions
+    return [...positions].sort((a, b) => {
+      let cmp = 0
+      switch (sortKey) {
+        case 'symbol':
+          cmp = a.position.symbol.localeCompare(b.position.symbol)
+          break
+        case 'qty':
+          cmp = a.position.quantity - b.position.quantity
+          break
+        case 'avgCost':
+          cmp = a.position.avgCost - b.position.avgCost
+          break
+        case 'mktPrice':
+          cmp = a.mktPrice - b.mktPrice
+          break
+        case 'mktValue':
+          cmp = a.mktValue - b.mktValue
+          break
+        case 'pnl':
+          cmp = a.pnl - b.pnl
+          break
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  })()
+
+  const totalPages = Math.max(1, Math.ceil(sortedPositions.length / perPage))
+  const safePage = Math.min(page, totalPages - 1)
+  const paginatedPositions = sortedPositions.slice(safePage * perPage, (safePage + 1) * perPage)
+
   const showConverted = preferredCurrency !== 'Original' && fxRates != null
   const prefCurrency = preferredCurrency === 'Original' ? (positions[0]?.position.currency ?? 'USD') : preferredCurrency
 
@@ -199,27 +251,63 @@ function HoldingsTable({
         <thead>
           <tr className="border-b" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}>
             <th className="w-8 px-3 py-2.5" />
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              {isDerivative ? 'Underlying' : 'Symbol'}
+            <th
+              className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={() => handleSort('symbol')}
+            >
+              <span className="inline-flex items-center gap-1">
+                {isDerivative ? 'Underlying' : 'Symbol'}
+                {sortKey === 'symbol' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              </span>
             </th>
-            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              {isDerivative ? 'Contracts' : 'Qty'}
+            <th
+              className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={() => handleSort('qty')}
+            >
+              <span className="inline-flex items-center gap-1">
+                {isDerivative ? 'Contracts' : 'Qty'}
+                {sortKey === 'qty' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              </span>
             </th>
-            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              {isDerivative ? 'Avg Price' : 'Avg Cost'}
+            <th
+              className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={() => handleSort('avgCost')}
+            >
+              <span className="inline-flex items-center gap-1">
+                {isDerivative ? 'Avg Price' : 'Avg Cost'}
+                {sortKey === 'avgCost' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              </span>
             </th>
-            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              {isDerivative ? 'Last Price' : 'Mkt Price'}
+            <th
+              className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={() => handleSort('mktPrice')}
+            >
+              <span className="inline-flex items-center gap-1">
+                {isDerivative ? 'Last Price' : 'Mkt Price'}
+                {sortKey === 'mktPrice' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              </span>
             </th>
-            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Mkt Value
+            <th
+              className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={() => handleSort('mktValue')}
+            >
+              <span className="inline-flex items-center gap-1">
+                Mkt Value
+                {sortKey === 'mktValue' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              </span>
             </th>
-            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              P&L
+            <th
+              className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={() => handleSort('pnl')}
+            >
+              <span className="inline-flex items-center gap-1">
+                P&L
+                {sortKey === 'pnl' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              </span>
             </th>
           </tr>
         </thead>
-        {positions.map((row, i) => {
+        {paginatedPositions.map((row, i) => {
           const { position } = row
           const isEven = i % 2 === 0
           const isExpanded = expandedIds.has(position.id)
@@ -317,8 +405,40 @@ function HoldingsTable({
             </tbody>
           )
         })}
-      </table>
-    </div>
+       </table>
+       {sortedPositions.length > perPage && (
+         <div
+           className="flex items-center justify-between px-4 py-2.5 border-t text-xs text-gray-400 dark:text-gray-500"
+           style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+         >
+           <span>
+             Showing {safePage * perPage + 1}–{Math.min((safePage + 1) * perPage, sortedPositions.length)} of{' '}
+             {sortedPositions.length} {sortedPositions.length === 1 ? 'position' : 'positions'}
+           </span>
+           <div className="flex items-center gap-2">
+             <button
+               onClick={() => setPage((p) => Math.max(0, p - 1))}
+               disabled={safePage === 0}
+               className="px-2 py-1 rounded border transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:border-amber-500 hover:text-amber-600"
+               style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
+             >
+               ← Prev
+             </button>
+             <span className="text-gray-500">
+               {safePage + 1} / {totalPages}
+             </span>
+             <button
+               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+               disabled={safePage === totalPages - 1}
+               className="px-2 py-1 rounded border transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:border-amber-500 hover:text-amber-600"
+               style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
+             >
+               Next →
+             </button>
+           </div>
+         </div>
+       )}
+     </div>
   )
 }
 
