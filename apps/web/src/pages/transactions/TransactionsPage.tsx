@@ -249,6 +249,7 @@ export function TransactionsPage() {
         ) : (
           <TransactionTable
             rows={rows}
+            sourceType={filters.sourceType}
             selectedIds={selectedIds}
             onToggleSelect={handleToggleSelect}
             onToggleAll={handleToggleAll}

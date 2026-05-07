@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db/db'
+import { BROKERAGE_TYPE_LABELS } from '../../lib/brokerage/unifiedTransactions'
 
 import { type Filters, defaultFilters } from './filterTypes'
 
@@ -193,11 +194,11 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
               style={inputStyle}
             >
               <option value="">All</option>
-              <option value="BUY">Buy</option>
-              <option value="SELL">Sell</option>
-              <option value="DIVIDEND">Dividend</option>
-              <option value="FEE">Fee</option>
-              <option value="CORP ACTION">Corp Action</option>
+              {Object.entries(BROKERAGE_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
           </div>
         </>
