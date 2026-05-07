@@ -345,9 +345,111 @@ async function main(): Promise<void> {
     console.log(fail(`Failed to fetch orders: ${err instanceof Error ? err.message : String(err)}`))
   }
 
-  // ── Step 5: Fund Details ───────────────────────────────────────────
+  // ── Step 5: Historical Filled Orders (batched 90-day windows) ──────
 
-  section('5. Fund Details (last 90 days)')
+  section('5. Historical Filled Orders (batched 90d windows)')
+
+  const allIds = new Map<string, string>() // orderId -> window tag to detect overlap
+  const windowFiles: string[] = []
+
+  try {
+    const today = new Date()
+    const windows = [90, 180, 270, 360, 720, 1095, 1825, 3650]
+
+    for (const daysAgo of windows) {
+      const end = new Date(today)
+      end.setDate(end.getDate() - daysAgo + 90) // window end = daysAgo - 90 + 1
+      const start = new Date(today)
+      start.setDate(start.getDate() - daysAgo)
+
+      // Clamp to today
+      if (end > today) end.setTime(today.getTime())
+
+      const startStr = start.toISOString().slice(0, 10)
+      const endStr = end.toISOString().slice(0, 10)
+
+      try {
+        const rawResponse = await client.execute<unknown>({
+          method: 'filled_orders',
+          bizContent: biz({
+            start_date: startStr,
+            end_date: endStr,
+          }),
+        })
+
+        const filename = `filled-orders-${startStr}--${endStr}.json`
+        fs.writeFileSync(filename, JSON.stringify(rawResponse, null, 2))
+        windowFiles.push(filename)
+
+        const orders = unwrapItems(rawResponse as ItemResponse<TigerOrder>)
+
+        // Track order IDs for overlap detection
+        let overlapCount = 0
+        for (const o of orders) {
+          const oid = String(o.id ?? o.orderId ?? '?')
+          const tag = `${startStr}→${endStr}`
+          if (allIds.has(oid)) {
+            overlapCount++
+          }
+          allIds.set(oid, tag)
+        }
+
+        // Date range of returned orders
+        const timestamps = orders
+          .map((o) => (o.latestTime ? new Date(o.latestTime) : null))
+          .filter((d): d is Date => d !== null)
+        const minDate =
+          timestamps.length > 0
+            ? timestamps
+                .reduce((a, b) => (a < b ? a : b))
+                .toISOString()
+                .slice(0, 10)
+            : 'N/A'
+        const maxDate =
+          timestamps.length > 0
+            ? timestamps
+                .reduce((a, b) => (a > b ? a : b))
+                .toISOString()
+                .slice(0, 10)
+            : 'N/A'
+
+        if (orders.length > 0) {
+          console.log(
+            check(`${startStr} → ${endStr}  (${String(daysAgo)}d ago)  → ${bold(String(orders.length))} orders`),
+            dim(` | date range: ${minDate} → ${maxDate}`),
+            overlapCount > 0 ? yellow(` | ⚠ ${overlapCount} IDs already seen in earlier window(s)`) : ''
+          )
+          // Show first & last 2 orders as a spot check
+          const samples = [...orders.slice(0, 2), ...orders.slice(-2)]
+          for (const o of samples) {
+            const t = o.latestTime ? new Date(o.latestTime).toISOString().slice(0, 10) : 'N/A'
+            console.log(
+              dim(
+                `     ${t}  id=${o.id ?? '?'}  ${(o.action ?? '').padEnd(5)} ${(o.symbol ?? '').padEnd(8)} ${(o.secType ?? '').padEnd(4)} qty=${o.totalQuantity}`
+              )
+            )
+          }
+        } else {
+          console.log(dim(`   ${startStr} → ${endStr}  (${String(daysAgo)}d ago)  → 0 orders (API accepted the range)`))
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.log(fail(`${startStr} → ${endStr}  (${String(daysAgo)}d ago)  → ${red(msg)}`))
+      }
+    }
+
+    // ── Overlap summary ─────────────────────────────────────────────
+    const totalUnique = allIds.size
+    console.log(`\n  ${bold('ID overlap summary:')}`)
+    console.log(dim(`   Total unique order IDs across all windows: ${totalUnique}`))
+    console.log(dim(`   Raw JSON saved: ${windowFiles.join(', ')}`))
+  } catch (err) {
+    console.log(fail(`Batched orders test failed: ${err instanceof Error ? err.message : String(err)}`))
+  }
+
+  // ── Step 6: Fund Details ───────────────────────────────────────────
+
+  section('6. Fund Details (last 90 days)')
 
   try {
     const since = new Date()
@@ -388,7 +490,7 @@ async function main(): Promise<void> {
 
   // ── Summary ───────────────────────────────────────────────────────────
 
-  section('Result')
+  section('7. Result')
 
   console.log(`\n  ${green('✓ Connection working')}  — Tiger OpenAPI is accessible with your credentials.\n`)
   console.log(dim('  The lokfi sync pipeline uses these same API calls through the'))
