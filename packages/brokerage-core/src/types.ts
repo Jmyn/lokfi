@@ -82,6 +82,8 @@ export interface BrokerageTransaction {
   commission?: number
   /** ISO-8601 timestamp of execution */
   executedAt: string
+  /** Security type of the traded instrument (STK, OPT, etc.). Added for filtering option vs. stock trades. */
+  secType?: SecurityType
 }
 
 // ── Fund Detail ───────────────────────────────────────────────────────────

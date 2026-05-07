@@ -94,50 +94,76 @@ export class TigerProvider implements BrokerageProvider {
     return tigerPositions.map(adaptPosition)
   }
 
-  async fetchTransactions(since: Date, _onProgress?: ProviderProgress): Promise<BrokerageTransaction[]> {
-    // Strategy:
-    // 1. Chunk the date range into ≤90-day windows (Tiger API limit)
-    // 2. Fetch completed orders (status = Filled) for each chunk
-    // 3. Adapt each to normalized transaction
-    // 4. Deduplicate across chunks (safety net)
-    // 5. Cache filled orders for enrichment use in fetchFundDetails
-
+  /**
+   * Fetch filled orders in 90-day chunks with pagination.
+   *
+   * The Tiger `filled_orders` API:
+   *   - Requires start_date/end_date (≤90 day window per call)
+   *   - Supports page_token-based pagination (default limit ~100, max 300)
+   *   - Returns { items: TigerOrder[], nextPageToken?: string }
+   *
+   * Strategy:
+   *   1. Split the full date range into ≤90-day windows
+   *   2. For each window, paginate via page_token until exhausted
+   *   3. Adapt each TigerOrder → BrokerageTransaction
+   *   4. Deduplicate across chunks (safety net for boundary-straddling orders)
+   *   5. Cache filled orders for fund_detail enrichment
+   */
+  async fetchTransactions(since: Date, onProgress?: ProviderProgress): Promise<BrokerageTransaction[]> {
     const endDate = new Date()
     const chunks = this.getDateChunks(since, endDate, TRANSACTIONS_CHUNK_DAYS)
 
     const allTransactions: BrokerageTransaction[] = []
 
-    for (const { start, end } of chunks) {
-      const filledOrdersRaw = await this.client.execute<{ items?: TigerOrder[] }>({
-        method: 'filled_orders',
-        bizContent: this.bizContent({
+    for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
+      const { start, end } = chunks[chunkIdx]
+      const label = `${start.toISOString().slice(0, 10)} → ${end.toISOString().slice(0, 10)}`
+      onProgress?.(`Fetching transactions chunk ${chunkIdx + 1}/${chunks.length} (${label})`)
+
+      let pageToken: string | undefined
+      let hasMore = true
+
+      while (hasMore) {
+        const bizContent: Record<string, unknown> = {
           start_date: start.toISOString().slice(0, 10),
           end_date: end.toISOString().slice(0, 10),
-        }),
-      })
-
-      const filledOrders = filledOrdersRaw?.items ?? []
-
-      for (const order of filledOrders) {
-        const txn = adaptOrder(order)
-        if (txn && new Date(txn.executedAt) >= since) {
-          allTransactions.push(txn)
+          limit: 300, // Max allowed per page to minimize round trips
+        }
+        if (pageToken) {
+          bizContent.page_token = pageToken
         }
 
-        // Also fetch detailed transaction records per order
-        if (order.orderId) {
-          try {
-            const detail = await this.client.execute<{ items?: unknown[] }>({
-              method: 'order_transactions',
-              bizContent: this.bizContent({ id: order.orderId }),
-            })
-            const txnItems = detail?.items ?? []
-            if (txnItems.length > 0) {
-              // Per-fill transaction records — extends the order-level data
-            }
-          } catch {
-            // Non-critical — order-level data is sufficient
+        // Response shape: { items: TigerOrder[], nextPageToken?: string }
+        // or in rare cases a direct TigerOrder[] (be defensive)
+        type FilledOrdersResponse = {
+          items?: TigerOrder[]
+          nextPageToken?: string
+        }
+
+        const response = await this.client.execute<FilledOrdersResponse | TigerOrder[]>({
+          method: 'filled_orders',
+          bizContent: this.bizContent(bizContent),
+        })
+
+        const orders = Array.isArray(response) ? response : (response?.items ?? [])
+
+        for (const order of orders) {
+          const txn = adaptOrder(order)
+          if (txn && new Date(txn.executedAt) >= since) {
+            allTransactions.push(txn)
           }
+        }
+
+        // Check for next page (only in object responses, not raw arrays)
+        if (!Array.isArray(response)) {
+          const nextToken = response?.nextPageToken
+          if (nextToken && nextToken.length > 0) {
+            pageToken = nextToken
+          } else {
+            hasMore = false
+          }
+        } else {
+          hasMore = false
         }
       }
     }

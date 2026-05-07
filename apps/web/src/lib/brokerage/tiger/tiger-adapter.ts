@@ -57,12 +57,20 @@ export function adaptPosition(raw: TigerPosition): BrokeragePosition {
 
 /**
  * Convert a Tiger Order (which includes fills) to a BrokerageTransaction.
- * Only orders with status 'Filled' or 'PartiallyFilled' produce transactions.
- * Partially filled orders produce one transaction per fill quantity.
+ *
+ * Uses `order.id` as the unique identifier because Tiger's `orderId` field
+ * is always 0 for certain account types (notably global/prime accounts),
+ * causing all orders to collide on key `tiger_0` in the DB.
+ *
+ * Only orders with filledQuantity > 0 produce transactions.
  */
 export function adaptOrder(order: TigerOrder): BrokerageTransaction | null {
-  const orderId = String(order.orderId ?? order.id ?? '')
-  if (!orderId) return null
+  // Use the unique record ID (order.id) as the primary identifier.
+  // order.orderId may be 0 for some account types — skip it as unique key.
+  const rawId = order.id ?? order.orderId
+  if (rawId === undefined || rawId === null) return null
+  const id = String(rawId)
+  if (!id || id === '0') return null
 
   // Only emit transactions for executed order states
   const filledQty = order.filledQuantity ?? 0
@@ -71,15 +79,16 @@ export function adaptOrder(order: TigerOrder): BrokerageTransaction | null {
   const action = normalizeAction(order.action)
 
   return {
-    id: `${SOURCE}_${orderId}`,
+    id: `${SOURCE}_${id}`,
     source: SOURCE,
-    orderId,
+    orderId: id,
     symbol: order.symbol,
     action,
     quantity: filledQty,
     price: order.avgFillPrice ?? 0,
     currency: order.currency || 'USD',
     commission: order.commission,
+    secType: order.secType as BrokerageTransaction['secType'],
     executedAt: order.latestTime ? new Date(order.latestTime).toISOString() : new Date().toISOString(),
   }
 }
@@ -87,19 +96,23 @@ export function adaptOrder(order: TigerOrder): BrokerageTransaction | null {
 // ── Order Transaction Detail → Transaction ────────────────────────────────
 
 export function adaptOrderTransaction(raw: TigerOrderTransaction): BrokerageTransaction | null {
-  const orderId = String(raw.orderId ?? raw.id ?? '')
-  if (!orderId) return null
+  // Use the unique record ID first; orderId may be 0 for some account types.
+  const rawId = raw.id ?? raw.orderId
+  if (rawId === undefined || rawId === null) return null
+  const id = String(rawId)
+  if (!id || id === '0') return null
 
   return {
-    id: `${SOURCE}_txn_${orderId}`,
+    id: `${SOURCE}_txn_${id}`,
     source: SOURCE,
-    orderId,
+    orderId: id,
     symbol: raw.symbol ?? '',
     action: normalizeAction(raw.action ?? ''),
     quantity: raw.quantity ?? 0,
     price: raw.price ?? 0,
     currency: raw.currency || 'USD',
     commission: raw.commission,
+    secType: raw.secType as BrokerageTransaction['secType'],
     executedAt: raw.tradeTime ? new Date(raw.tradeTime).toISOString() : new Date().toISOString(),
   }
 }
