@@ -8,7 +8,6 @@ import {
   DexieSyncAdapter,
   SyncOrchestrator,
   TigerProvider,
-  computeIncrementalSince,
 } from '../../lib/brokerage'
 import type { TigerClientConfig } from '../../lib/brokerage'
 import { SyncProgressBar } from '../../lib/brokerage/SyncProgressBar'
@@ -139,13 +138,34 @@ export function BrokerageSettingsPage() {
       }
       const provider = new TigerProvider({ config })
       const adapter = new DexieSyncAdapter(db)
-      const since = await computeIncrementalSince(adapter, SOURCE)
+      const since = new Date(Date.now() - 3650 * 24 * 60 * 60 * 1000)
       const orchestrator = new SyncOrchestrator({
         provider,
         database: adapter,
         onProgress: (p) => setSyncProgress((prev) => [...prev, p]),
       })
-      await orchestrator.sync(undefined, since)
+
+      // Wrap clear + repopulate in a single Dexie transaction so that a
+      // partial failure (network error, API rate limit, etc.) rolls back the
+      // clear and leaves the previous data intact.
+      await db.transaction(
+        'rw',
+        [
+          db.brokerageTransactions,
+          db.brokerageFundDetails,
+          db.brokeragePositions,
+          db.brokeragePositionExtensions,
+          db.brokerageAccounts,
+        ],
+        async () => {
+          await db.brokerageTransactions.clear()
+          await db.brokerageFundDetails.clear()
+          await db.brokeragePositions.clear()
+          await db.brokeragePositionExtensions.clear()
+          await db.brokerageAccounts.clear()
+          await orchestrator.sync(undefined, since)
+        }
+      )
       showSuccess('Sync completed')
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Sync failed')
@@ -262,7 +282,7 @@ export function BrokerageSettingsPage() {
           <div className="space-y-1">
             <p className="text-xs text-gray-400 dark:text-gray-500">
               Credentials are encrypted and stored locally. Auto-sync on the Investments page. Sync range is computed
-              automatically (incremental from last sync, or all-time on first sync).
+              automatically (incremental from last sync, or since 3650 days ago on first sync).
             </p>
           </div>
         )}
@@ -290,11 +310,11 @@ export function BrokerageSettingsPage() {
           <button
             onClick={handleSync}
             disabled={syncing || loading}
-            className="text-sm font-medium px-4 py-2 rounded-full border transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full border transition-colors disabled:opacity-50"
             style={{ borderColor: 'var(--border)' }}
           >
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            <span className="ml-1">Sync Now</span>
+            <span>Full Sync</span>
           </button>
           {hasCredentials && (
             <button
