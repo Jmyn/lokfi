@@ -92,6 +92,23 @@ export function mapBankTransaction(t: DbTransaction): UnifiedTransactionRow {
   }
 }
 
+/** Label quantity with the correct unit name based on security type */
+function labelQty(qty: number, secType?: string): string {
+  if (secType === 'OPT' || secType === 'FUT' || secType === 'FOP') {
+    return `${qty} ${qty === 1 ? 'contract' : 'contracts'}`
+  }
+  return `${qty} ${qty === 1 ? 'share' : 'shares'}`
+}
+
+/**
+ * Return a secType suffix for non-stock trades so the instrument type is
+ * always visible in the description (e.g. "(OPT)" for option trades).
+ * Omitted for STK / undefined since those are the common default.
+ */
+function secTypeTag(secType?: string): string {
+  return secType && secType !== 'STK' ? ` (${secType})` : ''
+}
+
 /** Map a BrokerageTransaction to one or more UnifiedTransactionRows */
 export function mapBrokerageTransaction(t: BrokerageTransaction): UnifiedTransactionRow[] {
   const rows: UnifiedTransactionRow[] = []
@@ -101,14 +118,16 @@ export function mapBrokerageTransaction(t: BrokerageTransaction): UnifiedTransac
   const commission = t.commission ?? 0
   const total = t.action === 'BUY' ? -(gross + commission) : gross - commission
 
+  const qtyLabel = labelQty(t.quantity, t.secType)
+
   rows.push({
     id: `bt-${t.id}`,
     source: t.source,
     date,
-    description: `${t.action} ${t.symbol} — ${t.quantity} shares @ ${fmtCurrency(t.price, t.currency)}`,
+    description: `${t.action} ${t.symbol} — ${qtyLabel} @ ${fmtCurrency(t.price, t.currency)}${secTypeTag(t.secType)}`,
     amount: total,
     currency: t.currency,
-    type: t.action,
+    type: t.action as UnifiedTransactionRow['type'],
     symbol: t.symbol,
     quantity: t.quantity,
     price: t.price,
@@ -177,15 +196,18 @@ export function mapFundDetail(d: BrokerageFundDetail): UnifiedTransactionRow[] {
 
     case 'TRADE': {
       if (d.quantity !== undefined && d.price !== undefined && d.action) {
-        // Enriched trade — show as BUY/SELL row with per-share detail
+        // Enriched trade — show as BUY/SELL row with per-share detail.
+        // Fund details lack secType so we always say "shares" here.
         const gross = d.quantity * d.price
         const comm = d.commission ?? 0
         const total = d.action === 'BUY' ? -(gross + comm) : gross - comm
+        const qtyLabel = `${d.quantity} ${d.quantity === 1 ? 'share' : 'shares'}`
+
         rows.push({
           id: `fd-${d.id}`,
           source: d.source,
           date,
-          description: `${d.action} ${d.symbol || ''} — ${d.quantity} shares @ ${fmtCurrency(d.price, d.currency)}`,
+          description: `${d.action} ${d.symbol || ''} — ${qtyLabel} @ ${fmtCurrency(d.price, d.currency)}`,
           amount: total,
           currency: d.currency,
           type: d.action,
@@ -439,7 +461,16 @@ export async function fetchUnifiedRows(filters: Filters): Promise<{ rows: Unifie
 
     // Fund details
     const fundDetails = await db.brokerageFundDetails.toArray()
+    // Only skip enriched TRADEs when we actually have transactions for the
+    // same symbol. If the transaction sync failed (or is empty), enriched
+    // TRADEs are the only representation of those trades and must be shown.
+    const txnSymbols = new Set(txns.map((t) => t.symbol))
     for (const fd of fundDetails) {
+      if (fd.classifiedType === 'TRADE' && fd.quantity !== undefined && fd.price !== undefined && fd.action) {
+        if (txnSymbols.has(fd.symbol ?? '')) {
+          continue
+        }
+      }
       for (const row of mapFundDetail(fd)) {
         if (filterBrokerageRow(row, filters)) {
           brokerageRows.push(row)
