@@ -5,7 +5,7 @@ import type {
   BrokerageTransaction,
 } from '@lokfi/brokerage-core'
 import { describe, expect, it, vi } from 'vitest'
-import { type SyncDatabase, SyncOrchestrator } from './sync-orchestrator'
+import { type SyncDatabase, SyncOrchestrator, computeIncrementalSince } from './sync-orchestrator'
 
 // ── Mock Provider ─────────────────────────────────────────────────────────────
 
@@ -101,6 +101,65 @@ describe('SyncOrchestrator', () => {
       expect(categories).not.toContain('transactions')
       expect(categories).not.toContain('fund_details')
       expect(categories).not.toContain('account')
+    })
+  })
+
+  describe('sync() with since parameter', () => {
+    it('sync() passes since date to fetchTransactions and fetchFundDetails', async () => {
+      const provider = createMockProvider()
+      const db = createMockDatabase()
+      const orchestrator = new SyncOrchestrator({ provider, database: db })
+
+      const since = new Date('2025-01-01')
+      await orchestrator.sync(['transactions', 'fund_details'], since)
+
+      expect(provider.fetchTransactions).toHaveBeenCalledWith(since, expect.anything())
+      expect(provider.fetchFundDetails).toHaveBeenCalledWith(since, expect.anything())
+    })
+
+    it('sync() defaults to all-time (3650 days) when no since is given', async () => {
+      const provider = createMockProvider({
+        fetchTransactions: vi.fn().mockImplementation(() => {
+          return Promise.resolve([])
+        }),
+      })
+      const db = createMockDatabase()
+      const orchestrator = new SyncOrchestrator({ provider, database: db })
+
+      await orchestrator.sync(['transactions'])
+
+      const calledSince = vi.mocked(provider.fetchTransactions).mock.calls[0][0] as Date
+      const expectedMin = new Date()
+      expectedMin.setDate(expectedMin.getDate() - 3660) // generous window
+      expect(calledSince.getTime()).toBeGreaterThan(expectedMin.getTime())
+    })
+  })
+
+  describe('computeIncrementalSince()', () => {
+    it('returns undefined when no sync logs exist', async () => {
+      const db = createMockDatabase()
+      const result = await computeIncrementalSince(db, 'mock')
+      expect(result).toBeUndefined()
+    })
+
+    it('returns a since date 1 day before the latest successful sync when all categories synced', async () => {
+      const db = createMockDatabase()
+      const syncTime = new Date('2025-06-01T12:00:00.000Z')
+      // All 4 categories must have a sync log — otherwise unsynced
+      // categories pull the minSince back to now - 3650 days.
+      for (const cat of ['positions', 'transactions', 'fund_details', 'account'] as const) {
+        await db.insertSyncLog({
+          source: 'mock',
+          category: cat,
+          status: 'success',
+          lastSyncAt: syncTime.toISOString(),
+        })
+      }
+
+      const result = await computeIncrementalSince(db, 'mock')
+      expect(result).toBeInstanceOf(Date)
+      // 2025-06-01 minus 1 day → 2025-05-31
+      expect(result!.toISOString().startsWith('2025-05-31')).toBe(true)
     })
   })
 
