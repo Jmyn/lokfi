@@ -1,7 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link as LinkIcon } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { type UnifiedTransactionRow, fetchUnifiedRows } from '../../lib/brokerage/unifiedTransactions'
 import { db } from '../../lib/db/db'
 import { defaultFilters } from '../transactions/filterTypes'
@@ -138,6 +138,64 @@ export function InvestmentsTransactionsTab() {
   const dividendRows = useMemo(() => rows.filter((r) => r.type === 'DIVIDEND'), [rows])
   const dividendBankLinks = useDividendBankLinks(dividendRows)
 
+  // ── Sorting ──────────────────────────────────────────────────────────────────
+
+  type TxnSortKey = 'date' | 'description' | 'type' | 'symbol' | 'quantity' | 'price' | 'amount' | 'source'
+  const [sortKey, setSortKey] = useState<TxnSortKey | null>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  function handleTxnSort(key: TxnSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'date' ? 'desc' : 'asc')
+    }
+    setPage(0)
+  }
+
+  const sortedRows = (() => {
+    if (!sortKey) return rows
+    return [...rows].sort((a, b) => {
+      let cmp = 0
+      switch (sortKey) {
+        case 'date':
+          cmp = a.date.localeCompare(b.date)
+          break
+        case 'description':
+          cmp = a.description.localeCompare(b.description)
+          break
+        case 'type':
+          cmp = a.type.localeCompare(b.type)
+          break
+        case 'symbol':
+          cmp = (a.symbol ?? '').localeCompare(b.symbol ?? '')
+          break
+        case 'quantity':
+          cmp = (a.quantity ?? 0) - (b.quantity ?? 0)
+          break
+        case 'price':
+          cmp = (a.price ?? 0) - (b.price ?? 0)
+          break
+        case 'amount':
+          cmp = a.amount - b.amount
+          break
+        case 'source':
+          cmp = a.source.localeCompare(b.source)
+          break
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  })()
+
+  // ── Pagination ───────────────────────────────────────────────────────────────
+
+  const [page, setPage] = useState(0)
+  const perPage = 100
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / perPage))
+  const safePage = Math.min(page, totalPages - 1)
+  const paginatedRows = sortedRows.slice(safePage * perPage, (safePage + 1) * perPage)
+
   if (rows.length === 0) {
     return (
       <div className="text-center py-12">
@@ -157,37 +215,37 @@ export function InvestmentsTransactionsTab() {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Date
-            </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Description
-            </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Type
-            </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Symbol
-            </th>
-            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Quantity
-            </th>
-            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Price
-            </th>
-            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Amount
-            </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Source
-            </th>
+            {(['date', 'description', 'type', 'symbol', 'quantity', 'price', 'amount', 'source'] as const).map(
+              (key) => {
+                const isActive = sortKey === key
+                const isRight = key === 'quantity' || key === 'price' || key === 'amount'
+                const label = key.charAt(0).toUpperCase() + key.slice(1)
+                // Skip category — not sortable (computed cell)
+                return (
+                  <th
+                    key={key}
+                    className={`px-3 py-2.5 ${
+                      isRight ? 'text-right' : 'text-left'
+                    } text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 ${
+                      isActive ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                    onClick={() => handleTxnSort(key)}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      {isActive && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                    </span>
+                  </th>
+                )
+              }
+            )}
             <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Category
             </th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((t, i) => {
+          {paginatedRows.map((t, i) => {
             const isEven = i % 2 === 0
             const linkedBankId = dividendBankLinks.get(t.id)
 
@@ -265,14 +323,36 @@ export function InvestmentsTransactionsTab() {
         </tbody>
       </table>
 
-      {/* Footer */}
+      {/* Footer / Pagination */}
       <div
         className="flex items-center justify-between px-4 py-2.5 border-t text-xs text-gray-400 dark:text-gray-500"
         style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
       >
         <span>
-          Showing {rows.length} of {total} transactions
+          Showing {safePage * perPage + 1}–{Math.min((safePage + 1) * perPage, sortedRows.length)} of {total}{' '}
+          transactions
         </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={safePage === 0}
+            className="px-2 py-1 rounded border transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:border-amber-500 hover:text-amber-600"
+            style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
+          >
+            ← Prev
+          </button>
+          <span className="text-gray-500">
+            {safePage + 1} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={safePage === totalPages - 1}
+            className="px-2 py-1 rounded border transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:border-amber-500 hover:text-amber-600"
+            style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
+          >
+            Next →
+          </button>
+        </div>
       </div>
     </div>
   )
