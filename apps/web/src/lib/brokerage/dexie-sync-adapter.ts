@@ -45,16 +45,74 @@ export class DexieSyncAdapter implements SyncDatabase {
 
   async appendTransactions(transactions: BrokerageTransaction[]): Promise<void> {
     if (transactions.length === 0) return
-    // Use bulkPut with natural ID — if an orderId already exists, it won't
-    // overwrite because the ID is based on orderId which is unique per fill.
-    // New order fills (same orderId but different execution) would need
-    // a separate mechanism — but the SDK's order transactions use unique IDs.
-    await this.db.brokerageTransactions.bulkPut(transactions)
+
+    // Content-based dedup: defend against the provider returning the same order
+    // with different IDs across sync runs (e.g. from API pagination changes or
+    // chunk-boundary straddling). Uses symbol + action + qty + price + date as
+    // the natural business key for a trade fill.
+    const contentKey = (t: BrokerageTransaction) =>
+      `${t.source}|${t.symbol}|${t.secType ?? 'STK'}|${t.action}|${t.quantity}|${t.price}|${t.executedAt}`
+
+    // Deduplicate within the incoming batch first
+    const seen = new Set<string>()
+    const deduped = transactions.filter((t) => {
+      const key = contentKey(t)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
+    // Cross-check against existing records in the DB (streamed to avoid
+    // loading the entire table into memory for large histories).
+    const existingKeys = new Set<string>()
+    await this.db.brokerageTransactions.each((t) => {
+      existingKeys.add(contentKey(t))
+    })
+    const toInsert = deduped.filter((t) => !existingKeys.has(contentKey(t)))
+
+    if (toInsert.length > 0) {
+      await this.db.brokerageTransactions.bulkPut(toInsert)
+    }
   }
 
   async appendFundDetails(actions: BrokerageFundDetail[]): Promise<void> {
     if (actions.length === 0) return
-    await this.db.brokerageFundDetails.bulkPut(actions)
+
+    const contentKey = (fd: BrokerageFundDetail) =>
+      `${fd.source}|${fd.symbol ?? ''}|${fd.businessDate}|${fd.amount}|${fd.classifiedType}`
+
+    // Deduplicate within the incoming batch (Tiger returns same trade per linked account)
+    const seen = new Set<string>()
+    const deduped = actions.filter((fd) => {
+      const key = contentKey(fd)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
+    // Load existing records in the covered date range to detect cross-sync duplicates
+    const dates = deduped.map((fd) => fd.businessDate).filter(Boolean) as string[]
+    if (dates.length === 0) {
+      await this.db.brokerageFundDetails.bulkPut(deduped)
+      return
+    }
+
+    const minDate = dates.reduce((a, b) => (a < b ? a : b))
+    const maxDate = dates.reduce((a, b) => (a > b ? a : b))
+    const sourceSet = new Set(deduped.map((fd) => fd.source))
+
+    const existing = await this.db.brokerageFundDetails
+      .where('businessDate')
+      .between(minDate, maxDate, true, true)
+      .filter((fd) => sourceSet.has(fd.source))
+      .toArray()
+
+    const existingKeys = new Set(existing.map(contentKey))
+    const toInsert = deduped.filter((fd) => !existingKeys.has(contentKey(fd)))
+
+    if (toInsert.length > 0) {
+      await this.db.brokerageFundDetails.bulkPut(toInsert)
+    }
   }
 
   async upsertAccounts(accounts: BrokerageAccount[]): Promise<void> {

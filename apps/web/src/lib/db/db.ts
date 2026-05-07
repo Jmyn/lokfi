@@ -125,6 +125,31 @@ export class LokfiDatabase extends Dexie {
       brokerageFundDetails: 'id, source, classifiedType, symbol, businessDate',
     })
 
+    // v8 migration: deduplicate brokerageFundDetails by content key
+    // Tiger returns the same trade once per linked account; overlapping sync
+    // ranges also produce duplicate records. Clean up any that snuck in.
+    this.version(8).upgrade(async (trans) => {
+      const allRecords: BrokerageFundDetail[] = await trans.table('brokerageFundDetails').toArray()
+      const contentKey = (fd: BrokerageFundDetail) =>
+        `${fd.source}|${fd.symbol ?? ''}|${fd.businessDate}|${fd.amount}|${fd.classifiedType}`
+
+      const seen = new Map<string, string>()
+      const toDelete: string[] = []
+
+      for (const fd of allRecords) {
+        const key = contentKey(fd)
+        if (seen.has(key)) {
+          toDelete.push(fd.id)
+        } else {
+          seen.set(key, fd.id)
+        }
+      }
+
+      if (toDelete.length > 0) {
+        await trans.table('brokerageFundDetails').bulkDelete(toDelete)
+      }
+    })
+
     // Seed default categories on initial DB creation
     this.on('populate', () => {
       this.categories.bulkAdd(defaultCategories)
