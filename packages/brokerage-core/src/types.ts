@@ -143,7 +143,13 @@ export interface BrokerageSyncLog {
 
 // ── Credentials ───────────────────────────────────────────────────────────
 
-/** Encrypted credential record stored in Dexie */
+/**
+ * Encrypted credential record stored in Dexie.
+ *
+ * `version` distinguishes encryption schemes:
+ *   - `undefined` / `'pbkdf2-passphrase'`: legacy PBKDF2 with user passphrase (no longer supported)
+ *   - `'app-key'`: PBKDF2 with app-level secret + random salt (current)
+ */
 export interface BrokerageCredentials {
   /** Source name (e.g. 'tiger') */
   id: string
@@ -153,4 +159,6 @@ export interface BrokerageCredentials {
   iv: string
   /** PBKDF2 salt used for key derivation (base64) */
   salt: string
+  /** Encryption scheme version */
+  version?: 'pbkdf2-passphrase' | 'app-key'
 }

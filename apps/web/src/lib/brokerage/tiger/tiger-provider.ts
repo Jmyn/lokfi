@@ -26,8 +26,6 @@ import type { TigerAsset, TigerClientConfig, TigerFundDetail, TigerOrder, TigerP
 
 export interface TigerProviderOptions {
   config: TigerClientConfig
-  /** Lookback window for transaction/corp action history (days) */
-  lookbackDays?: number
 }
 
 const FUND_DETAIL_PAGE_SIZE = 100

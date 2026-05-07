@@ -37,6 +37,59 @@ export interface SyncDatabase {
   getSyncLogs(source: string): Promise<BrokerageSyncLog[]>
 }
 
+const ALL_CATEGORIES: SyncCategory[] = ['positions', 'transactions', 'fund_details', 'account']
+
+/**
+ * Compute the optimal `since` date for an incremental sync from sync logs.
+ *
+ * For each category that has a previous successful sync, starts from that
+ * timestamp minus 1 day (overlap to catch edge-of-window records). For
+ * categories that have never synced, falls back to a full all-time sync
+ * (3650 days ago).
+ *
+ * Returns the minimum `since` across all categories, or `undefined` if no
+ * categories have ever synced (caller should let the orchestrator default
+ * to 3650 days).
+ */
+export async function computeIncrementalSince(database: SyncDatabase, source: string): Promise<Date | undefined> {
+  const logs = await database.getSyncLogs(source)
+
+  // Find latest successful sync per category
+  const byCategory = new Map<SyncCategory, Date>()
+  for (const log of logs) {
+    if (log.status === 'success') {
+      const existing = byCategory.get(log.category as SyncCategory)
+      const d = new Date(log.lastSyncAt)
+      if (!existing || d > existing) {
+        byCategory.set(log.category as SyncCategory, d)
+      }
+    }
+  }
+
+  // No prior syncs — caller should use full 3650-day default
+  if (byCategory.size === 0) return undefined
+
+  let minSince: Date | undefined
+
+  for (const cat of ALL_CATEGORIES) {
+    const lastSync = byCategory.get(cat)
+    if (lastSync) {
+      // Incremental: 1-day overlap to catch edge-of-window records.
+      // Use UTC arithmetic since sync log timestamps are UTC ISO strings.
+      const since = new Date(lastSync)
+      since.setUTCDate(since.getUTCDate() - 1)
+      if (!minSince || since < minSince) minSince = since
+    } else {
+      // Category never synced — full all-time sync
+      const since = new Date()
+      since.setUTCDate(since.getUTCDate() - 3650)
+      if (!minSince || since < minSince) minSince = since
+    }
+  }
+
+  return minSince
+}
+
 /** Rate limit tiers matching Tiger OpenAPI documentation */
 const RATE_LIMITS: Record<string, number> = {
   positions: 1100, // Medium tier: 60/min → ~1.1s between requests
@@ -77,8 +130,6 @@ function makeProgress(
 export interface SyncOrchestratorOptions {
   provider: BrokerageProvider
   database: SyncDatabase
-  /** Transaction/corp action lookback window (days). Default: 90 */
-  lookbackDays?: number
   /** Called after each category completes with progress info */
   onProgress?: (progress: SyncProgress) => void
 }
@@ -99,7 +150,6 @@ export interface SyncProgress {
 export class SyncOrchestrator {
   private provider: BrokerageProvider
   private db: SyncDatabase
-  private lookbackDays: number
   private onProgress?: (progress: SyncProgress) => void
 
   // Track the last request timestamp per category for basic rate limiting
@@ -108,18 +158,31 @@ export class SyncOrchestrator {
   constructor(options: SyncOrchestratorOptions) {
     this.provider = options.provider
     this.db = options.database
-    this.lookbackDays = options.lookbackDays ?? 90
     this.onProgress = options.onProgress
   }
 
   /**
    * Sync all categories (or specified subset).
+   *
+   * If `since` is provided, it overrides the default all-time lookback
+   * (3650 days) for categories that accept a date range (transactions,
+   * fund_details). This enables incremental sync from a previously known
+   * sync checkpoint.
+   *
    * Categories fail independently — if one fails, others continue.
+   *
+   * @param categories - Subset of categories to sync (default: all four)
+   * @param since - Override date for incremental sync (default: 3650 days ago = all time)
    */
-  async sync(categories?: SyncCategory[]): Promise<void> {
+  async sync(categories?: SyncCategory[], since?: Date): Promise<void> {
     const toSync = categories ?? (['positions', 'transactions', 'fund_details', 'account'] as SyncCategory[])
-    const since = new Date()
-    since.setDate(since.getDate() - this.lookbackDays)
+    const effectiveSince =
+      since ??
+      (() => {
+        const d = new Date()
+        d.setUTCDate(d.getUTCDate() - 3650)
+        return d
+      })()
 
     let completed = 0
     const total = toSync.length
@@ -138,7 +201,7 @@ export class SyncOrchestrator {
       })
 
       try {
-        await this.syncCategory(category, since)
+        await this.syncCategory(category, effectiveSince)
       } catch (err) {
         // Error already logged in syncCategory. Continue to next category.
         console.error(`[SyncOrchestrator] Category "${category}" failed, continuing:`, err)

@@ -34,7 +34,7 @@ export type {
 export { CredentialManager } from './credential-manager'
 export type { CredentialStore } from './credential-manager'
 
-export { SyncOrchestrator } from './sync-orchestrator'
+export { computeIncrementalSince, SyncOrchestrator } from './sync-orchestrator'
 export type { SyncOrchestratorOptions, SyncDatabase, SyncProgress } from './sync-orchestrator'
 
 export { DexieSyncAdapter } from './dexie-sync-adapter'

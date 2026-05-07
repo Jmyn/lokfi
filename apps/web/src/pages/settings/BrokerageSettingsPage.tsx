@@ -8,19 +8,17 @@ import {
   DexieSyncAdapter,
   SyncOrchestrator,
   TigerProvider,
+  computeIncrementalSince,
 } from '../../lib/brokerage'
 import type { TigerClientConfig } from '../../lib/brokerage'
 import { SyncProgressBar } from '../../lib/brokerage/SyncProgressBar'
 import type { SyncProgress } from '../../lib/brokerage/sync-orchestrator'
 import { db } from '../../lib/db/db'
 
-const PRESETS = [30, 90, 180, 365]
 const SOURCE = 'tiger'
 
 export function BrokerageSettingsPage() {
   const [credentials, setCredentials] = useState({ tigerId: '', privateKey: '', account: '' })
-  const [passphrase, setPassphrase] = useState('')
-  const [lookbackDays, setLookbackDays] = useState(90)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -32,16 +30,6 @@ export function BrokerageSettingsPage() {
   const credManager = useMemo(() => new CredentialManager(new DexieCredentialStore(db)), [])
 
   const syncLogs = useLiveQuery(() => db.brokerageSyncLog.where('source').equals(SOURCE).reverse().toArray(), [])
-
-  // Load saved lookback days
-  useEffect(() => {
-    db.settings.get(`brokerage:${SOURCE}:lookbackDays`).then((s) => {
-      if (s) {
-        const days = Number.parseInt(s.value, 10)
-        if (!isNaN(days)) setLookbackDays(days)
-      }
-    })
-  }, [])
 
   // Check if credentials exist
   useEffect(() => {
@@ -59,15 +47,14 @@ export function BrokerageSettingsPage() {
   }
 
   async function handleSave() {
-    if (!credentials.tigerId || !credentials.privateKey || !credentials.account || !passphrase) {
+    if (!credentials.tigerId || !credentials.privateKey || !credentials.account) {
       showError('Please fill in all fields')
       return
     }
     setLoading(true)
     setError(null)
     try {
-      await credManager.store(SOURCE, credentials, passphrase)
-      await db.settings.put({ key: `brokerage:${SOURCE}:lookbackDays`, value: String(lookbackDays) })
+      await credManager.store(SOURCE, credentials)
       setHasCredentials(true)
       showSuccess('Credentials saved')
     } catch (err) {
@@ -78,11 +65,6 @@ export function BrokerageSettingsPage() {
   }
 
   async function handleTest() {
-    if (!passphrase) {
-      showError('Enter your passphrase to test the connection')
-      return
-    }
-
     // Auto-save if credentials are filled in but not yet stored
     if (!hasCredentials) {
       if (!credentials.tigerId || !credentials.privateKey || !credentials.account) {
@@ -90,7 +72,7 @@ export function BrokerageSettingsPage() {
         return
       }
       try {
-        await credManager.store(SOURCE, credentials, passphrase)
+        await credManager.store(SOURCE, credentials)
         setHasCredentials(true)
       } catch (err) {
         showError(err instanceof Error ? err.message : 'Failed to save credentials')
@@ -101,7 +83,7 @@ export function BrokerageSettingsPage() {
     setTesting(true)
     setError(null)
     try {
-      const stored = await credManager.retrieve(SOURCE, passphrase)
+      const stored = await credManager.retrieve(SOURCE)
       if (!stored) {
         showError('No credentials found')
         return
@@ -126,11 +108,6 @@ export function BrokerageSettingsPage() {
   }
 
   async function handleSync() {
-    if (!passphrase) {
-      showError('Enter your passphrase to sync')
-      return
-    }
-
     // Auto-save if credentials are filled in but not yet stored
     if (!hasCredentials) {
       if (!credentials.tigerId || !credentials.privateKey || !credentials.account) {
@@ -138,7 +115,7 @@ export function BrokerageSettingsPage() {
         return
       }
       try {
-        await credManager.store(SOURCE, credentials, passphrase)
+        await credManager.store(SOURCE, credentials)
         setHasCredentials(true)
       } catch (err) {
         showError(err instanceof Error ? err.message : 'Failed to save credentials')
@@ -150,7 +127,7 @@ export function BrokerageSettingsPage() {
     setError(null)
     setSyncProgress([])
     try {
-      const stored = await credManager.retrieve(SOURCE, passphrase)
+      const stored = await credManager.retrieve(SOURCE)
       if (!stored) {
         showError('No credentials found')
         return
@@ -162,13 +139,13 @@ export function BrokerageSettingsPage() {
       }
       const provider = new TigerProvider({ config })
       const adapter = new DexieSyncAdapter(db)
+      const since = await computeIncrementalSince(adapter, SOURCE)
       const orchestrator = new SyncOrchestrator({
         provider,
         database: adapter,
-        lookbackDays,
         onProgress: (p) => setSyncProgress((prev) => [...prev, p]),
       })
-      await orchestrator.sync()
+      await orchestrator.sync(undefined, since)
       showSuccess('Sync completed')
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Sync failed')
@@ -190,7 +167,6 @@ export function BrokerageSettingsPage() {
       await db.brokerageSyncLog.where('source').equals(SOURCE).delete()
       setHasCredentials(false)
       setCredentials({ tigerId: '', privateKey: '', account: '' })
-      setPassphrase('')
       showSuccess('Disconnected')
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Disconnect failed')
@@ -281,77 +257,15 @@ export function BrokerageSettingsPage() {
           </div>
         )}
 
-        {/* Passphrase — always shown for test/sync operations */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Passphrase</h2>
-          <div className="grid gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Passphrase</label>
-              <input
-                type="password"
-                value={passphrase}
-                onChange={(e) => setPassphrase(e.target.value)}
-                className="w-full text-sm border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                style={{ borderColor: 'var(--border)' }}
-                placeholder="Encryption passphrase"
-              />
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                {hasCredentials
-                  ? 'Enter your passphrase to test the connection or sync.'
-                  : 'Used to encrypt your credentials. You will need this every time you sync.'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Lookback */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Sync History</h2>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Lookback days</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={3650}
-                value={lookbackDays}
-                onChange={(e) => setLookbackDays(Number.parseInt(e.target.value, 10) || 90)}
-                className="w-24 text-sm border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                style={{ borderColor: 'var(--border)' }}
-              />
-              <div className="flex gap-1">
-                {PRESETS.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setLookbackDays(p)}
-                    className="text-xs px-2 py-1 rounded border transition-colors"
-                    style={{
-                      borderColor: lookbackDays === p ? 'var(--accent)' : 'var(--border)',
-                      backgroundColor: lookbackDays === p ? 'var(--accent-subtle)' : 'var(--bg)',
-                      color: lookbackDays === p ? 'var(--accent)' : 'inherit',
-                    }}
-                  >
-                    {p}d
-                  </button>
-                ))}
-                <button
-                  onClick={() => setLookbackDays(3650)}
-                  className="text-xs px-2 py-1 rounded border transition-colors"
-                  style={{
-                    borderColor: lookbackDays === 3650 ? 'var(--accent)' : 'var(--border)',
-                    backgroundColor: lookbackDays === 3650 ? 'var(--accent-subtle)' : 'var(--bg)',
-                    color: lookbackDays === 3650 ? 'var(--accent)' : 'inherit',
-                  }}
-                >
-                  All time
-                </button>
-              </div>
-            </div>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              How far back to fetch transactions and corporate actions
+        {/* Sync status — shown after first save */}
+        {hasCredentials && (
+          <div className="space-y-1">
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Credentials are encrypted and stored locally. Auto-sync on the Investments page. Sync range is computed
+              automatically (incremental from last sync, or all-time on first sync).
             </p>
           </div>
-        </div>
+        )}
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-2 pt-2">

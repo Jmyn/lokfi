@@ -40,7 +40,7 @@ The Tiger provider expects three pieces of configuration:
 | `account` | Your Tiger trading account number | `U1234567` |
 | `serverUrl` | (Optional) API base URL | `https://openapi.tigerfintech.com` (default) |
 
-These credentials are encrypted with a user-supplied passphrase using Web Crypto (AES-256-GCM + PBKDF2) and stored in IndexedDB. They **never** appear in plaintext in any persistent store.
+These credentials are encrypted with a app level secret and stored in IndexedDB. They **never** appear in plaintext in any persistent store.
 
 ## API Activation
 

@@ -2,20 +2,23 @@
  * Encrypted credential manager for brokerage API keys.
  *
  * Uses Web Crypto API (AES-256-GCM) for encryption and PBKDF2 for key
- * derivation. Credentials are stored encrypted in Dexie's
- * `brokerage_credentials` table — plaintext never touches persistent storage.
+ * derivation. The key is derived from an application-level secret + random
+ * salt. Credentials are stored encrypted in
+ * Dexie's `brokerage_credentials` table — plaintext never touches persistent
+ * storage.
  *
- * Flow:
- *   1. User provides credentials (e.g. tigerId + privateKey) + passphrase
- *   2. PBKDF2 derives an AES key from the passphrase + random salt
- *   3. Credentials JSON is encrypted with AES-GCM (random IV)
- *   4. Encrypted blob + salt + IV are stored in Dexie
+ * ── Security model ─────────────────────────────────────────────────────
+ * This provides protection against casual inspection of IndexedDB (someone
+ * opening DevTools sees ciphertext, not plaintext API keys). It does NOT
+ * protect against an attacker with access to the browser's runtime (XSS,
+ * malicious extensions, devtools execution), since the app secret is in the
+ * shipped JavaScript bundle. For stronger security, credentials should never
+ * leave a server-side proxy with its own secret.
  *
- * On sync:
- *   1. App prompts for passphrase
- *   2. PBKDF2 re-derives the AES key
- *   3. Encrypted blob is decrypted
- *   4. Plaintext credentials are passed to the provider (in-memory only)
+ * ── Migration ──────────────────────────────────────────────────────────
+ * The passphrase-based scheme was removed in favor of automated sync.
+ * Legacy credentials (version `undefined` or `'pbkdf2-passphrase'`) must
+ * be re-saved from Brokerage Settings to migrate to the `'app-key'` scheme.
  */
 
 import type { BrokerageCredentials, BrokerageSource } from '@lokfi/brokerage-core'
@@ -25,12 +28,16 @@ const KEY_LENGTH = 256
 const PBKDF2_ITERATIONS = 600_000
 const PBKDF2_HASH = 'SHA-256'
 
-export class CredentialDecryptError extends Error {
-  constructor() {
-    super('Wrong passphrase or corrupted credentials')
-    this.name = 'CredentialDecryptError'
-  }
-}
+/**
+ * App-level secret used as key material for PBKDF2 key derivation.
+ *
+ * This is embedded in the shipped JavaScript bundle, so it provides
+ * protection against casual inspection of IndexedDB — NOT against an
+ * attacker with access to the browser runtime (XSS, extensions, etc.).
+ * See the class JSDoc above for the full security model discussion.
+ * Do NOT use this secret for anything outside this module.
+ */
+const APP_SECRET = 'lokfi-brokerage-encryption-v1'
 
 export interface CredentialStore {
   get(source: BrokerageSource): Promise<BrokerageCredentials | undefined>
@@ -46,15 +53,16 @@ export class CredentialManager {
   }
 
   /**
-   * Encrypt credentials and persist to the store.
+   * Encrypt credentials and persist to the store using an app-level key.
+   * No user passphrase is required — the key is derived from a fixed
+   * app secret + random salt.
    *
    * @param source - Brokerage identifier (e.g. 'tiger')
    * @param credentials - Plaintext credentials object
-   * @param passphrase - User-supplied passphrase for key derivation
    */
-  async store(source: BrokerageSource, credentials: Record<string, string>, passphrase: string): Promise<void> {
+  async store(source: BrokerageSource, credentials: Record<string, string>): Promise<void> {
     const salt = crypto.getRandomValues(new Uint8Array(32))
-    const key = await deriveKey(passphrase, salt)
+    const key = await deriveKey(APP_SECRET, salt)
 
     const iv = crypto.getRandomValues(new Uint8Array(12))
     const plaintext = new TextEncoder().encode(JSON.stringify(credentials))
@@ -65,25 +73,37 @@ export class CredentialManager {
       encryptedData: arrayBufferToBase64(ciphertext),
       iv: arrayBufferToBase64(iv.buffer),
       salt: arrayBufferToBase64(salt.buffer),
+      version: 'app-key',
     }
 
     await this.credStore.put(record)
   }
 
   /**
-   * Retrieve and decrypt credentials.
+   * Retrieve and decrypt credentials using the app-level key.
+   *
+   * Legacy credentials (version `undefined` or `'pbkdf2-passphrase'`) cannot
+   * be decrypted without the original user passphrase and return null.
+   * The user must re-save credentials via Brokerage Settings to migrate.
    *
    * @param source - Brokerage identifier
-   * @param passphrase - User-supplied passphrase
-   * @returns Plaintext credentials, or null if not found or decryption fails
+   * @returns Plaintext credentials, or null if not found or legacy format
    */
-  async retrieve(source: BrokerageSource, passphrase: string): Promise<Record<string, string> | null> {
+  async retrieve(source: BrokerageSource): Promise<Record<string, string> | null> {
     const record = await this.credStore.get(source)
     if (!record) return null
 
+    // Legacy credentials (passphrase-based) can't be decrypted
+    if (!record.version || record.version !== 'app-key') {
+      console.warn(
+        '[CredentialManager] Legacy passphrase-encrypted credentials detected. Please re-save from Brokerage Settings.'
+      )
+      return null
+    }
+
     try {
       const salt = base64ToArrayBuffer(record.salt)
-      const key = await deriveKey(passphrase, new Uint8Array(salt))
+      const key = await deriveKey(APP_SECRET, new Uint8Array(salt))
 
       const iv = new Uint8Array(base64ToArrayBuffer(record.iv))
       const ciphertext = base64ToArrayBuffer(record.encryptedData)
@@ -92,8 +112,8 @@ export class CredentialManager {
       const json = new TextDecoder().decode(plaintext)
       return JSON.parse(json) as Record<string, string>
     } catch {
-      // Decryption failure — wrong passphrase or corrupted data
-      throw new CredentialDecryptError()
+      console.error('[CredentialManager] Decryption failed — data may be corrupted')
+      return null
     }
   }
 
@@ -115,8 +135,8 @@ export class CredentialManager {
 
 // ── Crypto Helpers ────────────────────────────────────────────────────────
 
-async function deriveKey(passphrase: string, salt: BufferSource): Promise<CryptoKey> {
-  const material = new TextEncoder().encode(passphrase)
+async function deriveKey(secret: string, salt: BufferSource): Promise<CryptoKey> {
+  const material = new TextEncoder().encode(secret)
   const baseKey = await crypto.subtle.importKey('raw', material, 'PBKDF2', false, ['deriveKey'])
 
   return crypto.subtle.deriveKey(
