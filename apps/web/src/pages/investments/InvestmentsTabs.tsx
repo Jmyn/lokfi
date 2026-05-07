@@ -1,6 +1,7 @@
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'holdings', label: 'Holdings' },
+  { id: 'closed', label: 'Closed' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'dividends', label: 'Dividends' },
 ] as const

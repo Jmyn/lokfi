@@ -15,6 +15,7 @@ import { SyncProgressBar } from '../../lib/brokerage/SyncProgressBar'
 import type { SyncProgress } from '../../lib/brokerage/sync-orchestrator'
 import { db } from '../../lib/db/db'
 import { useFxRates } from '../../lib/fx/useFxRates'
+import { ClosedPositionsTab } from './ClosedPositionsTab'
 import { CurrencySelector } from './CurrencySelector'
 import { DividendsTab } from './DividendsTab'
 import { HoldingsTab } from './HoldingsTab'
@@ -30,7 +31,7 @@ export function InvestmentsPage() {
   const location = useLocation()
   const searchParams = new URLSearchParams(location.search)
   const tab = searchParams.get('tab') || 'overview'
-  const validTabs = ['overview', 'holdings', 'transactions', 'dividends']
+  const validTabs = ['overview', 'holdings', 'closed', 'transactions', 'dividends']
   const activeTab = validTabs.includes(tab) ? tab : 'overview'
 
   const [preferredCurrency, setPreferredCurrencyState] = useState<CurrencyOption>('SGD')
@@ -157,7 +158,7 @@ export function InvestmentsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-5 py-8">
+    <div className="max-w-7xl mx-auto px-3 py-8">
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-serif text-xl text-gray-900 dark:text-white">Investments</h1>
@@ -254,6 +255,14 @@ export function InvestmentsPage() {
         )}
         {activeTab === 'holdings' && (
           <HoldingsTab
+            preferredCurrency={preferredCurrency}
+            fxRates={fxRates}
+            fxLastUpdated={fxLastUpdated}
+            fxError={fxError}
+          />
+        )}
+        {activeTab === 'closed' && (
+          <ClosedPositionsTab
             preferredCurrency={preferredCurrency}
             fxRates={fxRates}
             fxLastUpdated={fxLastUpdated}
