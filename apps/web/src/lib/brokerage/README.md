@@ -14,7 +14,7 @@ Shared infrastructure lives at the `brokerage/` root:
 | File | Role |
 |------|------|
 | `sync-orchestrator.ts` | Coordinates multi-category sync with retry + throttle |
-| `credential-manager.ts` | AES-256-GCM encryption + PBKDF2 key derivation for API keys |
+| `credential-manager.ts` | AES-256-GCM encryption + PBKDF2 key derivation (app-level secret) |
 | `dexie-credential-store.ts` | Dexie-backed `CredentialStore` for encrypted blobs |
 | `dexie-sync-adapter.ts` | Dexie-backed `SyncDatabase` for positions/transactions/etc. |
 
@@ -143,15 +143,16 @@ No other registration is needed — consumers construct your provider directly a
 If your brokerage needs API keys:
 
 1. The user enters credentials via the UI
-2. The UI calls `CredentialManager.store(source, credentials, passphrase)` which encrypts with AES-256-GCM + PBKDF2
-3. On sync, the UI calls `CredentialManager.retrieve(source, passphrase)` to get plaintext credentials
+2. The UI calls `CredentialManager.store(source, credentials)` which encrypts with AES-256-GCM + PBKDF2 using an app-level secret
+3. On sync, the UI calls `CredentialManager.retrieve(source)` to get plaintext credentials automatically
 4. Your provider constructor receives whatever config it needs
+
+Credentials are encrypted at rest in IndexedDB. No passphrase is needed because the encryption key is derived from an application-level secret + random salt stored alongside the ciphertext.
 
 Example credential flow in the consumer:
 
 ```ts
-const passphrase = promptUserForPassphrase()
-const creds = await credentialManager.retrieve('my_brokerage', passphrase)
+const creds = await credentialManager.retrieve('my_brokerage')
 const provider = new MyProvider({ apiKey: creds.apiKey, apiSecret: creds.apiSecret })
 const orchestrator = new SyncOrchestrator({ provider, database: dexieAdapter })
 await orchestrator.sync()
