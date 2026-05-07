@@ -24,7 +24,10 @@ Test file pattern: `*.test.ts`. Run single package: `pnpm --filter <pkg> test`.
 
 ## Architecture Notes
 
-- **Data**: Dexie.js (IndexedDB) — not localStorage. `lokfi-db` v2 schema. `manualCategory` on transactions overrides rule engine; never auto-updated by rules.
+- **Data**: 
+  - Dexie.js (IndexedDB) — not localStorage 
+  - `manualCategory` on transactions overrides rule engine; never auto-updated by rules
+  - ensure database schema changes are compatible with importing and exporting backups
 - **PDF parsing**: runs in a Web Worker via `pdfjs-dist`. Worker path set with `new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)`.
 - **Parser auto-detection**: `detectParser(text)` in `parser-core` tries each bank's `detect()` in order, returns first match.
 - **Rule engine**: Manual Override → General Rules (ascending priority) → Uncategorized. No hash-pinned rules.

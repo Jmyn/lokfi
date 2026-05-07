@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../../lib/db/db'
 import { BROKERAGE_TYPE_LABELS } from '../../lib/brokerage/unifiedTransactions'
+import { db } from '../../lib/db/db'
 
 import { type Filters, defaultFilters } from './filterTypes'
 

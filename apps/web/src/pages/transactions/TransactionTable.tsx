@@ -3,8 +3,8 @@ import { useState } from 'react'
 import type { UnifiedTransactionRow } from '../../lib/brokerage/unifiedTransactions'
 import { BROKERAGE_TYPE_LABELS } from '../../lib/brokerage/unifiedTransactions'
 import type { DbTransaction } from '../../lib/db/db'
-import type { SourceType } from './filterTypes'
 import { CategoryBadge } from './CategoryBadge'
+import type { SourceType } from './filterTypes'
 
 const fmtCache = new Map<string, Intl.NumberFormat>()
 function getFormatter(currency: string): Intl.NumberFormat {
