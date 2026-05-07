@@ -2,10 +2,12 @@ import type { BrokeragePosition } from '@lokfi/brokerage-core'
 import { Link } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ChevronDown, ChevronRight, Info } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { db } from '../../lib/db/db'
 import { convertAmount } from '../../lib/fx/convert'
 import type { CurrencyOption } from './currencyPreference'
+import { getAdjustedMetrics } from './holdingCalculations'
+import type { HoldingMetrics } from './holdingCalculations'
 
 interface HoldingsTabProps {
   preferredCurrency: CurrencyOption
@@ -20,10 +22,20 @@ interface PositionRow {
   mktValue: number
   pnl: number
   isEstimated: boolean
+  totalOptionPremiums: number
+  totalDividends: number
+  adjCostBasisPerShare: number | null
+  totalReturnPct: number | null
+  realisedPnl: number
+  unrealisedPnl: number
+  totalPnl: number
+  isIncomplete: boolean
+  diagnostics: string[]
 }
 
 interface HoldingDetailRowProps {
   row: PositionRow
+  variant?: 'stock' | 'derivative'
 }
 
 const fmtCache = new Map<string, Intl.NumberFormat>()
@@ -46,7 +58,7 @@ function formatCurrency(amount: number, currency: string): string {
   return getFormatter(currency).format(amount)
 }
 
-function HoldingDetailRow({ row }: HoldingDetailRowProps) {
+function HoldingDetailRow({ row, variant = 'stock' }: HoldingDetailRowProps) {
   const { position } = row
   const isDerivative = position.secType != null && DERIVATIVE_TYPES.has(position.secType)
   const costBasis = position.quantity * position.avgCost
@@ -72,7 +84,7 @@ function HoldingDetailRow({ row }: HoldingDetailRowProps) {
 
   return (
     <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-      <td colSpan={7} className="px-4 py-3">
+      <td colSpan={variant === 'stock' ? 13 : 7} className="px-4 py-3">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           {/* Left column */}
           <div className="space-y-2">
@@ -102,8 +114,14 @@ function HoldingDetailRow({ row }: HoldingDetailRowProps) {
             )}
             <div className="flex gap-2">
               <span className="text-gray-500 dark:text-gray-400 w-28 shrink-0">Adjusted Cost</span>
-              <span className="text-gray-900 dark:text-white">
-                Adjusted cost basis (including options) is coming in a future update.
+              <span className="text-gray-900 dark:text-white font-mono tabular-nums">
+                {(() => {
+                  const rawCostBasis = position.quantity * position.avgCost
+                  const adjTotal = rawCostBasis - row.totalOptionPremiums - row.totalDividends
+                  return row.adjCostBasisPerShare != null
+                    ? `${formatCurrency(adjTotal, position.currency)} (${formatCurrency(row.adjCostBasisPerShare, position.currency)}/sh)`
+                    : '—'
+                })()}
               </span>
             </div>
           </div>
@@ -155,6 +173,20 @@ function HoldingDetailRow({ row }: HoldingDetailRowProps) {
             </div>
           </div>
         </div>
+
+        {/* Diagnostics: surface data quality concerns */}
+        {row.diagnostics.length > 0 && (
+          <div className="mt-3 pt-3 border-t space-y-1" style={{ borderColor: 'var(--border)' }}>
+            <div className="text-amber-600 dark:text-amber-400 text-xs uppercase tracking-wider font-semibold mb-1">
+              Diagnostics
+            </div>
+            {row.diagnostics.map((msg, i) => (
+              <div key={i} className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                {msg}
+              </div>
+            ))}
+          </div>
+        )}
       </td>
     </tr>
   )
@@ -187,7 +219,19 @@ function HoldingsTable({
   const perPage = 100
 
   // Sorting
-  type HoldSortKey = 'symbol' | 'qty' | 'avgCost' | 'mktPrice' | 'mktValue' | 'pnl'
+  type HoldSortKey =
+    | 'symbol'
+    | 'qty'
+    | 'avgCost'
+    | 'mktPrice'
+    | 'mktValue'
+    | 'pnl'
+    | 'premium'
+    | 'dividend'
+    | 'adjCost'
+    | 'totalReturn'
+    | 'realised'
+    | 'totalPnl'
   const [sortKey, setSortKey] = useState<HoldSortKey | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -225,6 +269,24 @@ function HoldingsTable({
         case 'pnl':
           cmp = a.pnl - b.pnl
           break
+        case 'premium':
+          cmp = a.totalOptionPremiums - b.totalOptionPremiums
+          break
+        case 'dividend':
+          cmp = a.totalDividends - b.totalDividends
+          break
+        case 'adjCost':
+          cmp = (a.adjCostBasisPerShare ?? 0) - (b.adjCostBasisPerShare ?? 0)
+          break
+        case 'totalReturn':
+          cmp = (a.totalReturnPct ?? 0) - (b.totalReturnPct ?? 0)
+          break
+        case 'realised':
+          cmp = a.realisedPnl - b.realisedPnl
+          break
+        case 'totalPnl':
+          cmp = a.totalPnl - b.totalPnl
+          break
       }
       return sortDir === 'asc' ? cmp : -cmp
     })
@@ -254,6 +316,7 @@ function HoldingsTable({
             <th
               className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
               onClick={() => handleSort('symbol')}
+              title="Ticker symbol"
             >
               <span className="inline-flex items-center gap-1">
                 {isDerivative ? 'Underlying' : 'Symbol'}
@@ -263,6 +326,7 @@ function HoldingsTable({
             <th
               className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
               onClick={() => handleSort('qty')}
+              title={isDerivative ? 'Number of contracts held' : 'Number of shares currently held'}
             >
               <span className="inline-flex items-center gap-1">
                 {isDerivative ? 'Contracts' : 'Qty'}
@@ -272,6 +336,11 @@ function HoldingsTable({
             <th
               className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
               onClick={() => handleSort('avgCost')}
+              title={
+                isDerivative
+                  ? 'Broker-reported average price per contract'
+                  : 'Broker-reported average cost per share (split-adjusted)'
+              }
             >
               <span className="inline-flex items-center gap-1">
                 {isDerivative ? 'Avg Price' : 'Avg Cost'}
@@ -281,6 +350,7 @@ function HoldingsTable({
             <th
               className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
               onClick={() => handleSort('mktPrice')}
+              title={isDerivative ? 'Last traded price per contract' : 'Last traded market price per share'}
             >
               <span className="inline-flex items-center gap-1">
                 {isDerivative ? 'Last Price' : 'Mkt Price'}
@@ -290,6 +360,11 @@ function HoldingsTable({
             <th
               className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
               onClick={() => handleSort('mktValue')}
+              title={
+                isDerivative
+                  ? 'Market value = contracts × last price × multiplier'
+                  : 'Market value = qty × market price'
+              }
             >
               <span className="inline-flex items-center gap-1">
                 Mkt Value
@@ -299,12 +374,77 @@ function HoldingsTable({
             <th
               className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
               onClick={() => handleSort('pnl')}
+               title="Unrealised P&L on current position"
             >
               <span className="inline-flex items-center gap-1">
-                P&L
+                Unreal. P&L
                 {sortKey === 'pnl' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
               </span>
             </th>
+            {!isDerivative && (
+              <>
+                <th
+                  className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+                  onClick={() => handleSort('realised')}
+                  title="Realised gain/loss from closed stock sales only (excl. dividends & premiums)"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Realised P&L
+                    {sortKey === 'realised' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                  </span>
+                </th>
+                <th
+                  className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+                  onClick={() => handleSort('premium')}
+                   title="Net option premiums received = sold premiums − bought-back premiums (covers closed trades when transaction history is available)"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Prem Recv'd
+                    {sortKey === 'premium' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                  </span>
+                </th>
+                <th
+                  className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+                  onClick={() => handleSort('dividend')}
+                  title="Net dividends received (lifetime) = gross dividends − withholding tax. Tax reversals are capped at prior withholding."
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Div Recv'd
+                    {sortKey === 'dividend' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                  </span>
+                </th>
+                <th
+                  className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+                  onClick={() => handleSort('adjCost')}
+                  title="Adjusted cost per share = (raw cost basis − premiums − dividends) ÷ qty"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Adj Cost/Sh
+                    {sortKey === 'adjCost' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                  </span>
+                </th>
+                <th
+                  className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+                  onClick={() => handleSort('totalPnl')}
+                  title="All-time total = stock sale P&L + premiums + dividends + unrealised P&L"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Total P&L
+                    {sortKey === 'totalPnl' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                  </span>
+                </th>
+                <th
+                  className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+                  onClick={() => handleSort('totalReturn')}
+                   title="Total return % = (Mkt Value + Realised P&L + Prem Recv'd + Div Recv'd − cost basis) ÷ cost basis × 100, where cost basis = Avg Cost × Qty"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Total Return
+                    {sortKey === 'totalReturn' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                  </span>
+                </th>
+              </>
+            )}
           </tr>
         </thead>
         {paginatedPositions.map((row, i) => {
@@ -400,45 +540,79 @@ function HoldingsTable({
                     )}
                   </div>
                 </td>
+                {!isDerivative && (
+                  <>
+                    <td
+                      className={`px-3 py-2.5 text-right font-mono tabular-nums font-medium ${pnClass(row.realisedPnl)}`}
+                    >
+                      {row.realisedPnl !== 0 || !row.isIncomplete
+                        ? formatCurrency(row.realisedPnl, position.currency)
+                        : '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-900 dark:text-white">
+                      {row.totalOptionPremiums > 0 ? formatCurrency(row.totalOptionPremiums, position.currency) : '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-900 dark:text-white">
+                      {row.totalDividends > 0 ? formatCurrency(row.totalDividends, position.currency) : '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-900 dark:text-white">
+                      {row.adjCostBasisPerShare != null
+                        ? formatCurrency(row.adjCostBasisPerShare, position.currency)
+                        : '—'}
+                    </td>
+                    <td
+                      className={`px-3 py-2.5 text-right font-mono tabular-nums font-medium ${pnClass(row.totalPnl)}`}
+                    >
+                      {formatCurrency(row.totalPnl, position.currency)}
+                    </td>
+                    <td
+                      className={`px-3 py-2.5 text-right font-mono tabular-nums font-medium ${pnClass(row.totalReturnPct ?? 0)}`}
+                    >
+                      {row.totalReturnPct != null
+                        ? `${row.totalReturnPct >= 0 ? '+' : ''}${row.totalReturnPct.toFixed(2)}%`
+                        : '—'}
+                    </td>
+                  </>
+                )}
               </tr>
-              {isExpanded && <HoldingDetailRow row={row} />}
+              {isExpanded && <HoldingDetailRow row={row} variant={variant} />}
             </tbody>
           )
         })}
-       </table>
-       {sortedPositions.length > perPage && (
-         <div
-           className="flex items-center justify-between px-4 py-2.5 border-t text-xs text-gray-400 dark:text-gray-500"
-           style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
-         >
-           <span>
-             Showing {safePage * perPage + 1}–{Math.min((safePage + 1) * perPage, sortedPositions.length)} of{' '}
-             {sortedPositions.length} {sortedPositions.length === 1 ? 'position' : 'positions'}
-           </span>
-           <div className="flex items-center gap-2">
-             <button
-               onClick={() => setPage((p) => Math.max(0, p - 1))}
-               disabled={safePage === 0}
-               className="px-2 py-1 rounded border transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:border-amber-500 hover:text-amber-600"
-               style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
-             >
-               ← Prev
-             </button>
-             <span className="text-gray-500">
-               {safePage + 1} / {totalPages}
-             </span>
-             <button
-               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-               disabled={safePage === totalPages - 1}
-               className="px-2 py-1 rounded border transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:border-amber-500 hover:text-amber-600"
-               style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
-             >
-               Next →
-             </button>
-           </div>
-         </div>
-       )}
-     </div>
+      </table>
+      {sortedPositions.length > perPage && (
+        <div
+          className="flex items-center justify-between px-4 py-2.5 border-t text-xs text-gray-400 dark:text-gray-500"
+          style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+        >
+          <span>
+            Showing {safePage * perPage + 1}–{Math.min((safePage + 1) * perPage, sortedPositions.length)} of{' '}
+            {sortedPositions.length} {sortedPositions.length === 1 ? 'position' : 'positions'}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              className="px-2 py-1 rounded border transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:border-amber-500 hover:text-amber-600"
+              style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
+            >
+              ← Prev
+            </button>
+            <span className="text-gray-500">
+              {safePage + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={safePage === totalPages - 1}
+              className="px-2 py-1 rounded border transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:border-amber-500 hover:text-amber-600"
+              style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -471,7 +645,7 @@ function isDerivative(p: BrokeragePosition): boolean {
   return DERIVATIVE_TYPES.has(p.secType)
 }
 
-function toRow(position: BrokeragePosition): PositionRow {
+function toRow(position: BrokeragePosition, metrics?: HoldingMetrics): PositionRow {
   const mktValue = position.marketValue ?? position.quantity * position.avgCost
   // For derivatives, divide by multiplier so Last Price is per-share (consistent
   // with avgCost). Tiger reports marketValue as total contract value, so for
@@ -481,7 +655,22 @@ function toRow(position: BrokeragePosition): PositionRow {
   // Use authoritative unrealizedPnl from the API when available.
   const pnl = position.unrealizedPnl ?? (mktPrice - position.avgCost) * position.quantity * mult
   const isEstimated = !position.marketValue
-  return { position, mktPrice, mktValue, pnl, isEstimated }
+  return {
+    position,
+    mktPrice,
+    mktValue,
+    pnl,
+    isEstimated,
+    totalOptionPremiums: metrics?.totalOptionPremiums ?? 0,
+    totalDividends: metrics?.totalDividends ?? 0,
+    adjCostBasisPerShare: metrics?.adjCostBasisPerShare ?? null,
+    totalReturnPct: metrics?.totalReturnPct ?? null,
+    realisedPnl: metrics?.realisedStockPnl ?? 0,
+    unrealisedPnl: metrics?.unrealisedPnl ?? pnl,
+    totalPnl: metrics?.totalPnl ?? pnl,
+    isIncomplete: metrics?.isIncomplete ?? false,
+    diagnostics: metrics?.diagnostics ?? [],
+  }
 }
 
 function CollapsibleCurrencyGroup({
@@ -584,12 +773,39 @@ export function HoldingsTab({ preferredCurrency, fxRates, fxLastUpdated, fxError
 
   const allPositions = useLiveQuery(() => db.brokeragePositions.toArray(), [])
 
+  // Fund detail records for dividends and TRADE (used as fallback when
+  // transaction buy history is incomplete — fund details accumulate across syncs)
+  const fundDetails =
+    useLiveQuery(
+      () => db.brokerageFundDetails.where('classifiedType').anyOf(['TRADE', 'DIVIDEND', 'DIVIDEND_TAX']).toArray(),
+      []
+    ) ?? []
+
+  // All brokerage transactions for option premium calculation (includes secType for
+  // filtering option vs. stock trades, covering both open and closed positions)
+  const allTransactions = useLiveQuery(() => db.brokerageTransactions.toArray(), []) ?? []
+
+  // Option positions for premium calculation (fallback when transactions lack secType)
+  const optionPositions = useMemo(() => (allPositions ?? []).filter((p) => p.secType === 'OPT'), [allPositions])
+
+  // Precompute holding metrics for each stock position
+  const metricsByPositionId = useMemo(() => {
+    const map = new Map<string, HoldingMetrics>()
+    for (const p of allPositions ?? []) {
+      if (isStockLike(p)) {
+        map.set(p.id, getAdjustedMetrics(p, optionPositions, fundDetails, allTransactions))
+      }
+    }
+    return map
+  }, [allPositions, optionPositions, fundDetails, allTransactions])
+
   // Split into stock-like and derivatives
   const stockRows: PositionRow[] = []
   const derivativeRows: PositionRow[] = []
 
   for (const p of allPositions ?? []) {
-    const row = toRow(p)
+    const metrics = metricsByPositionId.get(p.id)
+    const row = toRow(p, metrics)
     if (isStockLike(p)) {
       stockRows.push(row)
     } else if (isDerivative(p)) {
