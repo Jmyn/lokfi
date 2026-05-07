@@ -1,13 +1,14 @@
 import { Link, useLocation, useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { RefreshCw, Settings } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CredentialManager,
   DexieCredentialStore,
   DexieSyncAdapter,
   SyncOrchestrator,
   TigerProvider,
+  computeIncrementalSince,
 } from '../../lib/brokerage'
 import type { TigerClientConfig } from '../../lib/brokerage'
 import { SyncProgressBar } from '../../lib/brokerage/SyncProgressBar'
@@ -17,9 +18,9 @@ import { useFxRates } from '../../lib/fx/useFxRates'
 import { CurrencySelector } from './CurrencySelector'
 import { DividendsTab } from './DividendsTab'
 import { HoldingsTab } from './HoldingsTab'
-import { OverviewTab } from './OverviewTab'
 import { InvestmentsTabs } from './InvestmentsTabs'
 import { InvestmentsTransactionsTab } from './InvestmentsTransactionsTab'
+import { OverviewTab } from './OverviewTab'
 import { type CurrencyOption, getPreferredCurrency, setPreferredCurrency } from './currencyPreference'
 
 const SOURCE = 'tiger'
@@ -33,12 +34,13 @@ export function InvestmentsPage() {
   const activeTab = validTabs.includes(tab) ? tab : 'overview'
 
   const [preferredCurrency, setPreferredCurrencyState] = useState<CurrencyOption>('SGD')
-  const [passphrase, setPassphrase] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [showSyncForm, setShowSyncForm] = useState(false)
   const [syncProgress, setSyncProgress] = useState<SyncProgress[]>([])
+
+  // Track whether auto-sync has been triggered since mount
+  const autoSyncDone = useRef(false)
 
   const credManager = useMemo(() => new CredentialManager(new DexieCredentialStore(db)), [])
   const { rates: fxRates, lastUpdated: fxLastUpdated, error: fxError } = useFxRates('USD')
@@ -48,11 +50,6 @@ export function InvestmentsPage() {
   const lastSyncLog = useLiveQuery(async () => {
     const logs = await db.brokerageSyncLog.orderBy('lastSyncAt').reverse().limit(1).toArray()
     return logs[0] ?? null
-  }, [])
-
-  const lookbackDays = useLiveQuery(async () => {
-    const s = await db.settings.get(`brokerage:${SOURCE}:lookbackDays`)
-    return s ? Number.parseInt(s.value, 10) : 90
   }, [])
 
   useEffect(() => {
@@ -82,23 +79,60 @@ export function InvestmentsPage() {
     }
   }, [success])
 
+  // ── Auto-sync on mount ──────────────────────────────────────────────
+  // Only triggers once per mount (guarded by autoSyncDone ref). If credentials
+  // are added later (e.g. user saves them in Settings and comes back), a manual
+  // "Sync Now" click is needed — the auto-sync is intentionally one-shot.
+  // If the component unmounts mid-sync, the aborted flag prevents stale state
+  // updates, but the API calls still complete (data keeps syncing).
+  useEffect(() => {
+    let aborted = false
+    ;(async () => {
+      if (autoSyncDone.current) return
+      if (!hasCredentials) return
+      if (syncing) return
+      if (aborted) return
+
+      autoSyncDone.current = true
+      setError(null)
+      setSuccess(null)
+      const adapter = new DexieSyncAdapter(db)
+      const since = await computeIncrementalSince(adapter, SOURCE)
+      if (!aborted) await runSync(since)
+    })()
+    return () => {
+      aborted = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasCredentials])
+
   async function handleSync() {
-    if (!passphrase) {
-      setError('Enter your passphrase to sync')
-      return
-    }
-    if (lookbackDays === undefined) {
-      setError('Lookback days not loaded')
-      return
-    }
-    setSyncing(true)
     setError(null)
     setSuccess(null)
     setSyncProgress([])
+    const adapter = new DexieSyncAdapter(db)
+    const since = await computeIncrementalSince(adapter, SOURCE)
+    await runSync(since)
+  }
+
+  /**
+   * Core sync runner — retrieves credentials, creates provider + orchestrator,
+   * and executes the sync. Accepts an optional `since` date for incremental sync.
+   */
+  async function runSync(since?: Date) {
+    setSyncing(true)
+    setSyncProgress([])
     try {
-      const stored = await credManager.retrieve(SOURCE, passphrase)
+      const stored = await credManager.retrieve(SOURCE)
       if (!stored) {
-        setError('No credentials found')
+        // Check whether credentials exist but are legacy (undecryptable)
+        // vs. genuinely absent, so the user gets a helpful message.
+        const exists = await credManager.hasCredentials(SOURCE)
+        setError(
+          exists
+            ? 'Credentials need to be re-saved (legacy format) — go to Brokerage Settings'
+            : 'No credentials found — go to Brokerage Settings to set up'
+        )
         return
       }
       const config: TigerClientConfig = {
@@ -111,13 +145,10 @@ export function InvestmentsPage() {
       const orchestrator = new SyncOrchestrator({
         provider,
         database: adapter,
-        lookbackDays,
         onProgress: (p) => setSyncProgress((prev) => [...prev, p]),
       })
-      await orchestrator.sync()
+      await orchestrator.sync(undefined, since)
       setSuccess('Sync completed')
-      setPassphrase('')
-      setShowSyncForm(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sync failed')
     } finally {
@@ -163,45 +194,15 @@ export function InvestmentsPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {showSyncForm ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="password"
-                value={passphrase}
-                onChange={(e) => setPassphrase(e.target.value)}
-                placeholder="Passphrase"
-                className="text-sm border rounded-lg px-3 py-1.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                style={{ borderColor: 'var(--border)' }}
-              />
-              <button
-                onClick={handleSync}
-                disabled={syncing}
-                className="text-sm font-medium px-3 py-1.5 rounded-full text-white transition-colors disabled:opacity-50"
-                style={{ backgroundColor: 'var(--accent)' }}
-              >
-                {syncing ? 'Syncing...' : 'Confirm'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowSyncForm(false)
-                  setPassphrase('')
-                }}
-                className="text-sm px-3 py-1.5 rounded-full border transition-colors"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowSyncForm(true)}
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition-colors"
-              style={{ borderColor: 'var(--border)' }}
-            >
-              <RefreshCw size={14} />
-              Sync Now
-            </button>
-          )}
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+            {syncing ? 'Syncing...' : 'Sync Now'}
+          </button>
         </div>
       </div>
 
