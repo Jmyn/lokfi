@@ -21,6 +21,25 @@ export type BrokerageRowType =
   | 'UNKNOWN'
   | 'REBATE'
 
+/** Display labels for brokerage row types, used in filters and table badges */
+export const BROKERAGE_TYPE_LABELS: Record<string, string> = {
+  BUY: 'Buy',
+  SELL: 'Sell',
+  DIVIDEND: 'Dividend',
+  FEE: 'Fee',
+  SPLIT: 'Split',
+  RIGHTS: 'Rights',
+  OTHER: 'Other',
+  DIVIDEND_TAX: 'Div. Tax',
+  TRANSFER_IN: 'Transfer In',
+  TRANSFER_OUT: 'Transfer Out',
+  DEPOSIT: 'Deposit',
+  WITHDRAWAL: 'Withdrawal',
+  CURRENCY_EXCHANGE: 'Currency Exchange',
+  UNKNOWN: 'Unknown',
+  REBATE: 'Rebate',
+}
+
 /** Common row shape for both bank and brokerage transactions in the UI */
 export interface UnifiedTransactionRow {
   id: string
