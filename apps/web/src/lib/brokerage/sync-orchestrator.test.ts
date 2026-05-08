@@ -158,8 +158,12 @@ describe('SyncOrchestrator', () => {
 
       const result = await computeIncrementalSince(db, 'mock')
       expect(result).toBeInstanceOf(Date)
-      // 2025-06-01 minus 1 day → 2025-05-31
-      expect(result!.toISOString().startsWith('2025-05-31')).toBe(true)
+      // Result should be syncTime minus 1 day in local timezone
+      const expected = new Date(syncTime)
+      expected.setDate(expected.getDate() - 1)
+      expect(result!.getFullYear()).toBe(expected.getFullYear())
+      expect(result!.getMonth()).toBe(expected.getMonth())
+      expect(result!.getDate()).toBe(expected.getDate())
     })
   })
 

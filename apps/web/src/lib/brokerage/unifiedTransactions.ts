@@ -2,6 +2,7 @@ import type { BrokerageFundDetail, BrokerageTransaction } from '@lokfi/brokerage
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { Filters } from '../../pages/transactions/filterTypes'
 import { type DbTransaction, db } from '../db/db'
+import { toYYYYMMDD } from '../format'
 
 /** Brokerage-specific row types displayed in the unified view */
 export type BrokerageRowType =
@@ -112,7 +113,7 @@ function secTypeTag(secType?: string): string {
 /** Map a BrokerageTransaction to one or more UnifiedTransactionRows */
 export function mapBrokerageTransaction(t: BrokerageTransaction): UnifiedTransactionRow[] {
   const rows: UnifiedTransactionRow[] = []
-  const date = t.executedAt
+  const date = toYYYYMMDD(new Date(t.executedAt))
 
   const gross = t.quantity * t.price
   const commission = t.commission ?? 0

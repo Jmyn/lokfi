@@ -264,7 +264,9 @@ describe('date sorting', () => {
     const rows = [mapBankTransaction(bank), ...mapBrokerageTransaction(brokerage), ...mapFundDetail(dividend)]
     rows.sort((a, b) => b.date.localeCompare(a.date))
 
-    expect(rows[0]!.date).toBe('2024-03-15T12:00:00Z')
+    // Brokerage transaction dates are now local YYYY-MM-DD; fund detail and
+    // bank dates remain ISO strings since they use businessDate / bank date.
+    expect(rows[0]!.date).toBe('2024-03-15')
     expect(rows[1]!.date).toBe('2024-03-12T00:00:00Z')
     expect(rows[2]!.date).toBe('2024-03-10T00:00:00Z')
   })

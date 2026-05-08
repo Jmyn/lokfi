@@ -374,7 +374,7 @@ function HoldingsTable({
             <th
               className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
               onClick={() => handleSort('pnl')}
-               title="Unrealised P&L on current position"
+              title="Unrealised P&L on current position"
             >
               <span className="inline-flex items-center gap-1">
                 Unreal. P&L
@@ -396,7 +396,7 @@ function HoldingsTable({
                 <th
                   className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
                   onClick={() => handleSort('premium')}
-                   title="Net option premiums received = sold premiums − bought-back premiums (covers closed trades when transaction history is available)"
+                  title="Net option premiums received = sold premiums − bought-back premiums (covers closed trades when transaction history is available)"
                 >
                   <span className="inline-flex items-center gap-1">
                     Prem Recv'd
@@ -436,7 +436,7 @@ function HoldingsTable({
                 <th
                   className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
                   onClick={() => handleSort('totalReturn')}
-                   title="Total return % = (Mkt Value + Realised P&L + Prem Recv'd + Div Recv'd − cost basis) ÷ cost basis × 100, where cost basis = Avg Cost × Qty"
+                  title="Total return % = (Mkt Value + Realised P&L + Prem Recv'd + Div Recv'd − cost basis) ÷ cost basis × 100, where cost basis = Avg Cost × Qty"
                 >
                   <span className="inline-flex items-center gap-1">
                     Total Return

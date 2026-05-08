@@ -12,6 +12,7 @@ import type {
   BrokerageTransaction,
 } from '@lokfi/brokerage-core'
 import type { BrokerageProvider, ProviderProgress } from '@lokfi/brokerage-core'
+import { toYYYYMMDD } from '../../format'
 import {
   SOURCE,
   adaptAsset,
@@ -110,14 +111,18 @@ export class TigerProvider implements BrokerageProvider {
    *   5. Cache filled orders for fund_detail enrichment
    */
   async fetchTransactions(since: Date, onProgress?: ProviderProgress): Promise<BrokerageTransaction[]> {
+    // Add 1 day to end date because the Tiger API treats end_date as exclusive
+    // (transactions up to but not including end_date). Without this, today's
+    // transactions would be excluded from the query.
     const endDate = new Date()
+    endDate.setDate(endDate.getDate() + 1)
     const chunks = this.getDateChunks(since, endDate, TRANSACTIONS_CHUNK_DAYS)
 
     const allTransactions: BrokerageTransaction[] = []
 
     for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
       const { start, end } = chunks[chunkIdx]
-      const label = `${start.toISOString().slice(0, 10)} → ${end.toISOString().slice(0, 10)}`
+      const label = `${toYYYYMMDD(start)} → ${toYYYYMMDD(end)}`
       onProgress?.(`Fetching transactions chunk ${chunkIdx + 1}/${chunks.length} (${label})`)
 
       let pageToken: string | undefined
@@ -125,8 +130,8 @@ export class TigerProvider implements BrokerageProvider {
 
       while (hasMore) {
         const bizContent: Record<string, unknown> = {
-          start_date: start.toISOString().slice(0, 10),
-          end_date: end.toISOString().slice(0, 10),
+          start_date: toYYYYMMDD(start),
+          end_date: toYYYYMMDD(end),
           limit: 300, // Max allowed per page to minimize round trips
         }
         if (pageToken) {
@@ -184,8 +189,12 @@ export class TigerProvider implements BrokerageProvider {
   }
 
   async fetchFundDetails(since: Date, onProgress?: ProviderProgress): Promise<BrokerageFundDetail[]> {
-    const endDate = new Date().toISOString().slice(0, 10)
-    const startDate = since.toISOString().slice(0, 10)
+    // Add 1 day to end date because the Tiger API treats end_date as exclusive
+    // (records up to but not including end_date).
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const endDate = toYYYYMMDD(tomorrow)
+    const startDate = toYYYYMMDD(since)
 
     // Tiger fund_details response includes pagination metadata at the top level.
     // The API expects offset-based pagination via `start` (not `page`).

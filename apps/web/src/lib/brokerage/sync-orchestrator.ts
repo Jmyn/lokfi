@@ -75,14 +75,14 @@ export async function computeIncrementalSince(database: SyncDatabase, source: st
     const lastSync = byCategory.get(cat)
     if (lastSync) {
       // Incremental: 1-day overlap to catch edge-of-window records.
-      // Use UTC arithmetic since sync log timestamps are UTC ISO strings.
+      // Use local date arithmetic so the API queries align with the user's local date.
       const since = new Date(lastSync)
-      since.setUTCDate(since.getUTCDate() - 1)
+      since.setDate(since.getDate() - 1)
       if (!minSince || since < minSince) minSince = since
     } else {
       // Category never synced — full all-time sync
       const since = new Date()
-      since.setUTCDate(since.getUTCDate() - 3650)
+      since.setDate(since.getDate() - 3650)
       if (!minSince || since < minSince) minSince = since
     }
   }
@@ -180,7 +180,7 @@ export class SyncOrchestrator {
       since ??
       (() => {
         const d = new Date()
-        d.setUTCDate(d.getUTCDate() - 3650)
+        d.setDate(d.getDate() - 3650)
         return d
       })()
 
