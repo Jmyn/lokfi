@@ -2,6 +2,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { AlertTriangle, Download, Trash2, Upload } from 'lucide-react'
 import { useBackupWarning } from '../../hooks/useBackupWarning'
 import { StorageManager } from '../../lib/db/StorageManager'
+import {
+  buildBackupPayload,
+  buildImportSummary,
+  importBackupPayload,
+  normalizeBackupForImport,
+  validateBackupShape,
+} from '../../lib/db/backup'
 import { db } from '../../lib/db/db'
 import type { DbCustomParserProfile } from '../../lib/db/db'
 
@@ -15,49 +22,7 @@ export function ProfilePage() {
   const customParsers = useLiveQuery(() => db.customParsers.orderBy('createdAt').toArray(), []) ?? []
 
   async function handleExport() {
-    const [
-      transactions,
-      rules,
-      categories,
-      customParsers,
-      budgets,
-      brokeragePositions,
-      brokeragePositionExtensions,
-      brokerageTransactions,
-      brokerageFundDetails,
-      brokerageAccounts,
-      brokerageSyncLog,
-      brokerageCredentials,
-    ] = await Promise.all([
-      db.transactions.toArray(),
-      db.rules.toArray(),
-      db.categories.toArray(),
-      db.customParsers.toArray(),
-      db.budgets.toArray(),
-      db.brokeragePositions.toArray(),
-      db.brokeragePositionExtensions.toArray(),
-      db.brokerageTransactions.toArray(),
-      db.brokerageFundDetails.toArray(),
-      db.brokerageAccounts.toArray(),
-      db.brokerageSyncLog.toArray(),
-      db.brokerageCredentials.toArray(),
-    ])
-    const data = {
-      version: 3,
-      exportedAt: new Date().toISOString(),
-      transactions,
-      rules,
-      categories,
-      customParsers,
-      budgets,
-      brokeragePositions,
-      brokeragePositionExtensions,
-      brokerageTransactions,
-      brokerageFundDetails,
-      brokerageAccounts,
-      brokerageSyncLog,
-      brokerageCredentials,
-    }
+    const data = await buildBackupPayload(db)
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: 'application/json',
     })
@@ -92,130 +57,21 @@ export function ProfilePage() {
     const text = await file.text()
     try {
       const data = JSON.parse(text)
-      // Validate basic backup structure (version 1, 2, or 3)
-      if (
-        !data ||
-        typeof data !== 'object' ||
-        Array.isArray(data) ||
-        ![1, 2, 3].includes(data.version) ||
-        !Array.isArray(data.transactions) ||
-        !Array.isArray(data.rules) ||
-        !Array.isArray(data.categories) ||
-        !Array.isArray(data.customParsers) ||
-        !Array.isArray(data.budgets)
-      ) {
-        alert(
-          'Invalid backup file: expected a Lokfi backup JSON (v1, v2, or v3) with ' +
-            'transactions, rules, categories, customParsers, and budgets.'
-        )
-        e.target.value = ''
-        return
-      }
-      // Version 2 must include all brokerage arrays (except brokerageFundDetails which is new in v3)
-      if (
-        data.version === 2 &&
-        (!Array.isArray(data.brokeragePositions) ||
-          !Array.isArray(data.brokeragePositionExtensions) ||
-          !Array.isArray(data.brokerageTransactions) ||
-          !Array.isArray(data.brokerageAccounts) ||
-          !Array.isArray(data.brokerageSyncLog) ||
-          !Array.isArray(data.brokerageCredentials))
-      ) {
-        alert(
-          'Invalid v2 backup file: missing brokerage data arrays. ' +
-            'The backup appears to be incomplete or corrupted.'
-        )
+      const validation = validateBackupShape(data)
+      if (!validation.valid) {
+        alert(validation.message)
         e.target.value = ''
         return
       }
 
-      // Version 3 must include brokerageFundDetails
-      if (data.version === 3 && !Array.isArray(data.brokerageFundDetails)) {
-        alert(
-          'Invalid v3 backup file: missing brokerageFundDetails array. ' +
-            'The backup appears to be incomplete or corrupted.'
-        )
-        e.target.value = ''
-        return
-      }
-      const hasBrokerage = data.version >= 2
-      const fundDetailsCount = Array.isArray(data.brokerageFundDetails) ? data.brokerageFundDetails.length : 0
-      const confirmed = window.confirm(
-        `This will replace all current data with the backup:\n` +
-          `• ${data.transactions.length} transaction(s)\n` +
-          `• ${data.rules.length} rule(s)\n` +
-          `• ${data.categories.length} categor(ies)\n` +
-          `• ${data.customParsers.length} parser profile(s)\n` +
-          `• ${data.budgets.length} budget(s)\n` +
-          (hasBrokerage
-            ? `• ${data.brokeragePositions.length} brokerage position(s)\n` +
-              `• ${data.brokerageTransactions.length} brokerage trade(s)\n` +
-              `• ${data.brokerageAccounts.length} brokerage account(s)\n` +
-              (fundDetailsCount > 0 ? `• ${fundDetailsCount} fund detail(s)\n` : '') +
-              `• ${data.brokerageCredentials.length} credential(s) (encrypted)\n`
-            : `• (no brokerage data in backup)\n`) +
-          `Current data will be overwritten. Are you sure?`
-      )
+      const normalized = normalizeBackupForImport(data)
+      const confirmed = window.confirm(buildImportSummary(normalized))
       if (!confirmed) {
         e.target.value = ''
         return
       }
-      const tables = hasBrokerage
-        ? [
-            db.transactions,
-            db.rules,
-            db.categories,
-            db.customParsers,
-            db.budgets,
-            db.brokeragePositions,
-            db.brokeragePositionExtensions,
-            db.brokerageTransactions,
-            db.brokerageFundDetails,
-            db.brokerageAccounts,
-            db.brokerageSyncLog,
-            db.brokerageCredentials,
-          ]
-        : [db.transactions, db.rules, db.categories, db.customParsers, db.budgets]
-      // Clear existing data and import backup in a single transaction
-      await db.transaction('rw', tables, async () => {
-        await Promise.all([
-          db.transactions.clear(),
-          db.rules.clear(),
-          db.categories.clear(),
-          db.customParsers.clear(),
-          db.budgets.clear(),
-          ...(hasBrokerage
-            ? [
-                db.brokeragePositions.clear(),
-                db.brokeragePositionExtensions.clear(),
-                db.brokerageTransactions.clear(),
-                db.brokerageFundDetails.clear(),
-                db.brokerageAccounts.clear(),
-                db.brokerageSyncLog.clear(),
-                db.brokerageCredentials.clear(),
-              ]
-            : []),
-        ])
-        if (data.transactions.length) await db.transactions.bulkAdd(data.transactions)
-        if (data.rules.length) await db.rules.bulkAdd(data.rules)
-        if (data.categories.length) await db.categories.bulkAdd(data.categories)
-        if (data.customParsers.length) await db.customParsers.bulkAdd(data.customParsers)
-        if (data.budgets.length) await db.budgets.bulkAdd(data.budgets)
-        if (hasBrokerage) {
-          // Restore positions first (extensions depend on them via positionId)
-          if (data.brokeragePositions.length) await db.brokeragePositions.bulkAdd(data.brokeragePositions)
-          if (data.brokeragePositionExtensions.length)
-            await db.brokeragePositionExtensions.bulkAdd(data.brokeragePositionExtensions)
-          // Remaining brokerage tables have no dependencies — parallelize
-          await Promise.all([
-            data.brokerageTransactions.length && db.brokerageTransactions.bulkAdd(data.brokerageTransactions),
-            data.brokerageFundDetails?.length && db.brokerageFundDetails.bulkAdd(data.brokerageFundDetails),
-            data.brokerageAccounts.length && db.brokerageAccounts.bulkAdd(data.brokerageAccounts),
-            data.brokerageSyncLog.length && db.brokerageSyncLog.bulkAdd(data.brokerageSyncLog),
-            data.brokerageCredentials.length && db.brokerageCredentials.bulkAdd(data.brokerageCredentials),
-          ])
-        }
-      })
+
+      await importBackupPayload(db, normalized)
       alert('Backup imported successfully!')
     } catch {
       alert('Invalid backup file — could not parse JSON')
