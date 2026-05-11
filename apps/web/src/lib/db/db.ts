@@ -9,6 +9,11 @@ import type {
 } from '@lokfi/brokerage-core'
 import type { CustomParserProfile, StatementSource } from '@lokfi/parser-core'
 import Dexie, { type Table } from 'dexie'
+import {
+  createDefaultPortfolioBuckets,
+  type DbPortfolioBucket,
+  type DbPortfolioBucketAssignment,
+} from '../investments/portfolioBuckets'
 import { type DbCategory, defaultCategories } from './seedCategories'
 
 export interface DbTransaction {
@@ -78,6 +83,10 @@ export class LokfiDatabase extends Dexie {
   brokerageSyncLog!: Table<BrokerageSyncLog>
   brokerageCredentials!: Table<BrokerageCredentials>
   fxRates!: Table<FxRateRecord>
+
+  // Investment portfolio bucket tables (v9)
+  portfolioBuckets!: Table<DbPortfolioBucket>
+  portfolioBucketAssignments!: Table<DbPortfolioBucketAssignment>
 
   constructor() {
     super('lokfi')
@@ -150,9 +159,24 @@ export class LokfiDatabase extends Dexie {
       }
     })
 
-    // Seed default categories on initial DB creation
+    // v9 schema (adds user-defined investment portfolio buckets)
+    this.version(9)
+      .stores({
+        portfolioBuckets: 'id, sortOrder, name',
+        portfolioBucketAssignments: 'securityKey, bucketId',
+      })
+      .upgrade(async (trans) => {
+        const table = trans.table('portfolioBuckets')
+        const count = await table.count()
+        if (count === 0) {
+          await table.bulkAdd(createDefaultPortfolioBuckets())
+        }
+      })
+
+    // Seed default categories and portfolio buckets on initial DB creation
     this.on('populate', () => {
       this.categories.bulkAdd(defaultCategories)
+      this.portfolioBuckets.bulkAdd(createDefaultPortfolioBuckets())
     })
   }
 }
