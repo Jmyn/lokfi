@@ -5,9 +5,18 @@ import { ChevronDown, ChevronRight, Info } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { db } from '../../lib/db/db'
 import { convertAmount } from '../../lib/fx/convert'
+import {
+  buildAssignmentLookup,
+  buildBucketOptions,
+  filterPositionsByBucket,
+  getSecurityKey,
+  type DbPortfolioBucketAssignment,
+} from '../../lib/investments/portfolioBuckets'
 import type { CurrencyOption } from './currencyPreference'
 import { getAdjustedMetrics } from './holdingCalculations'
 import type { HoldingMetrics } from './holdingCalculations'
+import { PortfolioBucketCombobox } from './PortfolioBucketCombobox'
+import { PortfolioBucketManager } from './PortfolioBucketManager'
 
 interface HoldingsTabProps {
   preferredCurrency: CurrencyOption
@@ -84,7 +93,7 @@ function HoldingDetailRow({ row, variant = 'stock' }: HoldingDetailRowProps) {
 
   return (
     <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-      <td colSpan={variant === 'stock' ? 13 : 7} className="px-4 py-3">
+      <td colSpan={variant === 'stock' ? 14 : 7} className="px-4 py-3">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           {/* Left column */}
           <div className="space-y-2">
@@ -197,12 +206,22 @@ function HoldingsTable({
   preferredCurrency,
   fxRates,
   variant = 'stock',
+  assignments,
+  onAssignBucket,
+  onManageBuckets,
 }: {
   positions: PositionRow[]
   preferredCurrency: CurrencyOption
   fxRates: Record<string, number> | null
   variant?: 'stock' | 'derivative'
+  assignments?: DbPortfolioBucketAssignment[]
+  onAssignBucket?: (position: BrokeragePosition, bucketId: string | null) => void
+  onManageBuckets?: () => void
 }) {
+  const assignmentBySecurity = useMemo(
+    () => buildAssignmentLookup(assignments ?? []),
+    [assignments]
+  )
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   function toggleExpand(id: string) {
@@ -443,6 +462,12 @@ function HoldingsTable({
                     {sortKey === 'totalReturn' && <span className="text-[10px]">{sortDir === 'asc' ? '▲' : '▼'}</span>}
                   </span>
                 </th>
+                <th
+                  className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                  title="Portfolio bucket assignment for this security"
+                >
+                  Bucket
+                </th>
               </>
             )}
           </tr>
@@ -572,6 +597,15 @@ function HoldingsTable({
                         ? `${row.totalReturnPct >= 0 ? '+' : ''}${row.totalReturnPct.toFixed(2)}%`
                         : '—'}
                     </td>
+                    <td className="px-3 py-2.5 text-left" onClick={(event) => event.stopPropagation()}>
+                      {onAssignBucket && onManageBuckets ? (
+                        <PortfolioBucketCombobox
+                          value={assignmentBySecurity.get(getSecurityKey(position)) ?? null}
+                          onChange={(bucketId) => onAssignBucket(position, bucketId)}
+                          onManage={onManageBuckets}
+                        />
+                      ) : null}
+                    </td>
                   </>
                 )}
               </tr>
@@ -681,6 +715,9 @@ function CollapsibleCurrencyGroup({
   fxRates,
   defaultExpanded,
   variant = 'stock',
+  assignments,
+  onAssignBucket,
+  onManageBuckets,
 }: {
   currency: string
   label: string
@@ -689,6 +726,9 @@ function CollapsibleCurrencyGroup({
   fxRates: Record<string, number> | null
   defaultExpanded: boolean
   variant?: 'stock' | 'derivative'
+  assignments?: DbPortfolioBucketAssignment[]
+  onAssignBucket?: (position: BrokeragePosition, bucketId: string | null) => void
+  onManageBuckets?: () => void
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
 
@@ -715,7 +755,15 @@ function CollapsibleCurrencyGroup({
         </span>
       </button>
       {expanded && (
-        <HoldingsTable positions={rows} preferredCurrency={preferredCurrency} fxRates={fxRates} variant={variant} />
+        <HoldingsTable
+          positions={rows}
+          preferredCurrency={preferredCurrency}
+          fxRates={fxRates}
+          variant={variant}
+          assignments={assignments}
+          onAssignBucket={onAssignBucket}
+          onManageBuckets={onManageBuckets}
+        />
       )}
     </div>
   )
@@ -729,6 +777,9 @@ function PositionSection({
   fxRates,
   defaultExpanded,
   variant = 'stock',
+  assignments,
+  onAssignBucket,
+  onManageBuckets,
 }: {
   title: string
   rows: PositionRow[]
@@ -737,6 +788,9 @@ function PositionSection({
   defaultExpanded: boolean
   variant?: 'stock' | 'derivative'
   emptyMessage?: string
+  assignments?: DbPortfolioBucketAssignment[]
+  onAssignBucket?: (position: BrokeragePosition, bucketId: string | null) => void
+  onManageBuckets?: () => void
 }) {
   if (rows.length === 0) return null
 
@@ -762,6 +816,9 @@ function PositionSection({
           fxRates={fxRates}
           defaultExpanded={defaultExpanded}
           variant={variant}
+          assignments={assignments}
+          onAssignBucket={onAssignBucket}
+          onManageBuckets={onManageBuckets}
         />
       ))}
     </div>
@@ -770,8 +827,28 @@ function PositionSection({
 
 export function HoldingsTab({ preferredCurrency, fxRates, fxLastUpdated, fxError }: HoldingsTabProps) {
   const [search, setSearch] = useState('')
+  const [bucketFilter, setBucketFilter] = useState('all')
+  const [bucketManagerOpen, setBucketManagerOpen] = useState(false)
 
   const allPositions = useLiveQuery(() => db.brokeragePositions.toArray(), [])
+  const buckets = useLiveQuery(() => db.portfolioBuckets.orderBy('sortOrder').toArray(), []) ?? []
+  const assignments = useLiveQuery(() => db.portfolioBucketAssignments.toArray(), []) ?? []
+
+  async function handleAssignBucket(position: BrokeragePosition, bucketId: string | null) {
+    const securityKey = getSecurityKey(position)
+    if (bucketId == null) {
+      await db.portfolioBucketAssignments.delete(securityKey)
+      return
+    }
+    const now = new Date().toISOString()
+    const existing = await db.portfolioBucketAssignments.get(securityKey)
+    await db.portfolioBucketAssignments.put({
+      securityKey,
+      bucketId,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    })
+  }
 
   // Fund detail records for dividends and TRADE (used as fallback when
   // transaction buy history is incomplete — fund details accumulate across syncs)
@@ -799,11 +876,15 @@ export function HoldingsTab({ preferredCurrency, fxRates, fxLastUpdated, fxError
     return map
   }, [allPositions, optionPositions, fundDetails, allTransactions])
 
+  // Apply bucket filter to stock-like positions (derivatives remain visible unless
+  // the user picks a bucket — bucket assignments are stock-only).
+  const bucketFilteredPositions = filterPositionsByBucket(allPositions ?? [], assignments, bucketFilter)
+
   // Split into stock-like and derivatives
   const stockRows: PositionRow[] = []
   const derivativeRows: PositionRow[] = []
 
-  for (const p of allPositions ?? []) {
+  for (const p of bucketFilteredPositions) {
     const metrics = metricsByPositionId.get(p.id)
     const row = toRow(p, metrics)
     if (isStockLike(p)) {
@@ -914,6 +995,37 @@ export function HoldingsTab({ preferredCurrency, fxRates, fxLastUpdated, fxError
         )}
       </div>
 
+      {/* Bucket filter */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {buildBucketOptions(buckets).map((option) => {
+          const active = bucketFilter === option.id
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setBucketFilter(option.id)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                active ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'
+              }`}
+              style={{
+                borderColor: active ? 'var(--accent)' : 'var(--border)',
+                backgroundColor: active ? 'var(--accent-subtle)' : 'transparent',
+              }}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+        <button
+          type="button"
+          onClick={() => setBucketManagerOpen(true)}
+          className="ml-auto shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          style={{ borderColor: 'var(--border)' }}
+        >
+          Manage buckets
+        </button>
+      </div>
+
       {/* No search results */}
       {search.trim() && filteredStock.length === 0 && filteredDerivatives.length === 0 && (
         <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
@@ -928,6 +1040,9 @@ export function HoldingsTab({ preferredCurrency, fxRates, fxLastUpdated, fxError
         preferredCurrency={preferredCurrency}
         fxRates={fxRates}
         defaultExpanded={true}
+        assignments={assignments}
+        onAssignBucket={handleAssignBucket}
+        onManageBuckets={() => setBucketManagerOpen(true)}
       />
 
       {/* Derivatives section (options, futures, etc.) */}
@@ -939,6 +1054,8 @@ export function HoldingsTab({ preferredCurrency, fxRates, fxLastUpdated, fxError
         defaultExpanded={false}
         variant="derivative"
       />
+
+      <PortfolioBucketManager open={bucketManagerOpen} onClose={() => setBucketManagerOpen(false)} />
     </div>
   )
 }
