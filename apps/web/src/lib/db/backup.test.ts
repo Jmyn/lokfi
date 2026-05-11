@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  BACKUP_VERSION,
-  buildImportSummary,
-  normalizeBackupForImport,
-  validateBackupShape,
-} from './backup'
+import { BACKUP_VERSION, buildImportSummary, normalizeBackupForImport, validateBackupShape } from './backup'
 
 const baseV3 = {
   version: 3,

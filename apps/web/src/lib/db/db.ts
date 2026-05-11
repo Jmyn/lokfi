@@ -10,9 +10,9 @@ import type {
 import type { CustomParserProfile, StatementSource } from '@lokfi/parser-core'
 import Dexie, { type Table } from 'dexie'
 import {
-  createDefaultPortfolioBuckets,
   type DbPortfolioBucket,
   type DbPortfolioBucketAssignment,
+  createDefaultPortfolioBuckets,
 } from '../investments/portfolioBuckets'
 import { type DbCategory, defaultCategories } from './seedCategories'
 

@@ -6,17 +6,17 @@ import { useMemo, useState } from 'react'
 import { db } from '../../lib/db/db'
 import { convertAmount } from '../../lib/fx/convert'
 import {
+  type DbPortfolioBucketAssignment,
   buildAssignmentLookup,
   buildBucketOptions,
   filterPositionsByBucket,
   getSecurityKey,
-  type DbPortfolioBucketAssignment,
 } from '../../lib/investments/portfolioBuckets'
+import { PortfolioBucketCombobox } from './PortfolioBucketCombobox'
+import { PortfolioBucketManager } from './PortfolioBucketManager'
 import type { CurrencyOption } from './currencyPreference'
 import { getAdjustedMetrics } from './holdingCalculations'
 import type { HoldingMetrics } from './holdingCalculations'
-import { PortfolioBucketCombobox } from './PortfolioBucketCombobox'
-import { PortfolioBucketManager } from './PortfolioBucketManager'
 
 interface HoldingsTabProps {
   preferredCurrency: CurrencyOption
@@ -218,10 +218,7 @@ function HoldingsTable({
   onAssignBucket?: (position: BrokeragePosition, bucketId: string | null) => void
   onManageBuckets?: () => void
 }) {
-  const assignmentBySecurity = useMemo(
-    () => buildAssignmentLookup(assignments ?? []),
-    [assignments]
-  )
+  const assignmentBySecurity = useMemo(() => buildAssignmentLookup(assignments ?? []), [assignments])
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   function toggleExpand(id: string) {
