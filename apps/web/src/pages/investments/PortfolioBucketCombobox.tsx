@@ -193,10 +193,7 @@ export function PortfolioBucketCombobox({
                     onClick={() => selectBucket(option.id)}
                     className={baseClass + activeClass}
                   >
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: option.bucket.color }}
-                    />
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: option.bucket.color }} />
                     <span className="truncate">{option.bucket.name}</span>
                   </button>
                 )

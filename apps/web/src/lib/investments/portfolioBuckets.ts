@@ -122,9 +122,7 @@ export function filterPositionsByBucket(
 export function buildBucketOptions(buckets: DbPortfolioBucket[]): Array<{ id: string; label: string }> {
   return [
     { id: 'all', label: 'All buckets' },
-    ...[...buckets]
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((bucket) => ({ id: bucket.id, label: bucket.name })),
+    ...[...buckets].sort((a, b) => a.sortOrder - b.sortOrder).map((bucket) => ({ id: bucket.id, label: bucket.name })),
     { id: UNASSIGNED_BUCKET_ID, label: 'Unassigned' },
   ]
 }

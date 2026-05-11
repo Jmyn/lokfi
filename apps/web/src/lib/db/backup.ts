@@ -203,7 +203,8 @@ export async function importBackupPayload(db: LokfiDatabase, data: LokfiBackup):
       if (data.brokeragePositionExtensions.length) {
         await db.brokeragePositionExtensions.bulkAdd(data.brokeragePositionExtensions as never[])
       }
-      if (data.brokerageTransactions.length) await db.brokerageTransactions.bulkAdd(data.brokerageTransactions as never[])
+      if (data.brokerageTransactions.length)
+        await db.brokerageTransactions.bulkAdd(data.brokerageTransactions as never[])
       if (data.brokerageFundDetails.length) await db.brokerageFundDetails.bulkAdd(data.brokerageFundDetails as never[])
       if (data.brokerageAccounts.length) await db.brokerageAccounts.bulkAdd(data.brokerageAccounts as never[])
       if (data.brokerageSyncLog.length) await db.brokerageSyncLog.bulkAdd(data.brokerageSyncLog as never[])

@@ -6,9 +6,9 @@ import { TOOLTIP_STYLE } from '../../lib/charts/chartTheme'
 import { db } from '../../lib/db/db'
 import { convertAmount } from '../../lib/fx/convert'
 import {
-  getPortfolioBucketAggregation,
   type DbPortfolioBucket,
   type DbPortfolioBucketAssignment,
+  getPortfolioBucketAggregation,
 } from '../../lib/investments/portfolioBuckets'
 import type { CurrencyOption } from './currencyPreference'
 
@@ -228,7 +228,8 @@ function PortfolioBucketBreakdown({
               <span className="truncate">{row.name}</span>
             </span>
             <span className="font-mono text-gray-500 dark:text-gray-400">
-              {row.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({row.pct.toFixed(1)}%)
+              {row.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (
+              {row.pct.toFixed(1)}%)
             </span>
           </div>
         ))}

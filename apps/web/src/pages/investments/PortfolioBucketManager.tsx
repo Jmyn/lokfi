@@ -56,10 +56,7 @@ export function PortfolioBucketManager({ open, onClose }: PortfolioBucketManager
         className="w-full max-w-lg rounded-xl border bg-white shadow-xl dark:bg-gray-950"
         style={{ borderColor: 'var(--border)' }}
       >
-        <div
-          className="flex items-center justify-between border-b px-5 py-4"
-          style={{ borderColor: 'var(--border)' }}
-        >
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
           <h2 className="font-serif text-lg text-gray-900 dark:text-white">Portfolio buckets</h2>
           <button
             type="button"
@@ -72,11 +69,7 @@ export function PortfolioBucketManager({ open, onClose }: PortfolioBucketManager
         </div>
         <div className="max-h-[65vh] space-y-3 overflow-y-auto p-5">
           {buckets.map((bucket, index) => (
-            <div
-              key={bucket.id}
-              className="rounded-lg border p-3"
-              style={{ borderColor: 'var(--border)' }}
-            >
+            <div key={bucket.id} className="rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
               <div className="flex items-center gap-2">
                 <input
                   defaultValue={bucket.name}
