@@ -5,6 +5,11 @@ import { CATEGORY_PALETTE } from '../../lib/charts/chartPalette'
 import { TOOLTIP_STYLE } from '../../lib/charts/chartTheme'
 import { db } from '../../lib/db/db'
 import { convertAmount } from '../../lib/fx/convert'
+import {
+  getPortfolioBucketAggregation,
+  type DbPortfolioBucket,
+  type DbPortfolioBucketAssignment,
+} from '../../lib/investments/portfolioBuckets'
 import type { CurrencyOption } from './currencyPreference'
 
 export interface OverviewTabProps {
@@ -155,6 +160,79 @@ function AllocationChart({
           <Legend formatter={(value: string) => value} />
         </PieChart>
       </ResponsiveContainer>
+    </div>
+  )
+}
+
+function PortfolioBucketBreakdown({
+  positions,
+  buckets,
+  assignments,
+  preferredCurrency,
+  fxRates,
+}: {
+  positions: import('@lokfi/brokerage-core').BrokeragePosition[]
+  buckets: DbPortfolioBucket[]
+  assignments: DbPortfolioBucketAssignment[]
+  preferredCurrency: CurrencyOption
+  fxRates: Record<string, number> | null
+}) {
+  const shouldConvert = preferredCurrency !== 'Original' && fxRates != null
+  const rows = getPortfolioBucketAggregation({
+    positions,
+    buckets,
+    assignments,
+    convertValue: (value, position) =>
+      shouldConvert ? convertAmount(value, position.currency, preferredCurrency, fxRates) : value,
+  })
+
+  if (rows.length === 0) return null
+
+  return (
+    <div
+      className="rounded-xl border p-5"
+      style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+    >
+      <h3 className="mb-4 font-serif text-sm font-medium text-gray-900 dark:text-white">Portfolio by bucket</h3>
+      <ResponsiveContainer width="100%" height={260}>
+        <PieChart>
+          <Pie
+            data={rows}
+            cx="50%"
+            cy="50%"
+            innerRadius={55}
+            outerRadius={75}
+            dataKey="value"
+            labelLine={false}
+            label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(1)}%`}
+          >
+            {rows.map((row) => (
+              <Cell key={row.bucketId} fill={row.color} />
+            ))}
+          </Pie>
+          <Tooltip
+            contentStyle={TOOLTIP_STYLE}
+            formatter={(value: number) => [
+              value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+              'Value',
+            ]}
+          />
+          <Legend formatter={(value: string) => value} />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="mt-3 space-y-2">
+        {rows.map((row) => (
+          <div key={row.bucketId} className="flex items-center justify-between text-xs">
+            <span className="flex min-w-0 items-center gap-2 text-gray-700 dark:text-gray-300">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
+              <span className="truncate">{row.name}</span>
+            </span>
+            <span className="font-mono text-gray-500 dark:text-gray-400">
+              {row.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({row.pct.toFixed(1)}%)
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -324,8 +402,15 @@ export function OverviewTab({
   const positions = useLiveQuery(() => db.brokeragePositions.toArray(), [])
   const accounts = useLiveQuery(() => db.brokerageAccounts.toArray(), [])
   const fundDetails = useLiveQuery(() => db.brokerageFundDetails.toArray(), [])
+  const buckets = useLiveQuery(() => db.portfolioBuckets.orderBy('sortOrder').toArray(), [])
+  const assignments = useLiveQuery(() => db.portfolioBucketAssignments.toArray(), [])
 
-  const isLoading = positions === undefined || accounts === undefined || fundDetails === undefined
+  const isLoading =
+    positions === undefined ||
+    accounts === undefined ||
+    fundDetails === undefined ||
+    buckets === undefined ||
+    assignments === undefined
 
   // ── Derived values ─────────────────────────────────────────────────────────
 
@@ -414,6 +499,17 @@ export function OverviewTab({
         <AllocationChart
           positions={positions!}
           totalValue={totalValue}
+          preferredCurrency={preferredCurrency}
+          fxRates={fxRates}
+        />
+      )}
+
+      {/* Portfolio by bucket */}
+      {!isLoading && hasData && (
+        <PortfolioBucketBreakdown
+          positions={positions!}
+          buckets={buckets!}
+          assignments={assignments!}
           preferredCurrency={preferredCurrency}
           fxRates={fxRates}
         />
