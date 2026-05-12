@@ -929,28 +929,6 @@ export function HoldingsTab({ preferredCurrency, fxRates, fxLastUpdated, fxError
     )
   }
 
-  if (stockRows.length === 0 && derivativeRows.length === 0) {
-    // All positions have an unexpected secType (shouldn't happen)
-    return (
-      <div
-        className="text-center p-8 rounded-xl border"
-        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
-      >
-        <p className="text-gray-600 dark:text-gray-400 mb-2">No recognizable holdings found.</p>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
-          Your account has positions with unknown security types. Try syncing again.
-        </p>
-        <Link
-          to="/settings/brokerage"
-          className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full text-white transition-colors"
-          style={{ backgroundColor: 'var(--accent)' }}
-        >
-          <Info size={14} />
-          Brokerage Settings
-        </Link>
-      </div>
-    )
-  }
 
   // ── Main render ────────────────────────────────────────────────────────
 
@@ -1023,10 +1001,32 @@ export function HoldingsTab({ preferredCurrency, fxRates, fxLastUpdated, fxError
         </button>
       </div>
 
-      {/* No search results */}
-      {search.trim() && filteredStock.length === 0 && filteredDerivatives.length === 0 && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-          No results for &quot;{search}&quot;
+      {/* Empty state when filters produce no results */}
+      {filteredStock.length === 0 && filteredDerivatives.length === 0 && (
+        <div
+          className="rounded-xl border px-6 py-8 text-center text-sm"
+          style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+        >
+          {search.trim() ? (
+            <p className="text-gray-500 dark:text-gray-400">No results for &quot;{search}&quot;</p>
+          ) : bucketFilter !== 'all' ? (
+            <>
+              <p className="text-gray-600 dark:text-gray-400">No holdings in this bucket yet.</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                Assign holdings to this bucket from the <strong>All buckets</strong> view.
+              </p>
+              <button
+                type="button"
+                onClick={() => setBucketFilter('all')}
+                className="mt-4 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
+                style={{ borderColor: 'var(--accent)', color: 'var(--accent)', backgroundColor: 'var(--accent-subtle)' }}
+              >
+                Show all holdings
+              </button>
+            </>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400">No recognizable holdings found.</p>
+          )}
         </div>
       )}
 
