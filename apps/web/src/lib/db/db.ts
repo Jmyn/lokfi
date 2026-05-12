@@ -65,6 +65,12 @@ export interface DbBudget {
   updatedAt: string
 }
 
+export interface DbPortfolioSnapshot {
+  date: string       // YYYY-MM-DD, primary key
+  totalValue: number
+  currency: string   // preferred currency used at snapshot time
+}
+
 export class LokfiDatabase extends Dexie {
   // Bank statement tables
   transactions!: Table<DbTransaction>
@@ -87,6 +93,9 @@ export class LokfiDatabase extends Dexie {
   // Investment portfolio bucket tables (v9)
   portfolioBuckets!: Table<DbPortfolioBucket>
   portfolioBucketAssignments!: Table<DbPortfolioBucketAssignment>
+
+  // Portfolio performance snapshots (v10)
+  portfolioSnapshots!: Table<DbPortfolioSnapshot>
 
   constructor() {
     super('lokfi')
@@ -172,6 +181,11 @@ export class LokfiDatabase extends Dexie {
           await table.bulkAdd(createDefaultPortfolioBuckets())
         }
       })
+
+    // v10 schema (adds daily portfolio value snapshots for performance chart)
+    this.version(10).stores({
+      portfolioSnapshots: 'date',
+    })
 
     // Seed default categories and portfolio buckets on initial DB creation
     this.on('populate', () => {
