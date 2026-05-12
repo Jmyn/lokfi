@@ -1,8 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { AlertCircle, Minus, TrendingDown, TrendingUp } from 'lucide-react'
 import { useState } from 'react'
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import { TOOLTIP_STYLE } from '../../lib/charts/chartTheme'
+import { Area, AreaChart, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
+import { AXIS_TICK, TOOLTIP_STYLE } from '../../lib/charts/chartTheme'
 import { db } from '../../lib/db/db'
 import { convertAmount } from '../../lib/fx/convert'
 import {
@@ -14,6 +14,9 @@ import {
   isStockLikePosition,
 } from '../../lib/investments/portfolioBuckets'
 import type { CurrencyOption } from './currencyPreference'
+import type { DbPortfolioSnapshot } from '../../lib/db/db'
+import { type RangeKey, type SnapshotPoint, computeReturn, filterSnapshotsByRange } from '../../lib/investments/portfolioPerformance'
+import { usePortfolioSnapshot } from '../../lib/investments/usePortfolioSnapshot'
 
 export interface OverviewTabProps {
   /** User's preferred display currency */
@@ -255,10 +258,42 @@ function PortfolioBucketBreakdown({
 }
 
 
-function PerformanceSparkline() {
-  // TODO: Implement historical snapshots — store portfolio value snapshots in
-  // brokerageAccounts history or a dedicated snapshot table, then compute
-  // value over time for the sparkline. Currently no historical data is stored.
+const PERFORMANCE_RANGES: RangeKey[] = ['1M', '3M', '6M', '1Y', 'YTD', 'All']
+
+function PerformanceCard({
+  snapshots,
+  preferredCurrency,
+  fxRates,
+}: {
+  snapshots: DbPortfolioSnapshot[]
+  preferredCurrency: CurrencyOption
+  fxRates: Record<string, number> | null
+}) {
+  const [range, setRange] = useState<RangeKey>('1Y')
+
+  const shouldConvert = preferredCurrency !== 'Original' && fxRates != null
+
+  const points: SnapshotPoint[] = snapshots.map((s) => ({
+    date: s.date,
+    value:
+      shouldConvert && s.currency !== preferredCurrency
+        ? convertAmount(s.totalValue, s.currency, preferredCurrency, fxRates)
+        : s.totalValue,
+  }))
+
+  const filtered = filterSnapshotsByRange(points, range, new Date())
+  const ret = computeReturn(filtered)
+
+  const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const currencyLabel = preferredCurrency === 'Original' ? '' : `${preferredCurrency} `
+
+  const returnColor =
+    ret === null || ret.pct === 0
+      ? 'text-gray-900 dark:text-white'
+      : ret.pct > 0
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : 'text-red-600 dark:text-red-400'
+
   return (
     <div
       className="rounded-xl border p-5"
@@ -267,19 +302,67 @@ function PerformanceSparkline() {
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-serif text-sm font-medium text-gray-900 dark:text-white">Performance</h3>
         <div className="flex gap-1">
-          {['1M', '3M', '6M', '1Y', 'YTD', 'All'].map((range) => (
+          {PERFORMANCE_RANGES.map((r) => (
             <button
-              key={range}
-              className="rounded px-2 py-0.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              key={r}
+              type="button"
+              onClick={() => setRange(r)}
+              className={`rounded px-2 py-0.5 text-xs transition-colors ${
+                r === range
+                  ? 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100'
+                  : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
             >
-              {range}
+              {r}
             </button>
           ))}
         </div>
       </div>
-      <div className="flex h-40 items-center justify-center text-sm text-gray-400">
-        Not enough data — sync again to build history
-      </div>
+
+      {ret !== null && (
+        <div className="mb-4">
+          <div className={`font-mono text-2xl font-semibold tabular-nums ${returnColor}`}>
+            {ret.pct >= 0 ? '+' : ''}
+            {ret.pct.toFixed(2)}%
+          </div>
+          <div className="text-xs text-gray-400">
+            {ret.abs >= 0 ? '+' : ''}
+            {currencyLabel}
+            {fmt(ret.abs)}
+          </div>
+        </div>
+      )}
+
+      {filtered.length < 2 ? (
+        <div className="flex h-40 items-center justify-center text-sm text-gray-400">
+          Sync again to start building history
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={160}>
+          <AreaChart data={filtered} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="perfGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis dataKey="date" tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={40} />
+            <Tooltip
+              contentStyle={TOOLTIP_STYLE}
+              formatter={(value: number) => [`${currencyLabel}${fmt(value)}`, 'Value']}
+            />
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke="var(--accent)"
+              strokeWidth={2}
+              fill="url(#perfGradient)"
+              dot={false}
+              activeDot={{ r: 4 }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
     </div>
   )
 }
@@ -313,13 +396,17 @@ export function OverviewTab({
   const fundDetails = useLiveQuery(() => db.brokerageFundDetails.toArray(), [])
   const buckets = useLiveQuery(() => db.portfolioBuckets.orderBy('sortOrder').toArray(), [])
   const assignments = useLiveQuery(() => db.portfolioBucketAssignments.toArray(), [])
+  const snapshots = useLiveQuery(() => db.portfolioSnapshots.orderBy('date').toArray(), [])
 
   const isLoading =
     positions === undefined ||
     accounts === undefined ||
     fundDetails === undefined ||
     buckets === undefined ||
-    assignments === undefined
+    assignments === undefined ||
+    snapshots === undefined
+
+  usePortfolioSnapshot(preferredCurrency, fxRates)
 
   // ── Derived values ─────────────────────────────────────────────────────────
 
@@ -392,10 +479,14 @@ export function OverviewTab({
         />
       )}
 
-      {/* Performance sparkline */}
-      {!isLoading && hasData && (
+      {/* Performance card */}
+      {!isLoading && (
         <div className="md:col-span-2 lg:col-span-3">
-          <PerformanceSparkline />
+          <PerformanceCard
+            snapshots={snapshots!}
+            preferredCurrency={preferredCurrency}
+            fxRates={fxRates}
+          />
         </div>
       )}
     </div>
