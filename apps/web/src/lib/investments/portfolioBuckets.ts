@@ -8,6 +8,7 @@ export interface DbPortfolioBucket {
   color: string
   sortOrder: number
   isDefault: boolean
+  targetPct?: number | null
   createdAt: string
   updatedAt: string
 }

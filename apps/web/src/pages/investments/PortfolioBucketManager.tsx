@@ -41,6 +41,12 @@ export function PortfolioBucketManager({ open, onClose }: PortfolioBucketManager
     })
   }
 
+  async function setTargetPct(id: string, raw: string) {
+    const parsed = raw === '' ? null : Math.min(100, Math.max(0, Number(raw)))
+    if (raw !== '' && Number.isNaN(parsed)) return
+    await db.portfolioBuckets.update(id, { targetPct: parsed, updatedAt: new Date().toISOString() })
+  }
+
   async function deleteBucket(id: string) {
     const confirmed = window.confirm('Delete this portfolio bucket? Affected holdings will become Unassigned.')
     if (!confirmed) return
@@ -68,6 +74,32 @@ export function PortfolioBucketManager({ open, onClose }: PortfolioBucketManager
           </button>
         </div>
         <div className="max-h-[65vh] space-y-3 overflow-y-auto p-5">
+          {(() => {
+            const totalTarget = buckets.reduce((sum, b) => sum + (b.targetPct ?? 0), 0)
+            const over = totalTarget > 100
+            const unallocated = 100 - totalTarget
+            if (totalTarget === 0) return null
+            return (
+              <div
+                className="flex items-center justify-between rounded-lg border px-3 py-2 text-xs"
+                style={{
+                  borderColor: over ? '#ef4444' : 'var(--border)',
+                  backgroundColor: over ? '#fef2f2' : 'var(--accent-subtle)',
+                  color: over ? '#ef4444' : 'var(--accent-text)',
+                }}
+              >
+                <span>Target total</span>
+                <span className="font-mono font-medium">
+                  {totalTarget}%{' '}
+                  {over
+                    ? `(${totalTarget - 100}% over)`
+                    : unallocated > 0
+                      ? `(${unallocated}% unallocated)`
+                      : '✓'}
+                </span>
+              </div>
+            )
+          })()}
           {buckets.map((bucket, index) => (
             <div key={bucket.id} className="rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
               <div className="flex items-center gap-2">
@@ -107,19 +139,35 @@ export function PortfolioBucketManager({ open, onClose }: PortfolioBucketManager
                   <Trash2 size={14} />
                 </button>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {COLOR_SWATCHES.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => recolorBucket(bucket.id, color)}
-                    className={`h-6 w-6 rounded-full border-2 ${
-                      bucket.color === color ? 'border-gray-900 dark:border-white' : 'border-transparent'
-                    }`}
-                    style={{ backgroundColor: color }}
-                    aria-label={`Use ${color}`}
+              <div className="mt-3 flex items-center gap-2">
+                <div className="flex flex-1 flex-wrap gap-2">
+                  {COLOR_SWATCHES.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => recolorBucket(bucket.id, color)}
+                      className={`h-6 w-6 rounded-full border-2 ${
+                        bucket.color === color ? 'border-gray-900 dark:border-white' : 'border-transparent'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      aria-label={`Use ${color}`}
+                    />
+                  ))}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    defaultValue={bucket.targetPct ?? ''}
+                    placeholder="—"
+                    onBlur={(e) => setTargetPct(bucket.id, e.target.value)}
+                    className="w-16 rounded-md border bg-white px-2 py-1 text-right text-sm text-gray-900 dark:bg-gray-900 dark:text-white"
+                    style={{ borderColor: 'var(--border)' }}
                   />
-                ))}
+                  <span className="text-xs text-gray-400">% target</span>
+                </div>
               </div>
             </div>
           ))}
