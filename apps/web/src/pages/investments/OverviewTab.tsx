@@ -1,14 +1,17 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { AlertCircle, Minus, TrendingDown, TrendingUp } from 'lucide-react'
+import { useState } from 'react'
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import { CATEGORY_PALETTE } from '../../lib/charts/chartPalette'
 import { TOOLTIP_STYLE } from '../../lib/charts/chartTheme'
 import { db } from '../../lib/db/db'
 import { convertAmount } from '../../lib/fx/convert'
 import {
   type DbPortfolioBucket,
   type DbPortfolioBucketAssignment,
+  buildAssignmentLookup,
   getPortfolioBucketAggregation,
+  getSecurityKey,
+  isStockLikePosition,
 } from '../../lib/investments/portfolioBuckets'
 import type { CurrencyOption } from './currencyPreference'
 
@@ -75,94 +78,6 @@ function KpiCard({ title, value, secondary, warning, trend, loading }: KpiCardPr
   )
 }
 
-function AllocationChart({
-  positions,
-  totalValue,
-  preferredCurrency,
-  fxRates,
-  loading,
-}: {
-  positions: import('@lokfi/brokerage-core').BrokeragePosition[]
-  totalValue: number
-  preferredCurrency: CurrencyOption
-  fxRates: Record<string, number> | null
-  loading?: boolean
-}) {
-  if (loading) {
-    return (
-      <div
-        className="animate-pulse rounded-xl border p-5"
-        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
-      >
-        <div className="mb-4 h-4 w-32 rounded bg-gray-200 dark:bg-gray-700" />
-        <div className="flex justify-center">
-          <div className="h-48 w-48 rounded-full bg-gray-200 dark:bg-gray-700" />
-        </div>
-      </div>
-    )
-  }
-
-  if (positions.length === 0) {
-    return null
-  }
-
-  // Group by secType
-  const grouped: Record<string, number> = {}
-  for (const p of positions) {
-    const secType = p.secType ?? 'OTHER'
-    const value = p.marketValue ?? p.quantity * p.avgCost
-    const shouldConvert = preferredCurrency !== 'Original' && fxRates != null
-    const convertedValue = shouldConvert ? convertAmount(value, p.currency, preferredCurrency, fxRates) : value
-    grouped[secType] = (grouped[secType] ?? 0) + convertedValue
-  }
-
-  const data = Object.entries(grouped)
-    .filter(([, v]) => v > 0)
-    .map(([name, value]) => ({
-      name,
-      value,
-      pct: totalValue > 0 ? (value / totalValue) * 100 : 0,
-    }))
-
-  if (data.length === 0) return null
-
-  const renderLabel = ({ name, percent }: { name: string; percent: number }) => `${name} ${(percent * 100).toFixed(1)}%`
-
-  return (
-    <div
-      className="rounded-xl border p-5"
-      style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
-    >
-      <h3 className="mb-4 font-serif text-sm font-medium text-gray-900 dark:text-white">Asset Allocation</h3>
-      <ResponsiveContainer width="100%" height={260}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={55}
-            outerRadius={75}
-            dataKey="value"
-            labelLine={false}
-            label={renderLabel}
-          >
-            {data.map((_, index) => (
-              <Cell key={`cell-${index}`} fill={CATEGORY_PALETTE[index % CATEGORY_PALETTE.length]} />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={TOOLTIP_STYLE}
-            formatter={(value: number) => [
-              value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-              'Value',
-            ]}
-          />
-          <Legend formatter={(value: string) => value} />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
 
 function PortfolioBucketBreakdown({
   positions,
@@ -178,6 +93,8 @@ function PortfolioBucketBreakdown({
   fxRates: Record<string, number> | null
 }) {
   const shouldConvert = preferredCurrency !== 'Original' && fxRates != null
+
+  // Bucket-level aggregation drives the legend + bottom list
   const rows = getPortfolioBucketAggregation({
     positions,
     buckets,
@@ -186,7 +103,51 @@ function PortfolioBucketBreakdown({
       shouldConvert ? convertAmount(value, position.currency, preferredCurrency, fxRates) : value,
   })
 
+  const [expandedBuckets, setExpandedBuckets] = useState<Set<string>>(new Set())
+  function toggleBucket(id: string) {
+    setExpandedBuckets((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   if (rows.length === 0) return null
+
+  // Per-position slices: each stock-like holding is its own slice, colored by its bucket
+  const bucketColorById = new Map(rows.map((r) => [r.bucketId, r.color]))
+  const bucketOrderById = new Map(rows.map((r, i) => [r.bucketId, i]))
+  const assignmentBySecurity = buildAssignmentLookup(assignments)
+  const slices = positions
+    .filter(isStockLikePosition)
+    .map((pos) => {
+      const raw = pos.marketValue ?? pos.quantity * pos.avgCost
+      if (raw <= 0) return null
+      const value = shouldConvert ? convertAmount(raw, pos.currency, preferredCurrency, fxRates) : raw
+      const bucketId = assignmentBySecurity.get(getSecurityKey(pos)) ?? 'unassigned'
+      return { name: pos.symbol, value, color: bucketColorById.get(bucketId) ?? '#94a3b8', bucketId }
+    })
+    .filter((s): s is { name: string; value: number; color: string; bucketId: string } => s !== null)
+    .sort((a, b) => {
+      const orderDiff = (bucketOrderById.get(a.bucketId) ?? 999) - (bucketOrderById.get(b.bucketId) ?? 999)
+      return orderDiff !== 0 ? orderDiff : b.value - a.value
+    })
+
+  // Target % lookup from the buckets prop (includes Unassigned which has no target)
+  const targetPctById = new Map(buckets.map((b) => [b.id, b.targetPct ?? null]))
+
+  // Sort buckets by value desc — used for legend and bucket rows
+  const rowsByValue = [...rows].sort((a, b) => b.value - a.value)
+  const legendPayload = rowsByValue.map((r) => ({ value: r.name, color: r.color, type: 'circle' as const }))
+
+  // Group slices by bucket for the expanded holding rows
+  const slicesByBucket = new Map<string, typeof slices>()
+  for (const slice of slices) {
+    const group = slicesByBucket.get(slice.bucketId) ?? []
+    group.push(slice)
+    slicesByBucket.set(slice.bucketId, group)
+  }
 
   return (
     <div
@@ -196,147 +157,93 @@ function PortfolioBucketBreakdown({
       <h3 className="mb-4 font-serif text-sm font-medium text-gray-900 dark:text-white">Portfolio by bucket</h3>
       <ResponsiveContainer width="100%" height={260}>
         <PieChart>
-          <Pie
-            data={rows}
-            cx="50%"
-            cy="50%"
-            innerRadius={55}
-            outerRadius={75}
-            dataKey="value"
-            labelLine={false}
-            label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(1)}%`}
-          >
-            {rows.map((row) => (
-              <Cell key={row.bucketId} fill={row.color} />
+          <Pie data={slices} cx="50%" cy="50%" innerRadius={55} outerRadius={75} dataKey="value">
+            {slices.map((slice, i) => (
+              <Cell key={`${slice.name}-${i}`} fill={slice.color} />
             ))}
           </Pie>
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
-            formatter={(value: number) => [
+            formatter={(value: number, _name: string, props: { payload?: { name: string } }) => [
               value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-              'Value',
+              props.payload?.name ?? '',
             ]}
           />
-          <Legend formatter={(value: string) => value} />
+          <Legend payload={legendPayload} wrapperStyle={{ fontSize: '12px' }} />
         </PieChart>
       </ResponsiveContainer>
-      <div className="mt-3 space-y-2">
-        {rows.map((row) => (
-          <div key={row.bucketId} className="flex items-center justify-between text-xs">
-            <span className="flex min-w-0 items-center gap-2 text-gray-700 dark:text-gray-300">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
-              <span className="truncate">{row.name}</span>
-            </span>
-            <span className="font-mono text-gray-500 dark:text-gray-400">
-              {row.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (
-              {row.pct.toFixed(1)}%)
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
-function CurrencyBreakdown({
-  positions,
-  accounts,
-  totalValue,
-  preferredCurrency,
-  fxRates,
-  loading,
-}: {
-  positions: import('@lokfi/brokerage-core').BrokeragePosition[]
-  accounts: import('@lokfi/brokerage-core').BrokerageAccount[]
-  totalValue: number
-  preferredCurrency: CurrencyOption
-  fxRates: Record<string, number> | null
-  loading?: boolean
-}) {
-  if (loading) {
-    return (
-      <div
-        className="animate-pulse rounded-xl border p-5"
-        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
-      >
-        <div className="mb-4 h-4 w-32 rounded bg-gray-200 dark:bg-gray-700" />
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="mb-3 flex items-center gap-3">
-            <div className="h-4 w-12 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-2 flex-1 rounded bg-gray-200 dark:bg-gray-700" />
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  if (positions.length === 0 && accounts.length === 0) {
-    return null
-  }
-
-  // Aggregate by currency
-  const currencyTotals: Record<string, { converted: number; original: number }> = {}
-  const shouldConvert = preferredCurrency !== 'Original' && fxRates != null
-
-  for (const p of positions) {
-    const value = p.marketValue ?? p.quantity * p.avgCost
-    const convertedValue = shouldConvert ? convertAmount(value, p.currency, preferredCurrency, fxRates) : value
-    if (!currencyTotals[p.currency]) currencyTotals[p.currency] = { converted: 0, original: 0 }
-    currencyTotals[p.currency].converted += convertedValue
-    currencyTotals[p.currency].original += value
-  }
-
-  for (const acc of accounts) {
-    const convertedValue = shouldConvert
-      ? convertAmount(acc.cashBalance, acc.currency, preferredCurrency, fxRates)
-      : acc.cashBalance
-    if (!currencyTotals[acc.currency]) currencyTotals[acc.currency] = { converted: 0, original: 0 }
-    currencyTotals[acc.currency].converted += convertedValue
-    currencyTotals[acc.currency].original += acc.cashBalance
-  }
-
-  const entries = Object.entries(currencyTotals).filter(([, c]) => c.converted > 0 || c.original > 0)
-
-  if (entries.length === 0) return null
-
-  return (
-    <div
-      className="rounded-xl border p-5"
-      style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
-    >
-      <h3 className="mb-4 font-serif text-sm font-medium text-gray-900 dark:text-white">Currency Breakdown</h3>
-      <div className="space-y-3">
-        {entries.map(([currency, c]) => {
-          const pct = totalValue > 0 ? (c.converted / totalValue) * 100 : 0
-          const needsWarning = shouldConvert && currency !== preferredCurrency && !fxRates?.[currency]
+      <div className="mt-3 space-y-1">
+        {rowsByValue.map((row) => {
+          const holdings = slicesByBucket.get(row.bucketId) ?? []
+          const isExpanded = expandedBuckets.has(row.bucketId)
+          const targetPct = targetPctById.get(row.bucketId) ?? null
+          const delta = targetPct !== null ? row.pct - targetPct : null
+          const deltaColor =
+            delta === null
+              ? ''
+              : Math.abs(delta) <= 2
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : Math.abs(delta) <= 8
+                  ? 'text-amber-500 dark:text-amber-400'
+                  : 'text-red-500 dark:text-red-400'
           return (
-            <div key={currency}>
-              <div className="mb-1 flex items-center justify-between text-xs">
-                <span className="font-medium text-gray-700 dark:text-gray-300">{currency}</span>
-                <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-                  {c.converted.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                  {needsWarning && <AlertCircle size={10} className="text-amber-500" />}
-                  <span className="text-gray-400">({pct.toFixed(1)}%)</span>
+            <div key={row.bucketId}>
+              {/* Bucket header row */}
+              <button
+                type="button"
+                onClick={() => toggleBucket(row.bucketId)}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                <span className="text-gray-400 dark:text-gray-500">{isExpanded ? '▾' : '▸'}</span>
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
+                <span className="font-medium text-gray-700 dark:text-gray-300">{row.name}</span>
+                <span className="ml-auto font-mono text-gray-500 dark:text-gray-400">
+                  {row.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-              </div>
-              <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800">
-                <div
-                  className="h-1.5 rounded-full transition-all"
-                  style={{
-                    width: `${Math.min(pct, 100)}%`,
-                    backgroundColor:
-                      CATEGORY_PALETTE[entries.findIndex(([k]) => k === currency) % CATEGORY_PALETTE.length],
-                  }}
-                />
-              </div>
-              {shouldConvert && currency !== preferredCurrency && (
-                <div className="mt-0.5 text-xs text-gray-400">
-                  Original:{' '}
-                  {c.original.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
-                  {currency}
+                <span className="font-mono text-gray-400 dark:text-gray-500">
+                  {row.pct.toFixed(1)}%
+                  {targetPct !== null && <span className="text-gray-300 dark:text-gray-600"> / {targetPct}%</span>}
+                </span>
+                {delta !== null && (
+                  <span className={`w-12 shrink-0 text-right font-mono font-medium ${deltaColor}`}>
+                    {delta >= 0 ? '+' : ''}
+                    {delta.toFixed(1)}%
+                  </span>
+                )}
+              </button>
+
+              {/* Expanded holdings */}
+              {isExpanded && (
+                <div className="mb-1 ml-6 space-y-1.5 pt-1">
+                  {holdings.map((holding) => {
+                    const withinBucketPct = row.value > 0 ? (holding.value / row.value) * 100 : 0
+                    return (
+                      <div key={holding.name} className="flex items-center gap-2 text-xs">
+                        <span className="w-12 shrink-0 font-mono font-medium text-gray-700 dark:text-gray-300">
+                          {holding.name}
+                        </span>
+                        <div
+                          className="min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
+                          style={{ height: 6 }}
+                        >
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${withinBucketPct}%`, backgroundColor: row.color }}
+                          />
+                        </div>
+                        <span className="w-10 shrink-0 text-right font-mono text-gray-500 dark:text-gray-400">
+                          {withinBucketPct.toFixed(1)}%
+                        </span>
+                        <span className="w-28 shrink-0 text-right font-mono text-gray-400 dark:text-gray-500">
+                          {holding.value.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -346,6 +253,7 @@ function CurrencyBreakdown({
     </div>
   )
 }
+
 
 function PerformanceSparkline() {
   // TODO: Implement historical snapshots — store portfolio value snapshots in
@@ -431,33 +339,17 @@ export function OverviewTab({
     return sum
   })()
 
-  // Day change: sum of unrealizedPnl as proxy (historical snapshots not available)
-  const dayChange = (() => {
-    if (!positions) return null
-    let sum = 0
-    for (const p of positions) {
-      if (p.unrealizedPnl != null) {
-        const v = shouldConvert
-          ? convertAmount(p.unrealizedPnl, p.currency, preferredCurrency, fxRates)
-          : p.unrealizedPnl
-        sum += v
-      }
-    }
-    return sum
-  })()
-
-  // Dividends YTD
-  const dividendsYtd = (() => {
+  // Dividends TTM (trailing 12 months)
+  const dividendsTtm = (() => {
     if (!fundDetails) return null
-    const year = new Date().getFullYear()
+    const cutoff = new Date()
+    cutoff.setFullYear(cutoff.getFullYear() - 1)
+    const cutoffStr = cutoff.toISOString().slice(0, 10)
     let sum = 0
     for (const fd of fundDetails) {
       if (fd.classifiedType !== 'DIVIDEND' && fd.classifiedType !== 'DIVIDEND_TAX') continue
-      if (!fd.businessDate) continue
-      const yearMatch = fd.businessDate.startsWith(String(year))
-      if (!yearMatch) continue
-      const amt = fd.amount
-      const v = shouldConvert ? convertAmount(amt, fd.currency, preferredCurrency, fxRates) : amt
+      if (!fd.businessDate || fd.businessDate < cutoffStr) continue
+      const v = shouldConvert ? convertAmount(fd.amount, fd.currency, preferredCurrency, fxRates) : fd.amount
       sum += v
     }
     return sum
@@ -479,14 +371,8 @@ export function OverviewTab({
       {/* KPI Row */}
       <KpiCard title="Total Portfolio Value" value={fmtWithSymbol(totalValue)} loading={isLoading} />
       <KpiCard
-        title="Day Change"
-        value={dayChange !== null ? fmtWithSymbol(dayChange) : '—'}
-        trend={dayChange !== null ? (dayChange > 0 ? 'positive' : dayChange < 0 ? 'negative' : 'neutral') : undefined}
-        loading={isLoading}
-      />
-      <KpiCard
-        title="Dividends YTD"
-        value={dividendsYtd !== null ? fmtWithSymbol(dividendsYtd) : '—'}
+        title="Dividends (TTM)"
+        value={dividendsTtm !== null ? fmtWithSymbol(dividendsTtm) : '—'}
         secondary={fxLastUpdated ? `Rates updated ${new Date(fxLastUpdated).toLocaleDateString()}` : undefined}
         warning={fxWarning ?? undefined}
         loading={isLoading}
@@ -495,33 +381,12 @@ export function OverviewTab({
       {/* Empty state */}
       {!isLoading && !hasData && <EmptyState />}
 
-      {/* Allocation chart */}
-      {!isLoading && hasData && (
-        <AllocationChart
-          positions={positions!}
-          totalValue={totalValue}
-          preferredCurrency={preferredCurrency}
-          fxRates={fxRates}
-        />
-      )}
-
       {/* Portfolio by bucket */}
       {!isLoading && hasData && (
         <PortfolioBucketBreakdown
           positions={positions!}
           buckets={buckets!}
           assignments={assignments!}
-          preferredCurrency={preferredCurrency}
-          fxRates={fxRates}
-        />
-      )}
-
-      {/* Currency breakdown */}
-      {!isLoading && hasData && (
-        <CurrencyBreakdown
-          positions={positions!}
-          accounts={accounts!}
-          totalValue={totalValue}
           preferredCurrency={preferredCurrency}
           fxRates={fxRates}
         />
