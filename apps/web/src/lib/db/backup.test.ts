@@ -18,9 +18,16 @@ const baseV3 = {
   brokerageCredentials: [],
 }
 
+const baseV4 = {
+  ...baseV3,
+  version: 4,
+  portfolioBuckets: [],
+  portfolioBucketAssignments: [],
+}
+
 describe('backup helpers', () => {
-  it('uses backup version 4 for portfolio buckets', () => {
-    expect(BACKUP_VERSION).toBe(4)
+  it('uses backup version 5 for portfolio snapshots', () => {
+    expect(BACKUP_VERSION).toBe(5)
   })
 
   it('requires portfolio bucket arrays for v4 backups', () => {
@@ -82,5 +89,42 @@ describe('backup helpers', () => {
 
     expect(summary).toContain('1 portfolio bucket(s)')
     expect(summary).toContain('1 portfolio bucket assignment(s)')
+  })
+
+  it('requires portfolioSnapshots array for v5 backups', () => {
+    expect(validateBackupShape({ ...baseV4, version: 5 }).valid).toBe(false)
+    expect(
+      validateBackupShape({ ...baseV4, version: 5, portfolioSnapshots: [] })
+    ).toEqual({ valid: true })
+  })
+
+  it('normalizes v4 and older backups with empty portfolioSnapshots', () => {
+    const normalizedV3 = normalizeBackupForImport(baseV3)
+    expect(normalizedV3.portfolioSnapshots).toEqual([])
+
+    const normalizedV4 = normalizeBackupForImport(baseV4)
+    expect(normalizedV4.portfolioSnapshots).toEqual([])
+  })
+
+  it('keeps portfolioSnapshots during v5 normalization', () => {
+    const snapshot = { date: '2026-05-01', totalValue: 10000, currency: 'SGD' }
+    const normalized = normalizeBackupForImport({
+      ...baseV4,
+      version: 5,
+      portfolioSnapshots: [snapshot],
+    })
+    expect(normalized.portfolioSnapshots).toHaveLength(1)
+    expect(normalized.portfolioSnapshots[0]).toEqual(snapshot)
+  })
+
+  it('includes snapshot count in import summary', () => {
+    const summary = buildImportSummary({
+      ...normalizeBackupForImport({ ...baseV4, version: 5, portfolioSnapshots: [] }),
+      portfolioSnapshots: [
+        { date: '2026-05-01', totalValue: 10000, currency: 'SGD' },
+        { date: '2026-05-02', totalValue: 10200, currency: 'SGD' },
+      ],
+    })
+    expect(summary).toContain('2 portfolio snapshot(s)')
   })
 })

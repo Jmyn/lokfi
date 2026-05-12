@@ -1,10 +1,10 @@
 import { createDefaultPortfolioBuckets } from '../investments/portfolioBuckets'
 import type { LokfiDatabase } from './db'
 
-export const BACKUP_VERSION = 4
+export const BACKUP_VERSION = 5
 
 export interface LokfiBackup {
-  version: 1 | 2 | 3 | 4
+  version: 1 | 2 | 3 | 4 | 5
   exportedAt?: string
   transactions: unknown[]
   rules: unknown[]
@@ -20,6 +20,7 @@ export interface LokfiBackup {
   brokerageCredentials: unknown[]
   portfolioBuckets: unknown[]
   portfolioBucketAssignments: unknown[]
+  portfolioSnapshots: unknown[]
 }
 
 function isArray(value: unknown): value is unknown[] {
@@ -32,7 +33,7 @@ export function validateBackupShape(data: unknown): { valid: true } | { valid: f
   }
   const candidate = data as Record<string, unknown>
   const version = Number(candidate.version)
-  if (![1, 2, 3, 4].includes(version)) {
+  if (![1, 2, 3, 4, 5].includes(version)) {
     return { valid: false, message: 'Invalid backup file: unsupported backup version.' }
   }
   for (const key of ['transactions', 'rules', 'categories', 'customParsers', 'budgets']) {
@@ -57,16 +58,19 @@ export function validateBackupShape(data: unknown): { valid: true } | { valid: f
   if (version >= 3 && !isArray(candidate.brokerageFundDetails)) {
     return { valid: false, message: 'Invalid v3 backup file: missing brokerageFundDetails array.' }
   }
-  if (version === 4) {
+  if (version >= 4) {
     if (!isArray(candidate.portfolioBuckets) || !isArray(candidate.portfolioBucketAssignments)) {
       return { valid: false, message: 'Invalid v4 backup file: missing portfolio bucket arrays.' }
     }
+  }
+  if (version >= 5 && !isArray(candidate.portfolioSnapshots)) {
+    return { valid: false, message: 'Invalid v5 backup file: missing portfolioSnapshots array.' }
   }
   return { valid: true }
 }
 
 export function normalizeBackupForImport(data: Record<string, unknown>): LokfiBackup {
-  const version = Number(data.version) as 1 | 2 | 3 | 4
+  const version = Number(data.version) as 1 | 2 | 3 | 4 | 5
   return {
     version,
     exportedAt: typeof data.exportedAt === 'string' ? data.exportedAt : undefined,
@@ -82,8 +86,9 @@ export function normalizeBackupForImport(data: Record<string, unknown>): LokfiBa
     brokerageAccounts: version >= 2 ? (data.brokerageAccounts as unknown[]) : [],
     brokerageSyncLog: version >= 2 ? (data.brokerageSyncLog as unknown[]) : [],
     brokerageCredentials: version >= 2 ? (data.brokerageCredentials as unknown[]) : [],
-    portfolioBuckets: version === 4 ? (data.portfolioBuckets as unknown[]) : [],
-    portfolioBucketAssignments: version === 4 ? (data.portfolioBucketAssignments as unknown[]) : [],
+    portfolioBuckets: version >= 4 ? (data.portfolioBuckets as unknown[]) : [],
+    portfolioBucketAssignments: version >= 4 ? (data.portfolioBucketAssignments as unknown[]) : [],
+    portfolioSnapshots: version >= 5 ? (data.portfolioSnapshots as unknown[]) : [],
   }
 }
 
@@ -102,6 +107,7 @@ export function buildImportSummary(data: LokfiBackup): string {
     `• ${data.brokerageCredentials.length} credential(s) (encrypted)\n` +
     `• ${data.portfolioBuckets.length} portfolio bucket(s)\n` +
     `• ${data.portfolioBucketAssignments.length} portfolio bucket assignment(s)\n` +
+    `• ${data.portfolioSnapshots.length} portfolio snapshot(s)\n` +
     `Current data will be overwritten. Are you sure?`
   )
 }
@@ -122,6 +128,7 @@ export async function buildBackupPayload(db: LokfiDatabase): Promise<LokfiBackup
     brokerageCredentials,
     portfolioBuckets,
     portfolioBucketAssignments,
+    portfolioSnapshots,
   ] = await Promise.all([
     db.transactions.toArray(),
     db.rules.toArray(),
@@ -137,6 +144,7 @@ export async function buildBackupPayload(db: LokfiDatabase): Promise<LokfiBackup
     db.brokerageCredentials.toArray(),
     db.portfolioBuckets.toArray(),
     db.portfolioBucketAssignments.toArray(),
+    db.portfolioSnapshots.toArray(),
   ])
   return {
     version: BACKUP_VERSION,
@@ -155,6 +163,7 @@ export async function buildBackupPayload(db: LokfiDatabase): Promise<LokfiBackup
     brokerageCredentials,
     portfolioBuckets,
     portfolioBucketAssignments,
+    portfolioSnapshots,
   }
 }
 
@@ -176,6 +185,7 @@ export async function importBackupPayload(db: LokfiDatabase, data: LokfiBackup):
       db.brokerageCredentials,
       db.portfolioBuckets,
       db.portfolioBucketAssignments,
+      db.portfolioSnapshots,
     ],
     async () => {
       await Promise.all([
@@ -193,6 +203,7 @@ export async function importBackupPayload(db: LokfiDatabase, data: LokfiBackup):
         db.brokerageCredentials.clear(),
         db.portfolioBuckets.clear(),
         db.portfolioBucketAssignments.clear(),
+        db.portfolioSnapshots.clear(),
       ])
       if (data.transactions.length) await db.transactions.bulkAdd(data.transactions as never[])
       if (data.rules.length) await db.rules.bulkAdd(data.rules as never[])
@@ -214,6 +225,7 @@ export async function importBackupPayload(db: LokfiDatabase, data: LokfiBackup):
       if (data.portfolioBucketAssignments.length) {
         await db.portfolioBucketAssignments.bulkAdd(data.portfolioBucketAssignments as never[])
       }
+      if (data.portfolioSnapshots.length) await db.portfolioSnapshots.bulkAdd(data.portfolioSnapshots as never[])
     }
   )
 }
