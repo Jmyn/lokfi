@@ -15,7 +15,7 @@ import {
 import { PortfolioBucketCombobox } from './PortfolioBucketCombobox'
 import { PortfolioBucketManager } from './PortfolioBucketManager'
 import type { CurrencyOption } from './currencyPreference'
-import { getAdjustedMetrics } from './holdingCalculations'
+import { computeDerivativeUnrealisedPnlPct, getAdjustedMetrics } from './holdingCalculations'
 import type { HoldingMetrics } from './holdingCalculations'
 
 interface HoldingsTabProps {
@@ -35,6 +35,7 @@ interface PositionRow {
   totalDividends: number
   adjCostBasisPerShare: number | null
   totalReturnPct: number | null
+  unrealisedPnlPct: number | null
   realisedPnl: number
   unrealisedPnl: number
   totalPnl: number
@@ -65,6 +66,11 @@ function getFormatter(currency: string): Intl.NumberFormat {
 
 function formatCurrency(amount: number, currency: string): string {
   return getFormatter(currency).format(amount)
+}
+
+function formatPercent(amount: number): string {
+  const sign = amount > 0 ? '+' : ''
+  return `${sign}${amount.toFixed(1)}%`
 }
 
 function HoldingDetailRow({ row, variant = 'stock' }: HoldingDetailRowProps) {
@@ -560,6 +566,11 @@ function HoldingsTable({
                     {showConverted && (
                       <div className="text-xs font-normal">{formatCurrency(row.pnl, position.currency)}</div>
                     )}
+                    {isDerivative && row.unrealisedPnlPct != null && (
+                      <div className={`text-xs font-normal ${pnClass(row.unrealisedPnlPct)}`}>
+                        {formatPercent(row.unrealisedPnlPct)}
+                      </div>
+                    )}
                   </div>
                 </td>
                 {!isDerivative && (
@@ -696,6 +707,7 @@ function toRow(position: BrokeragePosition, metrics?: HoldingMetrics): PositionR
     totalDividends: metrics?.totalDividends ?? 0,
     adjCostBasisPerShare: metrics?.adjCostBasisPerShare ?? null,
     totalReturnPct: metrics?.totalReturnPct ?? null,
+    unrealisedPnlPct: isDerivative(position) ? computeDerivativeUnrealisedPnlPct(position, pnl) : null,
     realisedPnl: metrics?.realisedStockPnl ?? 0,
     unrealisedPnl: metrics?.unrealisedPnl ?? pnl,
     totalPnl: metrics?.totalPnl ?? pnl,
@@ -929,7 +941,6 @@ export function HoldingsTab({ preferredCurrency, fxRates, fxLastUpdated, fxError
     )
   }
 
-
   // ── Main render ────────────────────────────────────────────────────────
 
   return (
@@ -1019,7 +1030,11 @@ export function HoldingsTab({ preferredCurrency, fxRates, fxLastUpdated, fxError
                 type="button"
                 onClick={() => setBucketFilter('all')}
                 className="mt-4 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
-                style={{ borderColor: 'var(--accent)', color: 'var(--accent)', backgroundColor: 'var(--accent-subtle)' }}
+                style={{
+                  borderColor: 'var(--accent)',
+                  color: 'var(--accent)',
+                  backgroundColor: 'var(--accent-subtle)',
+                }}
               >
                 Show all holdings
               </button>

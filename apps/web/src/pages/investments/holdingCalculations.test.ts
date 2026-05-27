@@ -1,6 +1,6 @@
 import type { BrokerageFundDetail, BrokerageTransaction } from '@lokfi/brokerage-core'
 import { describe, expect, it } from 'vitest'
-import { computeStockSalePnL, getDividends } from './holdingCalculations'
+import { computeDerivativeUnrealisedPnlPct, computeStockSalePnL, getDividends } from './holdingCalculations'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -41,6 +41,65 @@ function fundDetail(id: string, symbol: string, amount: number): BrokerageFundDe
     businessDate: '2025-01-15',
   }
 }
+
+// ---------------------------------------------------------------------------
+// computeDerivativeUnrealisedPnlPct
+// ---------------------------------------------------------------------------
+
+describe('computeDerivativeUnrealisedPnlPct', () => {
+  it('converts broker-provided unrealised P&L ratio to percentage points', () => {
+    expect(
+      computeDerivativeUnrealisedPnlPct({
+        id: 'CRWV_OPT_test',
+        source: 'test',
+        symbol: 'CRWV',
+        secType: 'OPT',
+        currency: 'USD',
+        quantity: -1,
+        avgCost: 1.2,
+        marketValue: -80,
+        unrealizedPnl: 40,
+        unrealizedPnlPercent: 0.3333,
+        multiplier: 100,
+        updatedAt: '2025-01-15T00:00:00Z',
+      })
+    ).toBeCloseTo(33.33, 5)
+  })
+
+  it('computes fallback percentage from unrealised P&L and absolute derivative cost basis', () => {
+    expect(
+      computeDerivativeUnrealisedPnlPct({
+        id: 'CRWV_OPT_test',
+        source: 'test',
+        symbol: 'CRWV',
+        secType: 'OPT',
+        currency: 'USD',
+        quantity: -2,
+        avgCost: 1.5,
+        unrealizedPnl: 90,
+        multiplier: 100,
+        updatedAt: '2025-01-15T00:00:00Z',
+      })
+    ).toBe(30)
+  })
+
+  it('returns null when derivative cost basis is zero', () => {
+    expect(
+      computeDerivativeUnrealisedPnlPct({
+        id: 'CRWV_OPT_test',
+        source: 'test',
+        symbol: 'CRWV',
+        secType: 'OPT',
+        currency: 'USD',
+        quantity: 0,
+        avgCost: 1.5,
+        unrealizedPnl: 90,
+        multiplier: 100,
+        updatedAt: '2025-01-15T00:00:00Z',
+      })
+    ).toBeNull()
+  })
+})
 
 // ---------------------------------------------------------------------------
 // computeStockSalePnL
