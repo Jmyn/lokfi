@@ -45,6 +45,7 @@ export function adaptPosition(raw: TigerPosition): BrokeragePosition {
     avgCost: raw.averageCost,
     marketValue: raw.marketValue,
     unrealizedPnl: raw.unrealizedPnl,
+    unrealizedPnlPercent: raw.unrealizedPnlPercent,
     // Option/derivative fields (only present for OPT, FUT, etc.)
     identifier: raw.identifier,
     multiplier: raw.multiplier,

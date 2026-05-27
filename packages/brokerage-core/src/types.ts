@@ -49,6 +49,7 @@ export interface BrokeragePosition {
   avgCost: number
   marketValue?: number
   unrealizedPnl?: number
+  unrealizedPnlPercent?: number
   /** ISO-8601 timestamp of when this position was last fetched */
   updatedAt: string
   /** Option/derivative: OCC option symbol (e.g. "CRWV  260508P00106000") */

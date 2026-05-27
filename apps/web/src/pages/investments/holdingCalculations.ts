@@ -123,6 +123,19 @@ export function getTotalOptionPremiums(
   return getOptionPremiums(stockSymbol, optionPositions)
 }
 
+export function computeDerivativeUnrealisedPnlPct(position: BrokeragePosition, unrealisedPnl?: number): number | null {
+  if (position.unrealizedPnlPercent != null) return position.unrealizedPnlPercent * 100
+
+  const multiplier = position.multiplier ?? 1
+  const costBasis = Math.abs(position.quantity * position.avgCost * multiplier)
+  if (costBasis <= 0) return null
+
+  const pnl = unrealisedPnl ?? position.unrealizedPnl
+  if (pnl == null) return null
+
+  return (pnl / costBasis) * 100
+}
+
 /**
  * Compute realised P&L from partial stock sales.
  *
