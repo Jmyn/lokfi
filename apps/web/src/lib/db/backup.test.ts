@@ -93,9 +93,7 @@ describe('backup helpers', () => {
 
   it('requires portfolioSnapshots array for v5 backups', () => {
     expect(validateBackupShape({ ...baseV4, version: 5 }).valid).toBe(false)
-    expect(
-      validateBackupShape({ ...baseV4, version: 5, portfolioSnapshots: [] })
-    ).toEqual({ valid: true })
+    expect(validateBackupShape({ ...baseV4, version: 5, portfolioSnapshots: [] })).toEqual({ valid: true })
   })
 
   it('normalizes v4 and older backups with empty portfolioSnapshots', () => {

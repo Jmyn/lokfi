@@ -66,9 +66,9 @@ export interface DbBudget {
 }
 
 export interface DbPortfolioSnapshot {
-  date: string       // YYYY-MM-DD, primary key
+  date: string // YYYY-MM-DD, primary key
   totalValue: number
-  currency: string   // preferred currency used at snapshot time
+  currency: string // preferred currency used at snapshot time
 }
 
 export class LokfiDatabase extends Dexie {

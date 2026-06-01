@@ -91,11 +91,7 @@ export function PortfolioBucketManager({ open, onClose }: PortfolioBucketManager
                 <span>Target total</span>
                 <span className="font-mono font-medium">
                   {totalTarget}%{' '}
-                  {over
-                    ? `(${totalTarget - 100}% over)`
-                    : unallocated > 0
-                      ? `(${unallocated}% unallocated)`
-                      : '✓'}
+                  {over ? `(${totalTarget - 100}% over)` : unallocated > 0 ? `(${unallocated}% unallocated)` : '✓'}
                 </span>
               </div>
             )
