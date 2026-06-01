@@ -4,6 +4,7 @@ const TABS = [
   { id: 'closed', label: 'Closed' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'dividends', label: 'Dividends' },
+  { id: 'signals', label: 'Signals' },
 ] as const
 
 interface InvestmentsTabsProps {

@@ -22,6 +22,7 @@ import { HoldingsTab } from './HoldingsTab'
 import { InvestmentsTabs } from './InvestmentsTabs'
 import { InvestmentsTransactionsTab } from './InvestmentsTransactionsTab'
 import { OverviewTab } from './OverviewTab'
+import { SignalTab } from './SignalTab'
 import { type CurrencyOption, getPreferredCurrency, setPreferredCurrency } from './currencyPreference'
 
 const SOURCE = 'tiger'
@@ -31,7 +32,7 @@ export function InvestmentsPage() {
   const location = useLocation()
   const searchParams = new URLSearchParams(location.search)
   const tab = searchParams.get('tab') || 'overview'
-  const validTabs = ['overview', 'holdings', 'closed', 'transactions', 'dividends']
+  const validTabs = ['overview', 'holdings', 'closed', 'transactions', 'dividends', 'signals']
   const activeTab = validTabs.includes(tab) ? tab : 'overview'
 
   const [preferredCurrency, setPreferredCurrencyState] = useState<CurrencyOption>('SGD')
@@ -278,6 +279,7 @@ export function InvestmentsPage() {
             fxError={fxError}
           />
         )}
+        {activeTab === 'signals' && <SignalTab />}
       </div>
     </div>
   )
