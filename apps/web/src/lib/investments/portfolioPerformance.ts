@@ -1,15 +1,11 @@
 export type RangeKey = '1M' | '3M' | '6M' | '1Y' | 'YTD' | 'All'
 
 export interface SnapshotPoint {
-  date: string  // YYYY-MM-DD
+  date: string // YYYY-MM-DD
   value: number
 }
 
-export function filterSnapshotsByRange(
-  snapshots: SnapshotPoint[],
-  range: RangeKey,
-  now: Date,
-): SnapshotPoint[] {
+export function filterSnapshotsByRange(snapshots: SnapshotPoint[], range: RangeKey, now: Date): SnapshotPoint[] {
   if (range === 'All') return [...snapshots]
 
   let cutoff: Date

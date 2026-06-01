@@ -1,15 +1,15 @@
 import type { BrokerageAccount, BrokeragePosition } from '@lokfi/brokerage-core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect } from 'react'
-import { convertAmount } from '../fx/convert'
-import { db } from '../db/db'
 import type { CurrencyOption } from '../../pages/investments/currencyPreference'
+import { db } from '../db/db'
+import { convertAmount } from '../fx/convert'
 
 export function computePortfolioTotalValue(
   positions: BrokeragePosition[],
   accounts: BrokerageAccount[],
   preferredCurrency: CurrencyOption,
-  fxRates: Record<string, number> | null,
+  fxRates: Record<string, number> | null
 ): number {
   const shouldConvert = preferredCurrency !== 'Original' && fxRates != null
   let sum = 0
@@ -23,10 +23,7 @@ export function computePortfolioTotalValue(
   return sum
 }
 
-export function usePortfolioSnapshot(
-  preferredCurrency: CurrencyOption,
-  fxRates: Record<string, number> | null,
-): void {
+export function usePortfolioSnapshot(preferredCurrency: CurrencyOption, fxRates: Record<string, number> | null): void {
   const positions = useLiveQuery(() => db.brokeragePositions.toArray(), [])
   const accounts = useLiveQuery(() => db.brokerageAccounts.toArray(), [])
 

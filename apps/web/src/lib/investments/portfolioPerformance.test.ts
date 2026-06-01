@@ -72,11 +72,7 @@ describe('computeReturn', () => {
   })
 
   it('uses first and last points only, ignoring middle values', () => {
-    const result = computeReturn([
-      snap('2026-01-01', 10000),
-      snap('2026-03-01', 999999),
-      snap('2026-05-01', 12000),
-    ])
+    const result = computeReturn([snap('2026-01-01', 10000), snap('2026-03-01', 999999), snap('2026-05-01', 12000)])
     expect(result!.pct).toBeCloseTo(20, 5)
     expect(result!.abs).toBeCloseTo(2000, 5)
   })

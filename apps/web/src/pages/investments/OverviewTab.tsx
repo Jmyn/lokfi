@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Area, AreaChart, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { AXIS_TICK, TOOLTIP_STYLE } from '../../lib/charts/chartTheme'
 import { db } from '../../lib/db/db'
+import type { DbPortfolioSnapshot } from '../../lib/db/db'
 import { convertAmount } from '../../lib/fx/convert'
 import {
   type DbPortfolioBucket,
@@ -13,10 +14,14 @@ import {
   getSecurityKey,
   isStockLikePosition,
 } from '../../lib/investments/portfolioBuckets'
-import type { CurrencyOption } from './currencyPreference'
-import type { DbPortfolioSnapshot } from '../../lib/db/db'
-import { type RangeKey, type SnapshotPoint, computeReturn, filterSnapshotsByRange } from '../../lib/investments/portfolioPerformance'
+import {
+  type RangeKey,
+  type SnapshotPoint,
+  computeReturn,
+  filterSnapshotsByRange,
+} from '../../lib/investments/portfolioPerformance'
 import { usePortfolioSnapshot } from '../../lib/investments/usePortfolioSnapshot'
+import type { CurrencyOption } from './currencyPreference'
 
 export interface OverviewTabProps {
   /** User's preferred display currency */
@@ -80,7 +85,6 @@ function KpiCard({ title, value, secondary, warning, trend, loading }: KpiCardPr
     </div>
   )
 }
-
 
 function PortfolioBucketBreakdown({
   positions,
@@ -256,7 +260,6 @@ function PortfolioBucketBreakdown({
     </div>
   )
 }
-
 
 const PERFORMANCE_RANGES: RangeKey[] = ['1M', '3M', '6M', '1Y', 'YTD', 'All']
 
@@ -482,11 +485,7 @@ export function OverviewTab({
       {/* Performance card */}
       {!isLoading && (
         <div className="md:col-span-2 lg:col-span-3">
-          <PerformanceCard
-            snapshots={snapshots!}
-            preferredCurrency={preferredCurrency}
-            fxRates={fxRates}
-          />
+          <PerformanceCard snapshots={snapshots!} preferredCurrency={preferredCurrency} fxRates={fxRates} />
         </div>
       )}
     </div>
