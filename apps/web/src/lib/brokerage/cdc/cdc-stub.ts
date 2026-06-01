@@ -10,6 +10,7 @@
 import type {
   BrokerageAccount,
   BrokerageFundDetail,
+  BrokerageKlineBar,
   BrokeragePosition,
   BrokerageTransaction,
 } from '@lokfi/brokerage-core'
@@ -35,6 +36,14 @@ export class CdcStubProvider implements BrokerageProvider {
 
   async fetchAccount(_onProgress?: ProviderProgress): Promise<BrokerageAccount[]> {
     return []
+  }
+
+  async fetchHistoricalBars(
+    _symbol: string,
+    _period: 'day' | 'week' | 'month',
+    _lookbackDays: number
+  ): Promise<BrokerageKlineBar[]> {
+    throw new Error('Not Implemented')
   }
 
   async validateConnection(): Promise<boolean> {

@@ -8,6 +8,7 @@
 import type {
   BrokerageAccount,
   BrokerageFundDetail,
+  BrokerageKlineBar,
   BrokeragePosition,
   BrokerageTransaction,
   FundDetailType,
@@ -17,6 +18,7 @@ import type {
   TigerAsset,
   TigerAssetSegment,
   TigerFundDetail,
+  TigerKlineBar,
   TigerOrder,
   TigerOrderTransaction,
   TigerPosition,
@@ -322,6 +324,36 @@ export function enrichTradeFundDetail(
 
 function orderGrossAmount(order: BrokerageTransaction): number {
   return order.quantity * order.price + (order.commission ?? 0)
+}
+
+// ── K-line ────────────────────────────────────────────────────────────────
+
+/**
+ * Adapt a raw Tiger K-line bar to a normalized BrokerageKlineBar.
+ *
+ * Tiger's K-line API returns timestamps in epoch milliseconds.
+ * The adapter passes them through as-is (BrokerageKlineBar expects epoch ms).
+ *
+ * @param raw     - Raw bar from Tiger API
+ * @param source  - Source discriminator (default: 'tiger')
+ */
+export function adaptKlineBars(
+  raw: TigerKlineBar[],
+  source = 'tiger',
+  period: BrokerageKlineBar['period'] = 'day'
+): BrokerageKlineBar[] {
+  return raw.map((bar) => ({
+    symbol: bar.symbol,
+    source,
+    // Tiger returns timestamps in epoch milliseconds
+    timestamp: bar.time,
+    open: bar.open ?? 0,
+    high: bar.high ?? 0,
+    low: bar.low ?? 0,
+    close: bar.close ?? 0,
+    volume: bar.volume ?? 0,
+    period,
+  }))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────

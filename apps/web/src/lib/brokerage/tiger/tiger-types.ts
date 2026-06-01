@@ -195,6 +195,20 @@ export interface TigerFundDetail {
   transactionTime?: number
 }
 
+// ── K-line ────────────────────────────────────────────────────────────────
+
+/** Raw K-line bar from Tiger K-line API */
+export interface TigerKlineBar {
+  symbol: string
+  /** Epoch milliseconds (Tiger's K-line API returns 13-digit ms timestamps) */
+  time: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
 // ── Client Config ─────────────────────────────────────────────────────────
 
 export interface TigerClientConfig {

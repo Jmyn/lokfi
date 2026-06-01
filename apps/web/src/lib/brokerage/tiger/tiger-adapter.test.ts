@@ -4,6 +4,7 @@ import {
   adaptAsset,
   adaptAssetSegment,
   adaptFundDetail,
+  adaptKlineBars,
   adaptOrder,
   adaptOrderTransaction,
   adaptPosition,
@@ -16,6 +17,7 @@ import type {
   TigerAsset,
   TigerAssetSegment,
   TigerFundDetail,
+  TigerKlineBar,
   TigerOrder,
   TigerOrderTransaction,
   TigerPosition,
@@ -618,6 +620,60 @@ describe('adaptFundDetail', () => {
     const result = adaptFundDetail(fundDetail)
 
     expect(result).toBeNull()
+  })
+})
+
+describe('adaptKlineBars', () => {
+  // Tiger's K-line API returns timestamps in epoch milliseconds.
+  // The adapter passes them through as-is.
+
+  it('passes through Tiger timestamps (already epoch ms)', () => {
+    const bars: TigerKlineBar[] = [
+      { symbol: 'TQQQ', time: 1742443200000, open: 50, high: 52, low: 49, close: 51, volume: 1000000 },
+    ]
+
+    const result = adaptKlineBars(bars)
+
+    expect(result[0].timestamp).toBe(1742443200000)
+    expect(result[0].close).toBe(51)
+  })
+
+  it('defaults missing fields to 0 via ?? fallback', () => {
+    const bars = [
+      {
+        symbol: 'TQQQ',
+        time: 1742443200000,
+        open: undefined as unknown as number,
+        high: null as unknown as number,
+        low: 0,
+        close: 100,
+        volume: 500,
+      },
+    ]
+
+    const result = adaptKlineBars(bars as unknown as TigerKlineBar[])
+
+    expect(result[0].open).toBe(0)
+    expect(result[0].high).toBe(0)
+    expect(result[0].low).toBe(0)
+    expect(result[0].close).toBe(100)
+    expect(result[0].volume).toBe(500)
+  })
+
+  it('passes through empty array', () => {
+    const result = adaptKlineBars([])
+    expect(result).toEqual([])
+  })
+
+  it('sets source and period on each bar', () => {
+    const bars: TigerKlineBar[] = [
+      { symbol: 'TQQQ', time: 1742443200000, open: 50, high: 52, low: 49, close: 51, volume: 1000000 },
+    ]
+
+    const result = adaptKlineBars(bars, 'tiger')
+
+    expect(result[0].source).toBe('tiger')
+    expect(result[0].period).toBe('day')
   })
 })
 
