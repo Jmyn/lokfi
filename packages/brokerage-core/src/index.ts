@@ -10,6 +10,7 @@ export type {
   BrokerageAccount,
   BrokerageCredentials,
   BrokerageFundDetail,
+  BrokerageKlineBar,
   BrokeragePosition,
   BrokeragePositionExtension,
   BrokerageSource,

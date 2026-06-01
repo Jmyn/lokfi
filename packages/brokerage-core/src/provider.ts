@@ -12,6 +12,7 @@
 import type {
   BrokerageAccount,
   BrokerageFundDetail,
+  BrokerageKlineBar,
   BrokeragePosition,
   BrokerageSource,
   BrokerageTransaction,
@@ -65,6 +66,33 @@ export interface BrokerageProvider {
    * @param onProgress - Optional callback for sub-method progress updates
    */
   fetchAccount(onProgress?: ProviderProgress): Promise<BrokerageAccount[]>
+
+  /**
+   * Fetch historical K-line (OHLCV) bars for a symbol.
+   *
+   * Used by the Signals tab to compute the 9 Sig Lite indicator.
+   * Providers SHOULD return daily bars sorted chronologically (oldest first).
+   *
+   * Rate-limit expectations:
+   *   - Providers should use their own internal throttle/retry logic.
+   *   - The caller will cache results with a 5-minute TTL and will not
+   *     call this method more than once per symbol per cache window.
+   *
+   * Error semantics:
+   *   - Throws the provider's standard error types on API failure (auth,
+   *     rate limit, network).
+   *   - Throws a clear "Not Implemented" error if the provider does not
+   *     support historical bar queries.
+   *
+   * @param symbol     - Trading symbol (e.g. "TQQQ")
+   * @param period     - Bar aggregation period
+   * @param lookbackDays - Maximum number of days of history to return
+   */
+  fetchHistoricalBars(
+    symbol: string,
+    period: 'day' | 'week' | 'month',
+    lookbackDays: number
+  ): Promise<BrokerageKlineBar[]>
 
   /**
    * Lightweight connectivity check — confirms auth works without fetching
