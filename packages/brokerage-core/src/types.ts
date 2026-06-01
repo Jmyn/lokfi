@@ -144,6 +144,28 @@ export interface BrokerageSyncLog {
   errorMessage?: string
 }
 
+// ── K-line (Historical Bars) ──────────────────────────────────────────────
+
+/**
+ * Normalized historical bar (K-line) returned by a brokerage.
+ * Providers map their raw API response into this unified shape.
+ */
+export interface BrokerageKlineBar {
+  /** Trading symbol (e.g. "TQQQ") */
+  symbol: string
+  /** Source discriminator (e.g. "tiger") */
+  source: BrokerageSource
+  /** Bar timestamp (epoch ms) — aligned to period boundary */
+  timestamp: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+  /** 'day' | 'week' | 'month' */
+  period: 'day' | 'week' | 'month'
+}
+
 // ── Credentials ───────────────────────────────────────────────────────────
 
 /**
