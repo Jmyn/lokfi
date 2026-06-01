@@ -74,10 +74,11 @@ export async function computeIncrementalSince(database: SyncDatabase, source: st
   for (const cat of ALL_CATEGORIES) {
     const lastSync = byCategory.get(cat)
     if (lastSync) {
-      // Incremental: 1-day overlap to catch edge-of-window records.
+      // Incremental: 14-day overlap to catch late-posted records (e.g.,
+      // dividends posted days after their occurTime/businessDate).
       // Use local date arithmetic so the API queries align with the user's local date.
       const since = new Date(lastSync)
-      since.setDate(since.getDate() - 1)
+      since.setDate(since.getDate() - 14)
       if (!minSince || since < minSince) minSince = since
     } else {
       // Category never synced — full all-time sync
@@ -89,6 +90,12 @@ export async function computeIncrementalSince(database: SyncDatabase, source: st
 
   return minSince
 }
+
+/**
+ * Per-category `since` date override for the sync() method.
+ * Keys that are not present fall back to the shared `since` parameter.
+ */
+export type SyncCategoryOverrides = Partial<Record<SyncCategory, Date>>
 
 /** Rate limit tiers matching Tiger OpenAPI documentation */
 const RATE_LIMITS: Record<string, number> = {
@@ -169,12 +176,18 @@ export class SyncOrchestrator {
    * fund_details). This enables incremental sync from a previously known
    * sync checkpoint.
    *
+   * `categoryOverrides` allows per-category `since` overrides. Any category
+   * present in this map uses its specific date instead of the shared `since`.
+   * This is used for periodic deep syncs (e.g., re-scanning fund_details
+   * over a wider window without re-fetching all transactions).
+   *
    * Categories fail independently — if one fails, others continue.
    *
    * @param categories - Subset of categories to sync (default: all four)
    * @param since - Override date for incremental sync (default: 3650 days ago = all time)
+   * @param categoryOverrides - Per-category `since` overrides
    */
-  async sync(categories?: SyncCategory[], since?: Date): Promise<void> {
+  async sync(categories?: SyncCategory[], since?: Date, categoryOverrides?: SyncCategoryOverrides): Promise<void> {
     const toSync = categories ?? (['positions', 'transactions', 'fund_details', 'account'] as SyncCategory[])
     const effectiveSince =
       since ??
@@ -201,7 +214,9 @@ export class SyncOrchestrator {
       })
 
       try {
-        await this.syncCategory(category, effectiveSince)
+        // Use per-category since if provided, otherwise fall back to the shared value
+        const catSince = categoryOverrides?.[category] ?? effectiveSince
+        await this.syncCategory(category, catSince)
       } catch (err) {
         // Error already logged in syncCategory. Continue to next category.
         console.error(`[SyncOrchestrator] Category "${category}" failed, continuing:`, err)

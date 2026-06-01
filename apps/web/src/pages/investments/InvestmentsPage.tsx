@@ -12,7 +12,7 @@ import {
 } from '../../lib/brokerage'
 import type { TigerClientConfig } from '../../lib/brokerage'
 import { SyncProgressBar } from '../../lib/brokerage/SyncProgressBar'
-import type { SyncProgress } from '../../lib/brokerage/sync-orchestrator'
+import type { SyncCategoryOverrides, SyncProgress } from '../../lib/brokerage/sync-orchestrator'
 import { db } from '../../lib/db/db'
 import { useFxRates } from '../../lib/fx/useFxRates'
 import { ClosedPositionsTab } from './ClosedPositionsTab'
@@ -149,7 +149,35 @@ export function InvestmentsPage() {
         database: adapter,
         onProgress: (p) => setSyncProgress((prev) => [...prev, p]),
       })
-      await orchestrator.sync(undefined, since)
+
+      // ── Periodic deep sync for fund_details ────────────────────────
+      // Dividends (fund details) can be posted by the broker days or weeks
+      // after their occurTime/businessDate. A 14-day overlap in the incremental
+      // sync covers moderately late postings. For anything older, run a periodic
+      // deep sync (scan last 180 days) every 7 days.
+      let categoryOverrides: SyncCategoryOverrides | undefined
+      if (since !== undefined) {
+        // Only apply deep sync when doing incremental sync (not first-time full sync)
+        const deepSyncSetting = await db.settings.get('brokerage_deepSyncAt')
+        const now = Date.now()
+        const DEEP_SYNC_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+        const isDeepSyncDue = !deepSyncSetting || now - Number(deepSyncSetting.value) > DEEP_SYNC_INTERVAL_MS
+
+        if (isDeepSyncDue) {
+          const deepSince = new Date()
+          deepSince.setDate(deepSince.getDate() - 180)
+          categoryOverrides = { fund_details: deepSince }
+        }
+      }
+
+      await orchestrator.sync(undefined, since, categoryOverrides)
+
+      // Update deep sync timestamp (even if fund_details failed — will retry
+      // after interval elapses again)
+      if (categoryOverrides) {
+        await db.settings.put({ key: 'brokerage_deepSyncAt', value: String(Date.now()) })
+      }
+
       setSuccess('Sync completed')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sync failed')

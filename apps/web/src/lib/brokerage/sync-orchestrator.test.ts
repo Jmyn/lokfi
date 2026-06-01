@@ -119,6 +119,23 @@ describe('SyncOrchestrator', () => {
       expect(provider.fetchFundDetails).toHaveBeenCalledWith(since, expect.anything())
     })
 
+    it('sync() uses categoryOverrides per-category when provided', async () => {
+      const provider = createMockProvider()
+      const db = createMockDatabase()
+      const orchestrator = new SyncOrchestrator({ provider, database: db })
+
+      const sharedSince = new Date('2025-01-01')
+      const fundDetailsSince = new Date('2024-06-01')
+      const overrides = { fund_details: fundDetailsSince } as const
+
+      await orchestrator.sync(['transactions', 'fund_details'], sharedSince, overrides)
+
+      // Transactions should use the shared since
+      expect(provider.fetchTransactions).toHaveBeenCalledWith(sharedSince, expect.anything())
+      // Fund details should use the override (wider window)
+      expect(provider.fetchFundDetails).toHaveBeenCalledWith(fundDetailsSince, expect.anything())
+    })
+
     it('sync() defaults to all-time (3650 days) when no since is given', async () => {
       const provider = createMockProvider({
         fetchTransactions: vi.fn().mockImplementation(() => {
@@ -144,7 +161,7 @@ describe('SyncOrchestrator', () => {
       expect(result).toBeUndefined()
     })
 
-    it('returns a since date 1 day before the latest successful sync when all categories synced', async () => {
+    it('returns a since date 14 days before the latest successful sync when all categories synced', async () => {
       const db = createMockDatabase()
       const syncTime = new Date('2025-06-01T12:00:00.000Z')
       // All 4 categories must have a sync log — otherwise unsynced
@@ -160,9 +177,9 @@ describe('SyncOrchestrator', () => {
 
       const result = await computeIncrementalSince(db, 'mock')
       expect(result).toBeInstanceOf(Date)
-      // Result should be syncTime minus 1 day in local timezone
+      // Result should be syncTime minus 14 days in local timezone
       const expected = new Date(syncTime)
-      expected.setDate(expected.getDate() - 1)
+      expected.setDate(expected.getDate() - 14)
       expect(result!.getFullYear()).toBe(expected.getFullYear())
       expect(result!.getMonth()).toBe(expected.getMonth())
       expect(result!.getDate()).toBe(expected.getDate())
