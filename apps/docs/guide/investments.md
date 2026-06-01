@@ -30,6 +30,27 @@ Individual trade history — buys, sells, dividends, and corporate actions — s
 ### Dividends
 A dedicated view of dividend income across your portfolio. See payouts by period, by stock, or in aggregate.
 
+### Signals (9 Sig Lite)
+
+The Signals tab shows a **9 Sig Lite** indicator for TQQQ (3x leveraged Nasdaq) — a quick read on whether the market is keeping pace with Jason Kelly's 9% quarterly target.
+
+**What it shows:**
+- **91-Day Growth** — TQQQ's price change over the last 91 days (a rolling quarterly proxy)
+- **9% Target** — The Kelly 9% quarterly benchmark, always displayed as a reference
+- **Delta** — How far above or below the 9% pace the current growth sits
+- **Days Analyzed** — How many days of price data were actually available (may be fewer than 91 for newly listed instruments)
+
+**Signal badge:**
+- **Above 9 Sig pace** (green) — Growth exceeds target by more than 0.5 percentage points
+- **Below 9 Sig pace** (red) — Growth trails target by more than 0.5 percentage points
+- **On 9 Sig pace** (neutral) — Growth is within 0.5 percentage points of the target
+
+**Price chart:** A line chart of TQQQ's daily closing price with a horizontal reference line at the 9% target price.
+
+**Data source:** The tab automatically picks the first configured brokerage that supports historical bar queries (Tiger first, then alphabetical). Data is cached in-memory for 5 minutes. Use the **Refresh** button to bypass the cache.
+
+> **Note:** This is the Lite variant — no plan setup, no calendar-quarter alignment, no rebalance triggers. It's a pure market-read indicator. The 91-day rolling window is a proxy for Kelly's exact quarterly cadence.
+
 ### Currency
 
 Toggle between your preferred currency (SGD, USD, etc.) or view values in their original currency using the currency selector. All values are converted using current exchange rates.
