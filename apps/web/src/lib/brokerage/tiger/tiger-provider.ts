@@ -8,6 +8,7 @@
 import type {
   BrokerageAccount,
   BrokerageFundDetail,
+  BrokerageKlineBar,
   BrokeragePosition,
   BrokerageTransaction,
 } from '@lokfi/brokerage-core'
@@ -18,12 +19,32 @@ import {
   adaptAsset,
   adaptAssetSegment,
   adaptFundDetail,
+  adaptKlineBars,
   adaptOrder,
   adaptPosition,
   enrichTradeFundDetail,
 } from './tiger-adapter'
 import { TigerHttpClient } from './tiger-http-client'
-import type { TigerAsset, TigerClientConfig, TigerFundDetail, TigerOrder, TigerPosition } from './tiger-types'
+import type {
+  TigerAsset,
+  TigerClientConfig,
+  TigerFundDetail,
+  TigerKlineBar,
+  TigerOrder,
+  TigerPosition,
+} from './tiger-types'
+
+/**
+ * Response shape from the Tiger K-line API.
+ *
+ * The endpoint returns `data: [{ symbol, period, items: [...] }]`
+ * (an array of per-symbol results), even when querying a single symbol.
+ */
+interface KlineResponseItem {
+  symbol: string
+  period: string
+  items: TigerKlineBar[]
+}
 
 export interface TigerProviderOptions {
   config: TigerClientConfig
@@ -348,6 +369,35 @@ export class TigerProvider implements BrokerageProvider {
     }
 
     return chunks
+  }
+
+  async fetchHistoricalBars(
+    symbol: string,
+    period: 'day' | 'week' | 'month',
+    lookbackDays: number
+  ): Promise<BrokerageKlineBar[]> {
+    // The kline endpoint returns `data: [{ symbol, period, items }]` (array).
+    // Cast via unknown to bypass the single-object expectation.
+    const response = await this.client.execute<unknown>({
+      method: 'kline',
+      bizContent: this.bizContent({
+        symbols: [symbol],
+        period,
+      }),
+    })
+
+    // Handle both array response [ { symbol, period, items } ] and
+    // any legacy single-object response { symbol, period, items }
+    const first = Array.isArray(response) ? (response as KlineResponseItem[])[0] : (response as KlineResponseItem)
+    const items = first?.items ?? []
+
+    // Sort chronologically (oldest first) by epoch ms
+    items.sort((a, b) => a.time - b.time)
+
+    // Take the most recent lookbackDays bars
+    const recent = items.length > lookbackDays ? items.slice(-lookbackDays) : items
+
+    return adaptKlineBars(recent, SOURCE, period)
   }
 
   async validateConnection(): Promise<boolean> {

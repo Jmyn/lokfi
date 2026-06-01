@@ -1,4 +1,5 @@
 import type {
+  BrokerageKlineBar,
   BrokeragePosition,
   BrokerageProvider,
   BrokerageSyncLog,
@@ -17,6 +18,7 @@ function createMockProvider(overrides?: Partial<BrokerageProvider>): BrokeragePr
     fetchTransactions: vi.fn().mockResolvedValue([]),
     fetchFundDetails: vi.fn().mockResolvedValue([]),
     fetchAccount: vi.fn().mockResolvedValue([]),
+    fetchHistoricalBars: vi.fn().mockResolvedValue([] as BrokerageKlineBar[]),
     validateConnection: vi.fn().mockResolvedValue(true),
     ...overrides,
   }
