@@ -10,7 +10,7 @@
 export type BrokerageSource = string
 
 /** Asset class / security type */
-export type SecurityType = 'STK' | 'OPT' | 'FUT' | 'FOP' | 'CASH' | 'FUND' | 'WAR' | 'MLEG'
+export type SecurityType = 'STK' | 'OPT' | 'FUT' | 'FOP' | 'CASH' | 'FUND' | 'WAR' | 'MLEG' | 'CRYPTO'
 
 /** Trade direction */
 export type TradeAction = 'BUY' | 'SELL'

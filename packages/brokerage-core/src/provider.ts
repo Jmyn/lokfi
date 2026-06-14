@@ -33,6 +33,14 @@ export interface BrokerageProvider {
   readonly displayName: string
 
   /**
+   * Maximum days of history the provider's API retains.
+   * When computing the initial (never-synced) `since` date, the orchestrator
+   * clamps the lookback to this value. Omit when the API has no practical
+   * retention limit (e.g. Tiger keeps the 10-year default).
+   */
+  readonly maxLookbackDays?: number
+
+  /**
    * Fetch current positions (holdings).
    * Returns an empty array if no positions exist.
    *
