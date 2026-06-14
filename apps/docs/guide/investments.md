@@ -24,11 +24,15 @@ The Performance card plots your portfolio value over time as an area chart. Use 
 ### Holdings
 A detailed view of each position — ticker, quantity, current price, market value, and bucket assignment. The holdings view supports filtering by portfolio bucket, searching by ticker or name, and expanding positions to see lot-level detail.
 
+> **Cost basis for crypto holdings:** Stock brokers report each position's average cost directly. The Crypto.com Exchange API does not — it only reports current quantity and market value for spot holdings. Lokfi reconstructs the average cost from your synced trade and transfer history (weighted average). When part of a holding can't be traced to a trade (coins deposited from outside the exchange, staking rewards, or history older than the exchange's ~6-month retention), Lokfi values it at the market price on the relevant date and flags the position with an **estimated** or **incomplete** cost-basis note in its expanded Diagnostics. Treat the unrealized P&L on flagged crypto holdings as an approximation.
+
 ### Transactions
 Individual trade history — buys, sells, dividends, and corporate actions — synced from your brokerages and normalized into Lokfi's unified transaction format.
 
 ### Dividends
 A dedicated view of dividend income across your portfolio. See payouts by period, by stock, or in aggregate.
+
+> **Crypto.com Exchange staking rewards** are the crypto equivalent of dividends, but the exchange's staking endpoints are not reachable from a browser (no CORS support), so staking rewards are **not synced in the default browser-only build**. The capability is implemented and can be enabled behind a same-origin proxy — see the note under [Crypto.com Exchange](#crypto-com-exchange-via-exchange-v1-api).
 
 ### Signals (9 Sig Lite)
 
@@ -47,7 +51,7 @@ The Signals tab shows a **9 Sig Lite** indicator for TQQQ (3x leveraged Nasdaq) 
 
 **Price chart:** A line chart of TQQQ's daily closing price with a horizontal reference line at the 9% target price.
 
-**Data source:** The tab automatically picks the first configured brokerage that supports historical bar queries (Tiger first, then alphabetical). Data is cached in-memory for 5 minutes. Use the **Refresh** button to bypass the cache.
+**Data source:** The tab automatically picks the first configured brokerage that supports historical bar queries (Tiger first, then alphabetical — Crypto.com Exchange also qualifies, serving candlestick history for crypto instruments). Data is cached in-memory for 5 minutes. Use the **Refresh** button to bypass the cache.
 
 > **Note:** This is the Lite variant — no plan setup, no calendar-quarter alignment, no rebalance triggers. It's a pure market-read indicator. The 91-day rolling window is a proxy for Kelly's exact quarterly cadence.
 
@@ -138,11 +142,36 @@ Once connected, Lokfi syncs:
 
 > Credentials are stored in IndexedDB and never leave your device. The sync runs entirely in your browser — Lokfi talks directly to the Tiger API.
 
+### Crypto.com Exchange (via Exchange v1 API)
+
+Lokfi connects to the **Crypto.com Exchange** (the trading platform at crypto.com/exchange — not the Crypto.com App). To set it up:
+
+1. On the exchange, open **User Center → Settings → API Keys** and create a new key
+2. Leave it at the default **Can Read** permission — Lokfi is read-only and never needs trading or withdrawal access
+3. (Optional) If you enable the key's IP whitelist, include the IP of the device running Lokfi
+4. In the app, go to **Settings → Brokerage → Crypto.com Exchange**, paste the **API key** and **secret key**, then click **Test Connection** and **Full Sync**
+
+Once connected, Lokfi syncs:
+- Spot holdings and staked assets (balances and market value)
+- Trade history (buys and sells, with fees)
+- The account ledger — deposits, withdrawals, conversions, and fees
+- Candlestick history for the Signals tab
+
+**Things to know about the Exchange API:**
+- **~6-month history.** The exchange only serves about six months of trade and ledger history. Your first sync covers the last 180 days; to build a longer record, keep syncing regularly (Lokfi accumulates history locally over time).
+- **First sync can take a few minutes.** Trade history is rate-limited to roughly one request per second, so backfilling an active account is deliberately paced. The progress bar shows which window is being fetched.
+- **Cost basis is computed, not reported** — see the note under [Holdings](#holdings).
+- **Staking rewards and deposit/withdrawal enrichment require a proxy.** The exchange serves CORS headers for its trading, account, and ledger endpoints, but **not** for its Wallet API (deposit/withdrawal history) or Staking API (reward history). From a browser these are unreachable, so Lokfi skips them by default: staking rewards are not synced, and deposits/withdrawals come through the account ledger without their txid/fee details. The code supports enabling these endpoints when requests are routed through a same-origin proxy (`enableProxiedEndpoints`), which a self-hosted deployment can add.
+- **Exchange only.** Holdings in the Crypto.com App (card, App Earn, App-side balances) are not visible to this API. Transfers between the App and the Exchange show up as deposits and withdrawals (via the ledger).
+
+> Credentials are stored in IndexedDB and never leave your device. The sync runs entirely in your browser — Lokfi signs each request locally and talks directly to the Crypto.com Exchange API.
+
 ### Security
 
 - API credentials are stored in your browser's IndexedDB (encrypted at rest)
-- No credential data is sent to any server — Lokfi connects directly to the broker API
-- You can revoke API access at any time from your Tiger Brokers account
+- No credential data is sent to any server — Lokfi connects directly to the broker/exchange API
+- Use **read-only** API keys wherever the provider supports them (the Crypto.com Exchange default)
+- You can revoke API access at any time from your Tiger Brokers or Crypto.com Exchange account
 
 ## Syncing
 
