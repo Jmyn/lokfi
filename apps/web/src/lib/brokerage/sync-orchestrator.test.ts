@@ -184,6 +184,87 @@ describe('SyncOrchestrator', () => {
       expect(result!.getMonth()).toBe(expected.getMonth())
       expect(result!.getDate()).toBe(expected.getDate())
     })
+
+    it('clamps never-synced categories to maxLookbackDays', async () => {
+      const db = createMockDatabase()
+      // One category synced, the rest never — without a clamp the unsynced
+      // categories would pull the result back to now - 3650 days.
+      await db.insertSyncLog({
+        source: 'mock',
+        category: 'positions',
+        status: 'success',
+        lastSyncAt: new Date().toISOString(),
+      })
+
+      const result = await computeIncrementalSince(db, 'mock', 180)
+      expect(result).toBeInstanceOf(Date)
+      const floor = new Date()
+      floor.setDate(floor.getDate() - 181)
+      expect(result!.getTime()).toBeGreaterThan(floor.getTime())
+    })
+
+    it('does not clamp recent incremental syncs', async () => {
+      const db = createMockDatabase()
+      const syncTime = new Date()
+      syncTime.setDate(syncTime.getDate() - 3)
+      for (const cat of ['positions', 'transactions', 'fund_details', 'account'] as const) {
+        await db.insertSyncLog({
+          source: 'mock',
+          category: cat,
+          status: 'success',
+          lastSyncAt: syncTime.toISOString(),
+        })
+      }
+
+      // Incremental result (last sync − 14d ≈ 17 days ago) is well within
+      // the 180-day clamp and must come through unchanged.
+      const result = await computeIncrementalSince(db, 'mock', 180)
+      const expected = new Date(syncTime)
+      expected.setDate(expected.getDate() - 14)
+      expect(result!.getDate()).toBe(expected.getDate())
+    })
+
+    it('does not advance the checkpoint past a failed sync', async () => {
+      const db = createMockDatabase()
+      const oldSuccess = new Date()
+      oldSuccess.setDate(oldSuccess.getDate() - 30)
+      for (const cat of ['positions', 'transactions', 'fund_details', 'account'] as const) {
+        await db.insertSyncLog({
+          source: 'mock',
+          category: cat,
+          status: 'success',
+          lastSyncAt: oldSuccess.toISOString(),
+        })
+      }
+      // A later failed transactions sync must not move the checkpoint —
+      // the failed window gets re-covered on the next sync.
+      await db.insertSyncLog({
+        source: 'mock',
+        category: 'transactions',
+        status: 'failure',
+        lastSyncAt: new Date().toISOString(),
+        errorMessage: 'network error mid-backfill',
+      })
+
+      const result = await computeIncrementalSince(db, 'mock')
+      const expected = new Date(oldSuccess)
+      expected.setDate(expected.getDate() - 14)
+      expect(result!.getDate()).toBe(expected.getDate())
+      expect(result!.getMonth()).toBe(expected.getMonth())
+    })
+
+    it('sync() default lookback respects the provider maxLookbackDays', async () => {
+      const provider = createMockProvider({ maxLookbackDays: 180 } as Partial<BrokerageProvider>)
+      const db = createMockDatabase()
+      const orchestrator = new SyncOrchestrator({ provider, database: db })
+
+      await orchestrator.sync(['transactions'])
+
+      const calledSince = vi.mocked(provider.fetchTransactions).mock.calls[0][0] as Date
+      const floor = new Date()
+      floor.setDate(floor.getDate() - 181)
+      expect(calledSince.getTime()).toBeGreaterThan(floor.getTime())
+    })
   })
 
   describe('sync() fetches and persists data', () => {
