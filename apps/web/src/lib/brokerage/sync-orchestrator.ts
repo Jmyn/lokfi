@@ -50,8 +50,17 @@ const ALL_CATEGORIES: SyncCategory[] = ['positions', 'transactions', 'fund_detai
  * Returns the minimum `since` across all categories, or `undefined` if no
  * categories have ever synced (caller should let the orchestrator default
  * to 3650 days).
+ *
+ * `maxLookbackDays` (a provider capability — e.g. Crypto.com retains only
+ * ~180 days of history) clamps the never-synced fallback so a first sync
+ * doesn't sweep a window the API cannot serve. Incremental syncs (last
+ * success minus the 14-day overlap) are unaffected by the clamp.
  */
-export async function computeIncrementalSince(database: SyncDatabase, source: string): Promise<Date | undefined> {
+export async function computeIncrementalSince(
+  database: SyncDatabase,
+  source: string,
+  maxLookbackDays?: number
+): Promise<Date | undefined> {
   const logs = await database.getSyncLogs(source)
 
   // Find latest successful sync per category
@@ -81,9 +90,11 @@ export async function computeIncrementalSince(database: SyncDatabase, source: st
       since.setDate(since.getDate() - 14)
       if (!minSince || since < minSince) minSince = since
     } else {
-      // Category never synced — full all-time sync
+      // Category never synced — full lookback, clamped to what the
+      // provider's API actually retains
+      const lookback = Math.min(3650, maxLookbackDays ?? 3650)
       const since = new Date()
-      since.setDate(since.getDate() - 3650)
+      since.setDate(since.getDate() - lookback)
       if (!minSince || since < minSince) minSince = since
     }
   }
@@ -97,12 +108,35 @@ export async function computeIncrementalSince(database: SyncDatabase, source: st
  */
 export type SyncCategoryOverrides = Partial<Record<SyncCategory, Date>>
 
-/** Rate limit tiers matching Tiger OpenAPI documentation */
-const RATE_LIMITS: Record<string, number> = {
-  positions: 1100, // Medium tier: 60/min → ~1.1s between requests
-  transactions: 600, // High tier: 120/min → 600ms
-  account: 1100, // Medium tier: 60/min → ~1.1s
-  fund_details: 6100, // Low tier: 10/min → 6.1s between requests
+/** Fallback inter-request spacing for sources without an explicit entry */
+const DEFAULT_RATE_LIMITS: Record<string, number> = {
+  positions: 1100,
+  transactions: 600,
+  account: 1100,
+  fund_details: 6100,
+}
+
+/**
+ * Per-source, per-category minimum spacing (ms) between category-level
+ * requests. Providers additionally self-pace within a category (pagination
+ * delays); these values gate the orchestrator's category dispatch.
+ */
+const RATE_LIMITS_BY_SOURCE: Record<string, Record<string, number>> = {
+  // Tiger OpenAPI tiers: medium 60/min, high 120/min, low 10/min
+  tiger: {
+    positions: 1100,
+    transactions: 600,
+    account: 1100,
+    fund_details: 6100,
+  },
+  // Crypto.com Exchange: get-trades/get-transactions are 1 req/s (provider
+  // self-paces pages at ≥1.1s); user-balance is in the 3 req/100ms tier.
+  cdc: {
+    positions: 100,
+    transactions: 1100,
+    account: 100,
+    fund_details: 1100,
+  },
 }
 
 /**
@@ -192,8 +226,10 @@ export class SyncOrchestrator {
     const effectiveSince =
       since ??
       (() => {
+        // Default all-time lookback, clamped to the provider's API retention
+        const lookback = Math.min(3650, this.provider.maxLookbackDays ?? 3650)
         const d = new Date()
-        d.setDate(d.getDate() - 3650)
+        d.setDate(d.getDate() - lookback)
         return d
       })()
 
@@ -363,7 +399,7 @@ export class SyncOrchestrator {
   // ── Rate limiting ──────────────────────────────────────────────────────
 
   private async throttle(category: SyncCategory): Promise<void> {
-    const minInterval = RATE_LIMITS[category] ?? 1000
+    const minInterval = RATE_LIMITS_BY_SOURCE[this.provider.source]?.[category] ?? DEFAULT_RATE_LIMITS[category] ?? 1000
     const lastTime = this.lastRequestTime.get(category) ?? 0
     const elapsed = Date.now() - lastTime
     const remaining = minInterval - elapsed
