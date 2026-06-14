@@ -58,7 +58,10 @@ export function createDefaultPortfolioBuckets(timestamp = new Date().toISOString
   }))
 }
 
-const STOCK_LIKE_TYPES = new Set(['STK', 'CASH', 'FUND', 'MLEG'])
+// CRYPTO holdings are stock-like for display/aggregation: a simple long
+// position with a cost basis and market value (unlike multiplier-bearing
+// derivatives). They render in the main Holdings section and bucket charts.
+const STOCK_LIKE_TYPES = new Set(['STK', 'CASH', 'FUND', 'MLEG', 'CRYPTO'])
 
 export interface BucketAggregationRow {
   bucketId: string

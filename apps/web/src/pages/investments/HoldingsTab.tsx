@@ -11,6 +11,7 @@ import {
   buildBucketOptions,
   filterPositionsByBucket,
   getSecurityKey,
+  isStockLikePosition,
 } from '../../lib/investments/portfolioBuckets'
 import { PortfolioBucketCombobox } from './PortfolioBucketCombobox'
 import { PortfolioBucketManager } from './PortfolioBucketManager'
@@ -96,6 +97,29 @@ function HoldingDetailRow({ row, variant = 'stock' }: HoldingDetailRowProps) {
   const dayHigh = getExt('dayHigh')
   const week52Low = getExt('week52Low')
   const week52High = getExt('week52High')
+
+  // Computed-basis quality (crypto positions: basis is reconstructed from
+  // trade/transfer history, not reported by the exchange)
+  const basisQuality = getExt('basisQuality')
+  const basisDiagnostics: string[] = (() => {
+    const rec = extData?.find((e) => e.key === 'basisDiagnostics')
+    if (!rec) return []
+    try {
+      const parsed = JSON.parse(rec.value)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  })()
+  const basisNotes: string[] = [
+    ...(basisQuality === 'estimated'
+      ? ['Cost basis is partly estimated (deposits/rewards valued at market price on their event date).']
+      : []),
+    ...(basisQuality === 'incomplete'
+      ? ['Cost basis is incomplete — some history is unavailable from the exchange.']
+      : []),
+    ...basisDiagnostics,
+  ]
 
   return (
     <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
@@ -190,12 +214,12 @@ function HoldingDetailRow({ row, variant = 'stock' }: HoldingDetailRowProps) {
         </div>
 
         {/* Diagnostics: surface data quality concerns */}
-        {row.diagnostics.length > 0 && (
+        {(row.diagnostics.length > 0 || basisNotes.length > 0) && (
           <div className="mt-3 pt-3 border-t space-y-1" style={{ borderColor: 'var(--border)' }}>
             <div className="text-amber-600 dark:text-amber-400 text-xs uppercase tracking-wider font-semibold mb-1">
               Diagnostics
             </div>
-            {row.diagnostics.map((msg, i) => (
+            {[...row.diagnostics, ...basisNotes].map((msg, i) => (
               <div key={i} className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                 {msg}
               </div>
@@ -673,13 +697,14 @@ function parseOptionIdentifier(
 }
 
 /** Stock-like security types shown in the main holdings section */
-const STOCK_LIKE_TYPES = new Set(['STK', 'CASH', 'FUND', 'MLEG'])
 /** Derivative types shown in the derivatives section */
 const DERIVATIVE_TYPES = new Set(['OPT', 'FUT', 'FOP', 'WAR'])
 
+// Stock-like classification (incl. CRYPTO) is shared with bucket aggregation
+// via isStockLikePosition — keep a single source of truth so a new secType
+// can't fall through both sections and vanish from the UI.
 function isStockLike(p: BrokeragePosition): boolean {
-  if (p.secType == null) return true // default / legacy
-  return STOCK_LIKE_TYPES.has(p.secType)
+  return isStockLikePosition(p)
 }
 
 function isDerivative(p: BrokeragePosition): boolean {

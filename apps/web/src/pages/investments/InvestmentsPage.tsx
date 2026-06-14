@@ -3,14 +3,16 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { RefreshCw, Settings } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  CONFIGURED_SOURCES,
+  CdcProvider,
   CredentialManager,
   DexieCredentialStore,
   DexieSyncAdapter,
   SyncOrchestrator,
-  TigerProvider,
   computeIncrementalSince,
+  createBrokerageProvider,
+  enrichCdcPositions,
 } from '../../lib/brokerage'
-import type { TigerClientConfig } from '../../lib/brokerage'
 import { SyncProgressBar } from '../../lib/brokerage/SyncProgressBar'
 import type { SyncCategoryOverrides, SyncProgress } from '../../lib/brokerage/sync-orchestrator'
 import { db } from '../../lib/db/db'
@@ -25,7 +27,10 @@ import { OverviewTab } from './OverviewTab'
 import { SignalTab } from './SignalTab'
 import { type CurrencyOption, getPreferredCurrency, setPreferredCurrency } from './currencyPreference'
 
-const SOURCE = 'tiger'
+/** Per-source deep-sync timestamp setting key (legacy global key: brokerage_deepSyncAt) */
+function deepSyncKey(source: string): string {
+  return source === 'tiger' ? 'brokerage_deepSyncAt' : `brokerage_deepSyncAt:${source}`
+}
 
 export function InvestmentsPage() {
   const navigate = useNavigate()
@@ -98,9 +103,7 @@ export function InvestmentsPage() {
       autoSyncDone.current = true
       setError(null)
       setSuccess(null)
-      const adapter = new DexieSyncAdapter(db)
-      const since = await computeIncrementalSince(adapter, SOURCE)
-      if (!aborted) await runSync(since)
+      if (!aborted) await runSync()
     })()
     return () => {
       aborted = true
@@ -112,73 +115,102 @@ export function InvestmentsPage() {
     setError(null)
     setSuccess(null)
     setSyncProgress([])
-    const adapter = new DexieSyncAdapter(db)
-    const since = await computeIncrementalSince(adapter, SOURCE)
-    await runSync(since)
+    await runSync()
   }
 
   /**
-   * Core sync runner — retrieves credentials, creates provider + orchestrator,
-   * and executes the sync. Accepts an optional `since` date for incremental sync.
+   * Core sync runner — iterates every configured source that has stored
+   * credentials, computes its incremental `since`, and executes the sync.
+   * Sources fail independently; CDC positions are basis-enriched after
+   * the sync persists trades and fund details.
    */
-  async function runSync(since?: Date) {
+  async function runSync() {
     setSyncing(true)
     setSyncProgress([])
     try {
-      const stored = await credManager.retrieve(SOURCE)
-      if (!stored) {
-        // Check whether credentials exist but are legacy (undecryptable)
-        // vs. genuinely absent, so the user gets a helpful message.
-        const exists = await credManager.hasCredentials(SOURCE)
-        setError(
-          exists
-            ? 'Credentials need to be re-saved (legacy format) — go to Brokerage Settings'
-            : 'No credentials found — go to Brokerage Settings to set up'
-        )
-        return
-      }
-      const config: TigerClientConfig = {
-        tigerId: stored.tigerId,
-        privateKey: stored.privateKey,
-        account: stored.account,
-      }
-      const provider = new TigerProvider({ config })
       const adapter = new DexieSyncAdapter(db)
-      const orchestrator = new SyncOrchestrator({
-        provider,
-        database: adapter,
-        onProgress: (p) => setSyncProgress((prev) => [...prev, p]),
-      })
+      const synced: string[] = []
+      const sourceErrors: string[] = []
+      let anyCredentials = false
 
-      // ── Periodic deep sync for fund_details ────────────────────────
-      // Dividends (fund details) can be posted by the broker days or weeks
-      // after their occurTime/businessDate. A 14-day overlap in the incremental
-      // sync covers moderately late postings. For anything older, run a periodic
-      // deep sync (scan last 180 days) every 7 days.
-      let categoryOverrides: SyncCategoryOverrides | undefined
-      if (since !== undefined) {
-        // Only apply deep sync when doing incremental sync (not first-time full sync)
-        const deepSyncSetting = await db.settings.get('brokerage_deepSyncAt')
-        const now = Date.now()
-        const DEEP_SYNC_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
-        const isDeepSyncDue = !deepSyncSetting || now - Number(deepSyncSetting.value) > DEEP_SYNC_INTERVAL_MS
+      for (const source of CONFIGURED_SOURCES) {
+        const stored = await credManager.retrieve(source)
+        if (!stored) {
+          // Distinguish legacy (undecryptable) credentials from absent ones
+          const exists = await credManager.hasCredentials(source)
+          if (exists) {
+            anyCredentials = true
+            sourceErrors.push(`${source}: credentials need to be re-saved (legacy format) — go to Brokerage Settings`)
+          }
+          continue
+        }
+        anyCredentials = true
 
-        if (isDeepSyncDue) {
-          const deepSince = new Date()
-          deepSince.setDate(deepSince.getDate() - 180)
-          categoryOverrides = { fund_details: deepSince }
+        const provider = createBrokerageProvider(source, stored)
+        if (!provider) {
+          sourceErrors.push(`${source}: stored credentials are incomplete — re-save in Brokerage Settings`)
+          continue
+        }
+
+        try {
+          const since = await computeIncrementalSince(adapter, source, provider.maxLookbackDays)
+          const orchestrator = new SyncOrchestrator({
+            provider,
+            database: adapter,
+            onProgress: (p) => setSyncProgress((prev) => [...prev, p]),
+          })
+
+          // ── Periodic deep sync for fund_details ────────────────────
+          // Dividends/rewards can post days or weeks after their business
+          // date. The 14-day incremental overlap covers moderately late
+          // postings; a periodic 180-day re-scan (every 7 days) catches
+          // the rest. (For CDC, 180 days is also the API's full retention.)
+          let categoryOverrides: SyncCategoryOverrides | undefined
+          if (since !== undefined) {
+            const deepSyncSetting = await db.settings.get(deepSyncKey(source))
+            const now = Date.now()
+            const DEEP_SYNC_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+            const isDeepSyncDue = !deepSyncSetting || now - Number(deepSyncSetting.value) > DEEP_SYNC_INTERVAL_MS
+
+            if (isDeepSyncDue) {
+              const deepSince = new Date()
+              deepSince.setDate(deepSince.getDate() - 180)
+              categoryOverrides = { fund_details: deepSince }
+            }
+          }
+
+          await orchestrator.sync(undefined, since, categoryOverrides)
+
+          // Update deep sync timestamp (even if fund_details failed — will
+          // retry after the interval elapses again)
+          if (categoryOverrides) {
+            await db.settings.put({ key: deepSyncKey(source), value: String(Date.now()) })
+          }
+
+          // CDC has no API-side cost basis — recompute it from the synced
+          // ledger after every sync (deep syncs included; it's idempotent).
+          if (provider instanceof CdcProvider) {
+            await enrichCdcPositions(db, (token, date) => provider.getDailyClose(token, date))
+          }
+
+          synced.push(provider.displayName)
+        } catch (err) {
+          sourceErrors.push(`${source}: ${err instanceof Error ? err.message : 'sync failed'}`)
         }
       }
 
-      await orchestrator.sync(undefined, since, categoryOverrides)
-
-      // Update deep sync timestamp (even if fund_details failed — will retry
-      // after interval elapses again)
-      if (categoryOverrides) {
-        await db.settings.put({ key: 'brokerage_deepSyncAt', value: String(Date.now()) })
+      if (!anyCredentials) {
+        setError('No credentials found — go to Brokerage Settings to set up')
+        return
       }
-
-      setSuccess('Sync completed')
+      if (sourceErrors.length > 0) {
+        const msg = synced.length > 0
+          ? `Partially synced (${synced.join(', ')}). Errors: ${sourceErrors.join('; ')}`
+          : sourceErrors.join('; ')
+        setError(msg)
+      } else if (synced.length > 0) {
+        setSuccess(`Sync completed (${synced.join(', ')})`)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sync failed')
     } finally {

@@ -11,8 +11,10 @@ import {
 } from '../../lib/brokerage'
 import type { TigerClientConfig } from '../../lib/brokerage'
 import { SyncProgressBar } from '../../lib/brokerage/SyncProgressBar'
+import { clearBrokerageSourceData } from '../../lib/brokerage/source-data'
 import type { SyncProgress } from '../../lib/brokerage/sync-orchestrator'
 import { db } from '../../lib/db/db'
+import { CdcSettingsSection } from './CdcSettingsSection'
 
 const SOURCE = 'tiger'
 
@@ -147,7 +149,8 @@ export function BrokerageSettingsPage() {
 
       // Wrap clear + repopulate in a single Dexie transaction so that a
       // partial failure (network error, API rate limit, etc.) rolls back the
-      // clear and leaves the previous data intact.
+      // clear and leaves the previous data intact. Scoped to this source so
+      // other connected brokerages (e.g. Crypto.com) keep their data.
       await db.transaction(
         'rw',
         [
@@ -159,11 +162,7 @@ export function BrokerageSettingsPage() {
           db.brokerageSyncLog,
         ],
         async () => {
-          await db.brokerageTransactions.clear()
-          await db.brokerageFundDetails.clear()
-          await db.brokeragePositions.clear()
-          await db.brokeragePositionExtensions.clear()
-          await db.brokerageAccounts.clear()
+          await clearBrokerageSourceData(db, SOURCE)
           await orchestrator.sync(undefined, since)
         }
       )
@@ -176,15 +175,12 @@ export function BrokerageSettingsPage() {
   }
 
   async function handleDisconnect() {
-    if (!confirm('Disconnect Tiger Brokers? This will remove all synced brokerage data.')) return
+    if (!confirm('Disconnect Tiger Brokers? This will remove its synced data (other brokerages are unaffected).'))
+      return
     setLoading(true)
     try {
       await credManager.remove(SOURCE)
-      await db.brokerageTransactions.clear()
-      await db.brokerageFundDetails.clear()
-      await db.brokeragePositions.clear()
-      await db.brokeragePositionExtensions.clear()
-      await db.brokerageAccounts.clear()
+      await clearBrokerageSourceData(db, SOURCE)
       await db.brokerageSyncLog.where('source').equals(SOURCE).delete()
       setHasCredentials(false)
       setCredentials({ tigerId: '', privateKey: '', account: '' })
@@ -207,8 +203,10 @@ export function BrokerageSettingsPage() {
     <div className="max-w-xl mx-auto px-5 py-8">
       <h1 className="font-serif text-2xl text-gray-900 dark:text-white mb-1">Brokerage Settings</h1>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
-        Connect your Tiger Brokers account to sync trades and dividends.
+        Connect your brokerage and exchange accounts to sync holdings, trades, and income.
       </p>
+
+      <h2 className="font-serif text-lg text-gray-900 dark:text-white mb-4">Tiger Brokers</h2>
 
       {error && (
         <div className="mb-4 flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-4 py-3 rounded-lg border border-red-200 dark:border-red-800">
@@ -363,6 +361,9 @@ export function BrokerageSettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Crypto.com Exchange connection */}
+      <CdcSettingsSection />
     </div>
   )
 }
