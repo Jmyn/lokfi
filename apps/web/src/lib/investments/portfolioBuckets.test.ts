@@ -43,6 +43,8 @@ describe('portfolioBuckets', () => {
     expect(isStockLikePosition(position({ secType: 'STK' }))).toBe(true)
     expect(isStockLikePosition(position({ secType: 'FUND' }))).toBe(true)
     expect(isStockLikePosition(position({ secType: 'CASH' }))).toBe(true)
+    // Crypto holdings render in the main Holdings section and bucket charts
+    expect(isStockLikePosition(position({ secType: 'CRYPTO' }))).toBe(true)
     expect(isStockLikePosition(position({ secType: 'OPT' }))).toBe(false)
     expect(isStockLikePosition(position({ secType: 'FUT' }))).toBe(false)
   })
