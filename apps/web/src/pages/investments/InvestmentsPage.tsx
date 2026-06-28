@@ -204,9 +204,10 @@ export function InvestmentsPage() {
         return
       }
       if (sourceErrors.length > 0) {
-        const msg = synced.length > 0
-          ? `Partially synced (${synced.join(', ')}). Errors: ${sourceErrors.join('; ')}`
-          : sourceErrors.join('; ')
+        const msg =
+          synced.length > 0
+            ? `Partially synced (${synced.join(', ')}). Errors: ${sourceErrors.join('; ')}`
+            : sourceErrors.join('; ')
         setError(msg)
       } else if (synced.length > 0) {
         setSuccess(`Sync completed (${synced.join(', ')})`)

@@ -1,10 +1,10 @@
 import { createDefaultPortfolioBuckets } from '../investments/portfolioBuckets'
 import type { LokfiDatabase } from './db'
 
-export const BACKUP_VERSION = 5
+export const BACKUP_VERSION = 6
 
 export interface LokfiBackup {
-  version: 1 | 2 | 3 | 4 | 5
+  version: 1 | 2 | 3 | 4 | 5 | 6
   exportedAt?: string
   transactions: unknown[]
   rules: unknown[]
@@ -21,6 +21,7 @@ export interface LokfiBackup {
   portfolioBuckets: unknown[]
   portfolioBucketAssignments: unknown[]
   portfolioSnapshots: unknown[]
+  costBasisOverrides: unknown[]
 }
 
 function isArray(value: unknown): value is unknown[] {
@@ -33,7 +34,7 @@ export function validateBackupShape(data: unknown): { valid: true } | { valid: f
   }
   const candidate = data as Record<string, unknown>
   const version = Number(candidate.version)
-  if (![1, 2, 3, 4, 5].includes(version)) {
+  if (![1, 2, 3, 4, 5, 6].includes(version)) {
     return { valid: false, message: 'Invalid backup file: unsupported backup version.' }
   }
   for (const key of ['transactions', 'rules', 'categories', 'customParsers', 'budgets']) {
@@ -66,11 +67,14 @@ export function validateBackupShape(data: unknown): { valid: true } | { valid: f
   if (version >= 5 && !isArray(candidate.portfolioSnapshots)) {
     return { valid: false, message: 'Invalid v5 backup file: missing portfolioSnapshots array.' }
   }
+  if (version >= 6 && !isArray(candidate.costBasisOverrides)) {
+    return { valid: false, message: 'Invalid v6 backup file: missing costBasisOverrides array.' }
+  }
   return { valid: true }
 }
 
 export function normalizeBackupForImport(data: Record<string, unknown>): LokfiBackup {
-  const version = Number(data.version) as 1 | 2 | 3 | 4 | 5
+  const version = Number(data.version) as 1 | 2 | 3 | 4 | 5 | 6
   return {
     version,
     exportedAt: typeof data.exportedAt === 'string' ? data.exportedAt : undefined,
@@ -89,6 +93,7 @@ export function normalizeBackupForImport(data: Record<string, unknown>): LokfiBa
     portfolioBuckets: version >= 4 ? (data.portfolioBuckets as unknown[]) : [],
     portfolioBucketAssignments: version >= 4 ? (data.portfolioBucketAssignments as unknown[]) : [],
     portfolioSnapshots: version >= 5 ? (data.portfolioSnapshots as unknown[]) : [],
+    costBasisOverrides: version >= 6 ? (data.costBasisOverrides as unknown[]) : [],
   }
 }
 
@@ -108,6 +113,7 @@ export function buildImportSummary(data: LokfiBackup): string {
     `• ${data.portfolioBuckets.length} portfolio bucket(s)\n` +
     `• ${data.portfolioBucketAssignments.length} portfolio bucket assignment(s)\n` +
     `• ${data.portfolioSnapshots.length} portfolio snapshot(s)\n` +
+    `• ${data.costBasisOverrides.length} cost-basis override(s)\n` +
     `Current data will be overwritten. Are you sure?`
   )
 }
@@ -129,6 +135,7 @@ export async function buildBackupPayload(db: LokfiDatabase): Promise<LokfiBackup
     portfolioBuckets,
     portfolioBucketAssignments,
     portfolioSnapshots,
+    costBasisOverrides,
   ] = await Promise.all([
     db.transactions.toArray(),
     db.rules.toArray(),
@@ -145,6 +152,7 @@ export async function buildBackupPayload(db: LokfiDatabase): Promise<LokfiBackup
     db.portfolioBuckets.toArray(),
     db.portfolioBucketAssignments.toArray(),
     db.portfolioSnapshots.toArray(),
+    db.costBasisOverrides.toArray(),
   ])
   return {
     version: BACKUP_VERSION,
@@ -164,6 +172,7 @@ export async function buildBackupPayload(db: LokfiDatabase): Promise<LokfiBackup
     portfolioBuckets,
     portfolioBucketAssignments,
     portfolioSnapshots,
+    costBasisOverrides,
   }
 }
 
@@ -186,6 +195,7 @@ export async function importBackupPayload(db: LokfiDatabase, data: LokfiBackup):
       db.portfolioBuckets,
       db.portfolioBucketAssignments,
       db.portfolioSnapshots,
+      db.costBasisOverrides,
     ],
     async () => {
       await Promise.all([
@@ -204,6 +214,7 @@ export async function importBackupPayload(db: LokfiDatabase, data: LokfiBackup):
         db.portfolioBuckets.clear(),
         db.portfolioBucketAssignments.clear(),
         db.portfolioSnapshots.clear(),
+        db.costBasisOverrides.clear(),
       ])
       if (data.transactions.length) await db.transactions.bulkAdd(data.transactions as never[])
       if (data.rules.length) await db.rules.bulkAdd(data.rules as never[])
@@ -226,6 +237,7 @@ export async function importBackupPayload(db: LokfiDatabase, data: LokfiBackup):
         await db.portfolioBucketAssignments.bulkAdd(data.portfolioBucketAssignments as never[])
       }
       if (data.portfolioSnapshots.length) await db.portfolioSnapshots.bulkAdd(data.portfolioSnapshots as never[])
+      if (data.costBasisOverrides.length) await db.costBasisOverrides.bulkAdd(data.costBasisOverrides as never[])
     }
   )
 }

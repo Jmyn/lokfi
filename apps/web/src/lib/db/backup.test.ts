@@ -25,9 +25,15 @@ const baseV4 = {
   portfolioBucketAssignments: [],
 }
 
+const baseV5 = {
+  ...baseV4,
+  version: 5,
+  portfolioSnapshots: [],
+}
+
 describe('backup helpers', () => {
-  it('uses backup version 5 for portfolio snapshots', () => {
-    expect(BACKUP_VERSION).toBe(5)
+  it('uses backup version 6 for cost-basis overrides', () => {
+    expect(BACKUP_VERSION).toBe(6)
   })
 
   it('requires portfolio bucket arrays for v4 backups', () => {
@@ -124,5 +130,34 @@ describe('backup helpers', () => {
       ],
     })
     expect(summary).toContain('2 portfolio snapshot(s)')
+  })
+
+  it('requires costBasisOverrides array for v6 backups', () => {
+    expect(validateBackupShape({ ...baseV5, version: 6 }).valid).toBe(false)
+    expect(validateBackupShape({ ...baseV5, version: 6, costBasisOverrides: [] })).toEqual({ valid: true })
+  })
+
+  it('normalizes v5 and older backups with empty costBasisOverrides', () => {
+    expect(normalizeBackupForImport(baseV3).costBasisOverrides).toEqual([])
+    expect(normalizeBackupForImport(baseV5).costBasisOverrides).toEqual([])
+  })
+
+  it('round-trips costBasisOverrides through v6 normalization', () => {
+    const override = { securityKey: 'CRYPTO:BTC', unitCost: 42000, currency: 'USD', updatedAt: 'now' }
+    const normalized = normalizeBackupForImport({
+      ...baseV5,
+      version: 6,
+      costBasisOverrides: [override],
+    })
+    expect(normalized.costBasisOverrides).toHaveLength(1)
+    expect(normalized.costBasisOverrides[0]).toEqual(override)
+  })
+
+  it('includes cost-basis override count in import summary', () => {
+    const summary = buildImportSummary({
+      ...normalizeBackupForImport({ ...baseV5, version: 6, costBasisOverrides: [] }),
+      costBasisOverrides: [{ securityKey: 'CRYPTO:BTC', unitCost: 42000, currency: 'USD', updatedAt: 'now' }],
+    })
+    expect(summary).toContain('1 cost-basis override(s)')
   })
 })

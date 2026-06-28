@@ -71,6 +71,21 @@ export interface DbPortfolioSnapshot {
   currency: string // preferred currency used at snapshot time
 }
 
+/**
+ * User-provided opening cost basis for a holding, keyed by security identity
+ * (e.g. `CRYPTO:BTC`). Prices the unexplained opening remainder, which the
+ * cost-basis engine blends with synced trades. Durable — survives syncs and
+ * full resyncs (not cleared by `clearBrokerageSourceData`) and is included in
+ * backups.
+ */
+export interface DbCostBasisOverride {
+  securityKey: string // primary key, e.g. 'CRYPTO:BTC'
+  unitCost: number // per-unit opening cost
+  currency: string
+  note?: string
+  updatedAt: string
+}
+
 export class LokfiDatabase extends Dexie {
   // Bank statement tables
   transactions!: Table<DbTransaction>
@@ -96,6 +111,9 @@ export class LokfiDatabase extends Dexie {
 
   // Portfolio performance snapshots (v10)
   portfolioSnapshots!: Table<DbPortfolioSnapshot>
+
+  // Manual opening cost-basis overrides (v11)
+  costBasisOverrides!: Table<DbCostBasisOverride>
 
   constructor() {
     super('lokfi')
@@ -185,6 +203,11 @@ export class LokfiDatabase extends Dexie {
     // v10 schema (adds daily portfolio value snapshots for performance chart)
     this.version(10).stores({
       portfolioSnapshots: 'date',
+    })
+
+    // v11 schema (adds manual opening cost-basis overrides, keyed by security)
+    this.version(11).stores({
+      costBasisOverrides: 'securityKey',
     })
 
     // Seed default categories and portfolio buckets on initial DB creation

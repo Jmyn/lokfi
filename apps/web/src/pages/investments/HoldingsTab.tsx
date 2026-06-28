@@ -2,9 +2,16 @@ import type { BrokeragePosition } from '@lokfi/brokerage-core'
 import { Link } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ChevronDown, ChevronRight, Info } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { OPENING_QTY_EXT_KEY } from '../../lib/brokerage/cdc/cdc-basis-enrichment'
+import { recomputeCdcBasis } from '../../lib/brokerage/cdc/recompute-basis'
 import { db } from '../../lib/db/db'
 import { convertAmount } from '../../lib/fx/convert'
+import {
+  clearCostBasisOverride,
+  getCostBasisOverride,
+  setCostBasisOverride,
+} from '../../lib/investments/costBasisOverrides'
 import {
   type DbPortfolioBucketAssignment,
   buildAssignmentLookup,
@@ -74,6 +81,97 @@ function formatPercent(amount: number): string {
   return `${sign}${amount.toFixed(1)}%`
 }
 
+/**
+ * Editor for a holding's opening cost — the per-unit cost of the position
+ * held before the synced trade history begins. Blends with real trades via
+ * the cost-basis engine; persisted as a durable override and recomputed on
+ * save. Shown only for CDC holdings that have an unpriced opening remainder.
+ */
+function OpeningCostEditor({ position, openingQty }: { position: BrokeragePosition; openingQty: number }) {
+  const securityKey = getSecurityKey(position)
+  const override = useLiveQuery(() => getCostBasisOverride(db, securityKey), [securityKey])
+  const [value, setValue] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Sync the input with the stored override when it loads/changes
+  useEffect(() => {
+    setValue(override ? String(override.unitCost) : '')
+  }, [override])
+
+  async function save() {
+    const num = Number.parseFloat(value)
+    if (!Number.isFinite(num) || num < 0) {
+      setError('Enter a valid cost ≥ 0')
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      await setCostBasisOverride(db, securityKey, num, position.currency, new Date().toISOString())
+      await recomputeCdcBasis(db)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function clear() {
+    setSaving(true)
+    try {
+      await clearCostBasisOverride(db, securityKey)
+      await recomputeCdcBasis(db)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-2 p-3 rounded-lg border" style={{ borderColor: 'var(--border)' }}>
+      <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">
+        Initial cost per unit
+      </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+        {openingQty.toLocaleString(undefined, { maximumFractionDigits: 8 })} {position.symbol} predates your synced
+        trade history. Enter what you paid per {position.symbol} — it blends with your trades into the average shown
+        above.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="number"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={`Cost per ${position.symbol}`}
+          className="w-40 text-sm border rounded-lg px-2 py-1 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+          style={{ borderColor: 'var(--border)' }}
+        />
+        <span className="text-xs text-gray-500 dark:text-gray-400">{position.currency}/unit</span>
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="text-xs font-medium px-3 py-1 rounded-full text-white transition-colors disabled:opacity-50"
+          style={{ backgroundColor: 'var(--accent)' }}
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        {override && (
+          <button
+            type="button"
+            onClick={clear}
+            disabled={saving}
+            className="text-xs font-medium px-3 py-1 rounded-full border transition-colors disabled:opacity-50"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {error && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>}
+    </div>
+  )
+}
+
 function HoldingDetailRow({ row, variant = 'stock' }: HoldingDetailRowProps) {
   const { position } = row
   const isDerivative = position.secType != null && DERIVATIVE_TYPES.has(position.secType)
@@ -99,7 +197,9 @@ function HoldingDetailRow({ row, variant = 'stock' }: HoldingDetailRowProps) {
   const week52High = getExt('week52High')
 
   // Computed-basis quality (crypto positions: basis is reconstructed from
-  // trade/transfer history, not reported by the exchange)
+  // trade/transfer history, not reported by the exchange). The `estimated` /
+  // `manual` states are conveyed by a badge (not free text — see BasisBadge);
+  // only `incomplete` keeps an explanatory note.
   const basisQuality = getExt('basisQuality')
   const basisDiagnostics: string[] = (() => {
     const rec = extData?.find((e) => e.key === 'basisDiagnostics')
@@ -112,14 +212,16 @@ function HoldingDetailRow({ row, variant = 'stock' }: HoldingDetailRowProps) {
     }
   })()
   const basisNotes: string[] = [
-    ...(basisQuality === 'estimated'
-      ? ['Cost basis is partly estimated (deposits/rewards valued at market price on their event date).']
-      : []),
     ...(basisQuality === 'incomplete'
-      ? ['Cost basis is incomplete — some history is unavailable from the exchange.']
+      ? ['Cost basis is incomplete — set an initial cost below, or some history is unavailable from the exchange.']
       : []),
     ...basisDiagnostics,
   ]
+
+  // Opening remainder the manual cost prices (0 = fully tracked from trades)
+  const openingQtyRaw = getExt(OPENING_QTY_EXT_KEY)
+  const openingQty = typeof openingQtyRaw === 'number' ? openingQtyRaw : Number(openingQtyRaw ?? 0)
+  const showOpeningCostEditor = position.source === 'cdc' && openingQty > 0
 
   return (
     <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
@@ -163,6 +265,21 @@ function HoldingDetailRow({ row, variant = 'stock' }: HoldingDetailRowProps) {
                 })()}
               </span>
             </div>
+            {(basisQuality === 'estimated' || basisQuality === 'manual') && (
+              <div className="flex gap-2 items-center">
+                <span className="text-gray-500 dark:text-gray-400 w-28 shrink-0">Basis</span>
+                <span
+                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                    basisQuality === 'manual'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                      : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                  }`}
+                >
+                  {basisQuality === 'manual' ? 'Manual' : 'Estimated'}
+                </span>
+              </div>
+            )}
+            {showOpeningCostEditor && <OpeningCostEditor position={position} openingQty={openingQty} />}
           </div>
 
           {/* Right column — price context only for stocks */}

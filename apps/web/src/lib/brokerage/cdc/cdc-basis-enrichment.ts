@@ -17,12 +17,17 @@ import type {
   BrokerageTransaction,
 } from '@lokfi/brokerage-core'
 import type { LokfiDatabase } from '../../db/db'
+import { loadOpeningCostOverrides } from '../../investments/costBasisOverrides'
+import { getSecurityKey } from '../../investments/portfolioBuckets'
 import { SOURCE, splitInstrument } from './cdc-adapter'
 import type { BasisEvent } from './spot-cost-basis'
-import { computeCostBasis, reconcile } from './spot-cost-basis'
+import { RECONCILE_TOLERANCE, computeCostBasis, reconcile } from './spot-cost-basis'
 
 /** Resolve a token's USD daily close on a yyyy-mm-dd date (null = unknown) */
 export type PriceLookup = (token: string, date: string) => Promise<number | null>
+
+/** Manual opening-cost overrides: securityKey (e.g. `CRYPTO:BTC`) → per-unit cost */
+export type OpeningCostOverrides = Map<string, number>
 
 /** Tokens treated as USD-pegged cash: basis is 1.0, no event replay needed */
 const STABLE_TOKENS = new Set(['USD', 'USDT', 'USDC', 'TUSD', 'DAI', 'PYUSD', 'FDUSD'])
@@ -33,6 +38,8 @@ const USD_QUOTES = new Set(['USD', 'USDT', 'USDC'])
 export const BASIS_QUALITY_EXT_KEY = 'basisQuality'
 export const BASIS_DIAGNOSTICS_EXT_KEY = 'basisDiagnostics'
 export const REALIZED_PNL_EXT_KEY = 'basisRealizedPnl'
+/** Quantity of the unexplained opening remainder that the opening cost prices (0 = fully tracked) */
+export const OPENING_QTY_EXT_KEY = 'basisOpeningQty'
 
 export interface BasisEnrichmentResult {
   positions: BrokeragePosition[]
@@ -47,7 +54,8 @@ export async function computeCdcBasisEnrichment(
   positions: BrokeragePosition[],
   transactions: BrokerageTransaction[],
   fundDetails: BrokerageFundDetail[],
-  priceLookup: PriceLookup
+  priceLookup: PriceLookup,
+  overrides: OpeningCostOverrides = new Map()
 ): Promise<BasisEnrichmentResult> {
   const updatedPositions: BrokeragePosition[] = []
   const extensions: BrokeragePositionExtension[] = []
@@ -64,13 +72,14 @@ export async function computeCdcBasisEnrichment(
 
   for (const [token, tokenPositions] of byToken) {
     const totalQty = tokenPositions.reduce((sum, p) => sum + p.quantity, 0)
-    const totalMarketValue = tokenPositions.reduce((sum, p) => sum + (p.marketValue ?? 0), 0)
-    const currentPrice = totalQty > 0 && totalMarketValue > 0 ? totalMarketValue / totalQty : null
 
     let avgCost: number
     let quality: string
     let diagnostics: string[]
     let realizedPnl = 0
+    // Quantity of the unexplained opening remainder (0 = fully tracked); drives
+    // the Holdings "Initial cost per unit" field.
+    let openingQty = 0
 
     if (STABLE_TOKENS.has(token)) {
       avgCost = 1
@@ -79,11 +88,41 @@ export async function computeCdcBasisEnrichment(
     } else {
       const events = await buildBasisEvents(token, transactions, fundDetails, priceLookup)
       const computed = computeCostBasis(events)
-      const reconciled = reconcile(computed, totalQty, currentPrice)
+
+      const diff = totalQty - computed.quantity
+      const scale = Math.max(Math.abs(totalQty), Math.abs(computed.quantity), 1e-12)
+      openingQty = diff / scale > RECONCILE_TOLERANCE ? diff : 0
+
+      // Price the unexplained opening remainder. Priority: manual override >
+      // earliest-activity-date estimate > none. Pricing at a fixed historical
+      // date (never current market) keeps the basis from drifting. The
+      // earliest-activity date is pinned once the first sync captures the
+      // available window; it can only shift if the history window later
+      // expands, which the API-only scope (≤180 days, append-only store) does
+      // not allow. With no history at all we leave it unpriced (incomplete)
+      // so the user can set an opening cost via the override.
+      const securityKey = getSecurityKey(tokenPositions[0])
+      const override = overrides.get(securityKey)
+      let openingPrice: number | null
+      let usedOverride = false
+      if (override != null) {
+        openingPrice = override
+        usedOverride = true
+      } else if (events.length > 0) {
+        const earliestTs = Math.min(...events.map((e) => e.timestamp))
+        openingPrice = await priceLookup(token, new Date(earliestTs).toISOString().slice(0, 10))
+      } else {
+        openingPrice = null
+      }
+
+      const reconciled = reconcile(computed, totalQty, openingPrice)
       avgCost = reconciled.avgCost
-      quality = reconciled.basisQuality
       diagnostics = reconciled.diagnostics
       realizedPnl = reconciled.realizedPnl
+      // reconcile produces `estimated` for any non-null opening price; promote
+      // to `manual` only when that price came from a user override (and a
+      // remainder was actually priced — otherwise the override is inert).
+      quality = usedOverride && reconciled.basisQuality === 'estimated' ? 'manual' : reconciled.basisQuality
     }
 
     for (const pos of tokenPositions) {
@@ -99,7 +138,8 @@ export async function computeCdcBasisEnrichment(
       extensions.push(
         { positionId: pos.id, key: BASIS_QUALITY_EXT_KEY, value: JSON.stringify(quality) },
         { positionId: pos.id, key: BASIS_DIAGNOSTICS_EXT_KEY, value: JSON.stringify(diagnostics) },
-        { positionId: pos.id, key: REALIZED_PNL_EXT_KEY, value: JSON.stringify(realizedPnl) }
+        { positionId: pos.id, key: REALIZED_PNL_EXT_KEY, value: JSON.stringify(realizedPnl) },
+        { positionId: pos.id, key: OPENING_QTY_EXT_KEY, value: JSON.stringify(openingQty) }
       )
     }
   }
@@ -200,12 +240,14 @@ export async function enrichCdcPositions(db: LokfiDatabase, priceLookup: PriceLo
 
   const transactions = await db.brokerageTransactions.where('source').equals(SOURCE).toArray()
   const fundDetails = await db.brokerageFundDetails.where('source').equals(SOURCE).toArray()
+  const overrides = await loadOpeningCostOverrides(db)
 
   const { positions: updated, extensions } = await computeCdcBasisEnrichment(
     positions,
     transactions,
     fundDetails,
-    priceLookup
+    priceLookup,
+    overrides
   )
 
   await db.brokeragePositions.bulkPut(updated)
