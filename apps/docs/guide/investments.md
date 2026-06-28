@@ -24,7 +24,16 @@ The Performance card plots your portfolio value over time as an area chart. Use 
 ### Holdings
 A detailed view of each position — ticker, quantity, current price, market value, and bucket assignment. The holdings view supports filtering by portfolio bucket, searching by ticker or name, and expanding positions to see lot-level detail.
 
-> **Cost basis for crypto holdings:** Stock brokers report each position's average cost directly. The Crypto.com Exchange API does not — it only reports current quantity and market value for spot holdings. Lokfi reconstructs the average cost from your synced trade and transfer history (weighted average). When part of a holding can't be traced to a trade (coins deposited from outside the exchange, staking rewards, or history older than the exchange's ~6-month retention), Lokfi values it at the market price on the relevant date and flags the position with an **estimated** or **incomplete** cost-basis note in its expanded Diagnostics. Treat the unrealized P&L on flagged crypto holdings as an approximation.
+#### Cost basis for crypto holdings
+
+Stock brokers report each position's average cost directly. The Crypto.com Exchange API does not — it only reports current quantity and market value for spot holdings — and it serves at most ~6 months of trade history. So Lokfi reconstructs the average cost as a **weighted average** of:
+
+- **Your synced trades** (real fill prices), which accumulate permanently as you sync — keep syncing and the record only grows.
+- **An opening balance** — the quantity you held before your synced history begins. Lokfi prices it at the market price on your earliest known activity date (a fixed historical price, so your cost basis does **not** drift as the market moves) and shows an **Estimated** badge on the holding.
+
+Expand a holding to see its cost basis. When a holding has an opening balance, an **Initial cost per unit** field lets you enter what you actually paid for that early portion; it blends with your real trades into the average, and the holding switches to a **Manual** badge. The number you type is the *opening* cost per unit, so the average shown will differ once your real trades mix in. Setting it is optional — the estimate is used until you do, and you only ever set one number per coin. Your overrides are saved locally and are included in backups.
+
+> Lokfi computes a **weighted-average** cost basis, not specific-lot (FIFO/tax-lot) accounting. Treat the unrealized P&L on `Estimated` holdings as an approximation; set the initial cost to make it exact. Coins with no synced history and no initial cost set show as `incomplete` (zero cost) until you enter one.
 
 ### Transactions
 Individual trade history — buys, sells, dividends, and corporate actions — synced from your brokerages and normalized into Lokfi's unified transaction format.
