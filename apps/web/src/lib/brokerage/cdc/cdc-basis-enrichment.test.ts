@@ -119,16 +119,98 @@ describe('computeCdcBasisEnrichment', () => {
     expect(quality?.value).toBe(JSON.stringify('ok'))
   })
 
-  it('reconciles against the exchange quantity when ledger history is missing', async () => {
-    // 1 BTC held but no trades/transfers at all → synthetic acquisition at market
+  it('leaves a fully-untracked holding at zero cost (incomplete) when no price is available', async () => {
+    // 1 BTC held, no trades/transfers and no price → we can't date the
+    // acquisition, so the opening balance is unpriced (user can override)
     const result = await computeCdcBasisEnrichment([position({ quantity: 1, marketValue: 60_000 })], [], [], noPrices)
     const pos = result.positions[0]
-    // Reconciled at current market price (60_000 / 1)
-    expect(pos?.avgCost).toBe(60_000)
+    expect(pos?.avgCost).toBe(0)
     const quality = result.extensions.find((e) => e.key === BASIS_QUALITY_EXT_KEY)
     expect(quality?.value).toBe(JSON.stringify('incomplete'))
     const diags = result.extensions.find((e) => e.key === BASIS_DIAGNOSTICS_EXT_KEY)
     expect(JSON.parse(diags?.value ?? '[]').length).toBeGreaterThan(0)
+  })
+
+  it('prices the opening remainder at the earliest-activity date estimate', async () => {
+    // Trade explains 0.2 BTC; the 0.8 opening remainder is priced at the
+    // earliest activity date (the trade date), not current market.
+    const prices = async (_t: string, date: string) => (date === '2026-03-01' ? 55_000 : null)
+    const result = await computeCdcBasisEnrichment(
+      [position({ quantity: 1, marketValue: 60_000 })],
+      [trade({ symbol: 'BTC_USD', quantity: 0.2, price: 61_000 })],
+      [],
+      prices
+    )
+    expect(result.positions[0]?.avgCost).toBeCloseTo(0.8 * 55_000 + 0.2 * 61_000)
+    const quality = result.extensions.find((e) => e.key === BASIS_QUALITY_EXT_KEY)
+    expect(quality?.value).toBe(JSON.stringify('estimated'))
+  })
+
+  it('does not drift — avgCost is independent of current market value', async () => {
+    const prices = async () => 55_000
+    const args = (mv: number) =>
+      computeCdcBasisEnrichment(
+        [position({ quantity: 1, marketValue: mv })],
+        [trade({ symbol: 'BTC_USD', quantity: 0.2, price: 61_000 })],
+        [],
+        prices
+      )
+    const low = await args(60_000)
+    const high = await args(90_000)
+    expect(low.positions[0]?.avgCost).toBe(high.positions[0]?.avgCost)
+  })
+
+  it('blends a manual opening-cost override with synced trades and flags manual', async () => {
+    const overrides = new Map([['CRYPTO:BTC', 42_000]])
+    const result = await computeCdcBasisEnrichment(
+      [position({ quantity: 1, marketValue: 60_000 })],
+      [trade({ symbol: 'BTC_USD', quantity: 0.2, price: 61_000 })],
+      [],
+      noPrices,
+      overrides
+    )
+    // 0.8 opening @ 42,000 (override) blended with 0.2 @ 61,000 (real)
+    expect(result.positions[0]?.avgCost).toBeCloseTo(0.8 * 42_000 + 0.2 * 61_000)
+    const quality = result.extensions.find((e) => e.key === BASIS_QUALITY_EXT_KEY)
+    expect(quality?.value).toBe(JSON.stringify('manual'))
+  })
+
+  it('per-unit override still applies after the opening remainder shrinks', async () => {
+    const overrides = new Map([['CRYPTO:BTC', 42_000]])
+    // Whole position is the opening remainder (no trades)
+    const noTrades = await computeCdcBasisEnrichment(
+      [position({ quantity: 1, marketValue: 60_000 })],
+      [],
+      [],
+      noPrices,
+      overrides
+    )
+    expect(noTrades.positions[0]?.avgCost).toBeCloseTo(42_000)
+    // A trade now explains 0.2 BTC; the same per-unit override prices the
+    // smaller 0.8 remainder without re-entry
+    const withTrade = await computeCdcBasisEnrichment(
+      [position({ quantity: 1, marketValue: 60_000 })],
+      [trade({ symbol: 'BTC_USD', quantity: 0.2, price: 61_000 })],
+      [],
+      noPrices,
+      overrides
+    )
+    expect(withTrade.positions[0]?.avgCost).toBeCloseTo(0.8 * 42_000 + 0.2 * 61_000)
+  })
+
+  it('override is inert when the holding is fully tracked', async () => {
+    const overrides = new Map([['CRYPTO:BTC', 42_000]])
+    const result = await computeCdcBasisEnrichment(
+      [position({ quantity: 1, marketValue: 60_000 })],
+      [trade({ symbol: 'BTC_USD', quantity: 1, price: 50_000 })],
+      [],
+      noPrices,
+      overrides
+    )
+    // No opening remainder → override has nothing to price
+    expect(result.positions[0]?.avgCost).toBe(50_000)
+    const quality = result.extensions.find((e) => e.key === BASIS_QUALITY_EXT_KEY)
+    expect(quality?.value).toBe(JSON.stringify('ok'))
   })
 
   it('values staking rewards from the reward record itself', async () => {

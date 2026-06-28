@@ -102,16 +102,16 @@ describe('computeCostBasis — history gaps', () => {
 })
 
 describe('reconcile', () => {
-  it('adds missing quantity at the current market price and flags incomplete', () => {
+  it('prices the opening remainder at the given price and flags estimated', () => {
     const state = computeCostBasis([buy(0.8, 50_000)])
     const reconciled = reconcile(state, 1.0, 60_000)
     expect(reconciled.quantity).toBe(1.0)
     expect(reconciled.totalCost).toBeCloseTo(0.8 * 50_000 + 0.2 * 60_000)
-    expect(reconciled.basisQuality).toBe('incomplete')
-    expect(reconciled.diagnostics.some((d) => d.includes('Reconciled'))).toBe(true)
+    expect(reconciled.basisQuality).toBe('estimated')
+    expect(reconciled.diagnostics.some((d) => d.includes('Opening balance'))).toBe(true)
   })
 
-  it('adds missing quantity at zero cost when no price is available', () => {
+  it('enters the opening remainder at zero cost and flags incomplete when no price is available', () => {
     const state = computeCostBasis([buy(0.5, 100)])
     const reconciled = reconcile(state, 1.0, null)
     expect(reconciled.quantity).toBe(1.0)
@@ -119,13 +119,26 @@ describe('reconcile', () => {
     expect(reconciled.basisQuality).toBe('incomplete')
   })
 
-  it('removes excess quantity proportionally', () => {
+  it('removes excess quantity proportionally and preserves the computed quality', () => {
     const state = computeCostBasis([buy(2, 100)])
+    expect(state.basisQuality).toBe('ok')
     const reconciled = reconcile(state, 1, 500)
     expect(reconciled.quantity).toBe(1)
     expect(reconciled.totalCost).toBe(100)
     expect(reconciled.avgCost).toBe(100)
-    expect(reconciled.basisQuality).toBe('incomplete')
+    // No new units priced on excess removal → quality not forced to incomplete
+    expect(reconciled.basisQuality).toBe('ok')
+  })
+
+  it('is deterministic — same opening price yields the same basis (no drift)', () => {
+    const state = computeCostBasis([buy(0.8, 50_000)])
+    const a = reconcile(state, 1.0, 55_000)
+    const b = reconcile(state, 1.0, 55_000)
+    expect(a.avgCost).toBe(b.avgCost)
+    // A different opening price (the only input) is what changes the basis —
+    // current market never enters reconcile.
+    const c = reconcile(state, 1.0, 70_000)
+    expect(c.avgCost).not.toBe(a.avgCost)
   })
 
   it('ignores divergence within the 0.1% tolerance', () => {

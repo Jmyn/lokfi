@@ -11,8 +11,10 @@
  *   WITHDRAWAL proportional quantity/cost reduction, no P&L impact
  *
  * Basis quality degrades monotonically: ok → estimated (some basis is
- * market-priced rather than traded) → incomplete (unpriced events, oversells,
- * or reconciliation against the authoritative balance was needed).
+ * market-priced rather than traded — e.g. a priced opening balance) →
+ * incomplete (unpriced events, oversells, or an opening balance with no
+ * available price). The enrichment caller promotes `estimated` to `manual`
+ * when the opening price came from a user override.
  *
  * Pure module — no I/O, no Date.now(); fully unit-testable.
  */
@@ -160,11 +162,15 @@ export function computeCostBasis(events: BasisEvent[]): BasisState {
  * reported by the exchange (`user-balance`).
  *
  * Divergence within RECONCILE_TOLERANCE (relative) is ignored as dust.
- * Larger divergence is corrected with a synthetic adjustment — missing
- * quantity enters at the current market price (or zero cost when unknown),
- * excess is removed proportionally — and flags the basis `incomplete`.
+ * A positive remainder (history we don't have — the opening balance) enters
+ * as a single lot priced at `openingPrice`: a non-null price (the caller's
+ * earliest-activity estimate or a manual override) yields `estimated`; a null
+ * price enters at zero cost and yields `incomplete`. Pricing is the caller's
+ * responsibility, NOT current market — so the basis does not drift as the
+ * price moves. Excess quantity is removed proportionally; since no new units
+ * are priced there, the engine-computed quality is preserved.
  */
-export function reconcile(state: BasisState, authoritativeQuantity: number, currentPrice: number | null): BasisState {
+export function reconcile(state: BasisState, authoritativeQuantity: number, openingPrice: number | null): BasisState {
   const diff = authoritativeQuantity - state.quantity
   const scale = Math.max(Math.abs(authoritativeQuantity), Math.abs(state.quantity), EPSILON)
   if (Math.abs(diff) / scale <= RECONCILE_TOLERANCE) {
@@ -173,20 +179,24 @@ export function reconcile(state: BasisState, authoritativeQuantity: number, curr
 
   const diagnostics = [...state.diagnostics]
   let { totalCost } = state
+  let quality = state.basisQuality
 
   if (diff > 0) {
-    const addedCost = currentPrice !== null ? diff * currentPrice : 0
+    const addedCost = openingPrice !== null ? diff * openingPrice : 0
     totalCost += addedCost
+    quality = degrade(quality, openingPrice !== null ? 'estimated' : 'incomplete')
     diagnostics.push(
-      `Reconciled +${diff} against the exchange balance (entered at ${
-        currentPrice !== null ? `market price ${currentPrice}` : 'zero cost'
-      }) — ledger history is incomplete`
+      openingPrice !== null
+        ? `Opening balance of ${diff} priced at ${openingPrice}/unit to match the exchange balance`
+        : `Opening balance of ${diff} entered at zero cost (no price available) to match the exchange balance`
     )
   } else {
+    // Excess removal: strip proportionally. No new units are priced, so the
+    // quality from the priced lots is left as-is (not forced to incomplete).
     const removeQty = Math.min(-diff, state.quantity)
     const removedCost = state.quantity > EPSILON ? totalCost * (removeQty / state.quantity) : 0
     totalCost -= removedCost
-    diagnostics.push(`Reconciled ${diff} against the exchange balance — ledger history is incomplete`)
+    diagnostics.push(`Removed ${-diff} excess quantity to match the exchange balance`)
   }
 
   const quantity = authoritativeQuantity
@@ -195,7 +205,7 @@ export function reconcile(state: BasisState, authoritativeQuantity: number, curr
     totalCost,
     avgCost: quantity > EPSILON ? totalCost / quantity : 0,
     realizedPnl: state.realizedPnl,
-    basisQuality: 'incomplete',
+    basisQuality: quality,
     diagnostics,
   }
 }
