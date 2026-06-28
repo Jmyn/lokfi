@@ -110,6 +110,9 @@ function OpeningCostEditor({ position, openingQty }: { position: BrokeragePositi
     try {
       await setCostBasisOverride(db, securityKey, num, position.currency, new Date().toISOString())
       await recomputeCdcBasis(db)
+    } catch (err) {
+      console.error('Failed to save opening cost override', err)
+      setError('Failed to save — see console. Your override was persisted but cost basis may be stale until next sync.')
     } finally {
       setSaving(false)
     }
@@ -120,6 +123,9 @@ function OpeningCostEditor({ position, openingQty }: { position: BrokeragePositi
     try {
       await clearCostBasisOverride(db, securityKey)
       await recomputeCdcBasis(db)
+    } catch (err) {
+      console.error('Failed to clear opening cost override', err)
+      setError('Failed to clear — see console. Cost basis may be stale until next sync.')
     } finally {
       setSaving(false)
     }
