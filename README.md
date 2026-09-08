@@ -11,6 +11,7 @@ Lokfi is a local-first, privacy-first personal finance tracker. It allows you to
 - **CSV Transaction Parsing**: Support for CSV transaction history.
 - **Rule Engine**: Automatically categorize transactions using matching rules.
 - **Local-first Architecture**: Uses IndexedDB (via Dexie.js) for high-performance, asynchronous local storage.
+- **Portfolio Export**: Download your stored investment holdings, cash, and allocation targets from the Investments page as a readable text file. Includes data timestamps and cost-basis quality; excludes credentials and bank transactions. Exporting does not sync broker data or upload anything.
 - **Open Core**: The core parser library and web app are open-source and auditable.
 
 ## 🚀 Getting Started

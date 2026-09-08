@@ -20,6 +20,7 @@ import { useFxRates } from '../../lib/fx/useFxRates'
 import { ClosedPositionsTab } from './ClosedPositionsTab'
 import { CurrencySelector } from './CurrencySelector'
 import { DividendsTab } from './DividendsTab'
+import { ExportPortfolioButton } from './ExportPortfolioButton'
 import { HoldingsTab } from './HoldingsTab'
 import { InvestmentsTabs } from './InvestmentsTabs'
 import { InvestmentsTransactionsTab } from './InvestmentsTransactionsTab'
@@ -283,6 +284,8 @@ export function InvestmentsPage() {
 
       {/* Sync progress */}
       <SyncProgressBar progress={syncProgress} syncing={syncing} />
+
+      <ExportPortfolioButton syncing={syncing} />
 
       {/* No data CTA */}
       {hasCredentials === 0 && (
