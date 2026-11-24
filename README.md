@@ -6,7 +6,7 @@ Lokfi is a local-first, privacy-first personal finance tracker. It allows you to
 
 ## ✨ Features
 
-- **100% Private**: Your data never leaves your device. All parsing and storage happen locally.
+- **Local by default**: Parsing and storage happen on your device. Optional AI suggestions send context for filtered statement transactions directly to your configured provider.
 - **Bank Statement Parsing**: Support for major Singapore banks (see [Supported Banks](#-supported-banks) below).
 - **CSV Transaction Parsing**: Support for CSV transaction history.
 - **Rule Engine**: Automatically categorize transactions using matching rules.
