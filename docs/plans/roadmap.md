@@ -32,6 +32,10 @@ Support major Singapore banks so users aren't locked into one account type.
 
 **Goal:** A user with any Singapore bank account can import and categorise in under 5 minutes.
 
+**Done:**
+
+- Citibank Singapore Credit PDF parser for SGD statements
+
 **In progress:**
 
 - OCBC Debit parser
@@ -40,7 +44,6 @@ Support major Singapore banks so users aren't locked into one account type.
 **Next:**
 
 - UOB Credit parser
-- Citibank parser
 
 **Triage:**
 
@@ -101,4 +104,4 @@ These are unvalidated ideas that are out of scope for v1–v2:
 
 ---
 
-*Last updated: March 2026*
+*Last updated: November 2026*

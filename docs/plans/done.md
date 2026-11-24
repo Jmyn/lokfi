@@ -4,6 +4,12 @@
 
 ---
 
+## 2026-11-24 — Citibank Credit PDF Import
+
+- [x] Citibank Credit parser (1C-3). Lokfi auto-detects and imports Singapore credit card statements in SGD. Browser verification imported 163 transactions from 13 statements and confirmed that reimporting them added zero rows.
+
+---
+
 ## 2026-03-21 — Dashboard + PDF Parsing
 
 - **Dashboard (`/dashboard`)** shipped as replacement for `/stats`. Full widget suite: KPI row, monthly trend chart, category breakdown, category budget bars, savings rate gauge, average spending, spending heatmap, top merchants.

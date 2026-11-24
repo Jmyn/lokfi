@@ -46,8 +46,10 @@ lokfi/
 │   │   ├── src/
 │   │   │   ├── extractors/         # Parser implementations (CSV + PDF)
 │   │   │   │   ├── pdf/
-│   │   │   │   │   ├── ocbc/       # OCBC Credit PDF parser
-│   │   │   │   │   └── ocbcCreditPdfParser.ts
+│   │   │   │   │   ├── citibank/
+│   │   │   │   │   │   └── CitibankCreditPdfParser.ts
+│   │   │   │   │   └── ocbc/
+│   │   │   │   │       └── OcbcCreditPdfParser.ts
 │   │   │   │   ├── ocrNormalizer.ts # OCR artifact cleaning for PDF parsers
 │   │   │   │   └── index.ts
 │   │   │   ├── parsers/
@@ -60,8 +62,6 @@ lokfi/
 │   │   │   │   ├── uob/
 │   │   │   │   │   ├── uob-credit.parser.ts
 │   │   │   │   │   └── uob-debit.parser.ts
-│   │   │   │   ├── citibank/
-│   │   │   │   │   └── citibank-credit.parser.ts
 │   │   │   │   ├── maybank/
 │   │   │   │   └── cdc/
 │   │   │   ├── types.ts            # Shared type system

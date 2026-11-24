@@ -15,8 +15,6 @@ export interface FileParseResult {
   profileName?: string
   /** Label of the parser used (e.g. "ocbc-nxt-main", "OCBC Credit"). Derived from StatementParser.label. */
   parserLabel?: string
-  /** Raw ArrayBuffer for PDF files — needed for re-parsing with a different parser. */
-  rawBuffer?: ArrayBuffer
 }
 
 interface FileStatusListProps {
@@ -31,6 +29,7 @@ interface FileStatusListProps {
 // Unlisted sources fall back to the raw source key string (see sourceLabel() below).
 const SOURCE_LABELS: Record<string, string> = {
   'ocbc-credit': 'OCBC Credit',
+  citibank: 'Citibank',
   'generic-pdf': 'Generic PDF',
   generic: 'Generic CSV',
   cdc: 'CDC Debit',
@@ -262,7 +261,7 @@ function StatusBadge({ status }: { status: FileParseStatus }) {
 }
 
 /** Labels of built-in (non-custom) parsers — used to group in the parser selector. */
-const BUILTIN_PARSER_LABELS = new Set(['CDC Debit', 'Generic CSV', 'Generic PDF', 'OCBC Credit'])
+const BUILTIN_PARSER_LABELS = new Set(['CDC Debit', 'Generic CSV', 'Generic PDF', 'OCBC Credit', 'Citibank Credit PDF'])
 
 // ─── Parser Badge with Dropdown Selector ─────────────────────────────────────
 

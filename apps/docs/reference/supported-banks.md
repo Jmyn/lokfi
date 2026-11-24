@@ -5,7 +5,7 @@
 | Bank | Debit | Credit | CSV | Notes |
 | ---- | ----- | ------ | --- | ----- |
 | **OCBC** | — | ✅ | ✅ | PDF credit/debit statements & CSV transaction history |
-| **Citibank** | — | — | Planned | |
+| **Citibank** | — | ✅ | Planned | Singapore credit card statements in SGD (PDF) |
 | **UOB** | — | — | Planned | |
 | **Crypto.com** | ✅ | — | ✅ | CSV card transaction history |
 | **DBS / POSB** | Planned | Planned | Planned | Phase 2 |
@@ -19,6 +19,10 @@
 - **PDF**: Supports both credit card and debit account statements
 - **CSV**: Supports transaction history exports
 - Parser auto-detection checks for OCBC-specific header patterns
+
+### Citibank
+
+Lokfi auto-detects Singapore credit card statements in SGD as **Citibank Credit PDF**. It imports purchases, fees, payments, and refunds across all transaction pages.
 
 ### Crypto.com
 - **CSV**: Supports card transaction history exports

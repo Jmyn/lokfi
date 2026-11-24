@@ -94,6 +94,7 @@ Common formats encountered:
 | Bank | Transaction date format | Notes |
 |------|------------------------|-------|
 | OCBC | `DD/MM` | Year from header `DD-MM-YYYY` |
+| Citibank Singapore | `DD MMM` | Year from `Statement Date Month DD, YYYY` |
 | Generic | `DD MMM YYYY`, `DD/MM/YYYY` | Year present inline |
 
 ### 2. Scan all lines for metadata — never slice by line count
@@ -146,6 +147,8 @@ OCBC instalment lines have both the original purchase amount and the instalment 
 
 The `001/006` is a plan reference (not a fraction or date). The **last** decimal value (`335.00`) is the actual charge this statement period. Using the first amount would overstate charges by 6×.
 
+On Citibank continuation pages, PDF.js can append a 16-digit page reference after the SGD amount. The parser reads the decimal amount and ignores the reference.
+
 ### 7. Per-transaction `accountNo` for consolidated statements
 
 Consolidated statements contain multiple cards. All transactions must not be assigned the primary card's `accountNo`. Track the current card as you cross card number lines:
@@ -192,6 +195,9 @@ extractors/pdf/
   index.ts                ← re-exports all parsers
   ocrNormalizer.ts        ← cleans OCR artifacts (em/en dashes, multi-space)
   GenericPdfParser.ts     ← fallback for unknown formats
+  citibank/
+    CitibankCreditPdfParser.ts
+    CitibankCreditPdfParser.test.ts
   ocbc/
     OcbcCreditPdfParser.ts
     OcbcCreditPdfParser.test.ts
@@ -200,10 +206,10 @@ extractors/pdf/
     [Bank]PdfParser.test.ts
 ```
 
-Register new parsers in two places:
+Export new parsers and register them in the import flow.
 
-1. `extractors/pdf/index.ts` — add export
-2. `packages/parser-core/src/index.ts` → `ParserRegistry` — add instance to the registry
+1. Export the parser from `extractors/pdf/index.ts` and `packages/parser-core/src/index.ts`.
+2. Register it before `GenericPdfParser` in `apps/web/src/pages/import/ImportPage.tsx` so the bank-specific parser takes priority.
 
 ---
 

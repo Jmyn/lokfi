@@ -9,7 +9,6 @@
 
 ## Next
 
-- [ ] Citibank Credit parser (1C-3)
 - [ ] UOB Credit parser (1C-4)
 - [ ] Category drilldown (3B-2)
 - [ ] Export transactions to CSV (3B-3)
