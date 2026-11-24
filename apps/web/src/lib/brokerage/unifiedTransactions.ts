@@ -1,6 +1,7 @@
 import type { BrokerageFundDetail, BrokerageTransaction } from '@lokfi/brokerage-core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { Filters } from '../../pages/transactions/filterTypes'
+import { getBankSpendingExclusion } from '../bankSpendingExclusions'
 import { type DbTransaction, db } from '../db/db'
 import { toYYYYMMDD } from '../format'
 
@@ -376,6 +377,10 @@ export function mapFundDetail(d: BrokerageFundDetail): UnifiedTransactionRow[] {
 
 // ── Filtering ───────────────────────────────────────────────────────────────
 
+function matchesDescription(description: string, search: string | undefined): boolean {
+  return !search || description.toLowerCase().includes(search.toLowerCase())
+}
+
 function filterBankRow(row: UnifiedTransactionRow, filters: Filters): boolean {
   if (!row.isBank || !row.originalBank) return false
   const t = row.originalBank
@@ -383,8 +388,14 @@ function filterBankRow(row: UnifiedTransactionRow, filters: Filters): boolean {
   if (filters.dateFrom && t.date < filters.dateFrom) return false
   if (filters.dateTo && t.date > filters.dateTo) return false
   if (filters.sources.length > 0 && !filters.sources.includes(t.source)) return false
+  if (filters.noAccounts) return false
   if (filters.accounts.length > 0 && !filters.accounts.includes(t.accountNo)) return false
   if (filters.type && row.type !== filters.type) return false
+  if (!matchesDescription(t.description, filters.description)) return false
+  if (filters.resultRowIds && !filters.resultRowIds.has(t.id)) return false
+  if (filters.categoryIds && !filters.categoryIds.includes(t.manualCategory ?? t.category ?? '__uncategorised__')) {
+    return false
+  }
   if (filters.categoryId) {
     const resolved = t.manualCategory ?? t.category
     if (filters.categoryId === '__uncategorised__') {
@@ -403,6 +414,8 @@ function filterBrokerageRow(row: UnifiedTransactionRow, filters: Filters): boole
   if (filters.dateTo && dateOnly > filters.dateTo) return false
   if (filters.sources.length > 0 && !filters.sources.includes(row.source)) return false
   if (filters.type && row.type !== filters.type) return false
+  if (!matchesDescription(row.description, filters.description)) return false
+  if (filters.resultRowIds && !filters.resultRowIds.has(row.id)) return false
   // Bank-specific filters (accounts, categoryId) don't apply to brokerage rows
   // DIVIDEND_TAX, TRANSFER_IN, REBATE, FEE don't have symbol-specific filtering
   return true
@@ -439,8 +452,17 @@ export async function fetchUnifiedRows(filters: Filters): Promise<{ rows: Unifie
       query = query.and((t) => filters.accounts.includes(t.accountNo))
     }
 
+    const categoryNames =
+      filters.excludeTransfers || filters.excludeInvestments
+        ? new Map((await db.categories.toArray()).map(({ id, name }) => [id, name]))
+        : null
     const allBank = await query.toArray()
     for (const t of allBank) {
+      if (
+        (categoryNames || filters.excludedCategoryIds?.length) &&
+        getBankSpendingExclusion(t, categoryNames?.get(t.manualCategory ?? t.category ?? ''), filters)
+      )
+        continue
       const row = mapBankTransaction(t)
       if (filterBankRow(row, filters)) {
         bankRows.push(row)
