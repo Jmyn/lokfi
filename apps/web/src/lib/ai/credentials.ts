@@ -1,8 +1,8 @@
 import type { BrokerageCredentials } from '@lokfi/brokerage-core'
-import { CredentialManager } from '../brokerage/credential-manager'
+import { CredentialManager, type CredentialStore } from '../brokerage/credential-manager'
 import { db } from '../db/db'
 
-export const aiCredentials = new CredentialManager({
+const credentialStore: CredentialStore = {
   async get(provider) {
     const setting = await db.settings.get(`ai-credentials:${provider}`)
     return setting ? (JSON.parse(setting.value) as BrokerageCredentials) : undefined
@@ -13,4 +13,11 @@ export const aiCredentials = new CredentialManager({
   async delete(provider) {
     await db.settings.delete(`ai-credentials:${provider}`)
   },
-})
+}
+
+export const aiCredentials = new CredentialManager(credentialStore)
+
+export async function getAiCredentialRevision(provider: string): Promise<string | null> {
+  // The salt changes whenever a key is saved, without exposing the encrypted key or its value.
+  return (await credentialStore.get(provider))?.salt ?? null
+}

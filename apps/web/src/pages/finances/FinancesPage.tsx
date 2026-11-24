@@ -1,3 +1,6 @@
+import { useEffect } from 'react'
+import { useAskLokfiWorkspace } from '../ask/AskLokfiContext'
+import { defaultFilters } from '../transactions/filterTypes'
 import { FinancesFilterProvider, useFinances } from './FinancesContext'
 import { FinancesFilters } from './FinancesFilters'
 import { AverageIncome } from './widgets/AverageIncome'
@@ -11,7 +14,22 @@ import { SpendingHeatmap } from './widgets/SpendingHeatmap'
 import { TopMerchants } from './widgets/TopMerchants'
 
 function FinancesContent() {
-  const { isLoading, transactions } = useFinances()
+  const { isLoading, transactions, allTransactions, categories, filters } = useFinances()
+  const { setFinancesFilters } = useAskLokfiWorkspace()
+
+  useEffect(() => {
+    if (isLoading) return
+    const accountCount = new Set(allTransactions.map(({ accountNo }) => accountNo)).size
+    setFinancesFilters({
+      ...defaultFilters,
+      sourceType: 'bank',
+      dateFrom: filters.dateFrom,
+      dateTo: filters.dateTo,
+      accounts: filters.accounts.length === accountCount ? [] : filters.accounts,
+      noAccounts: accountCount > 0 && filters.accounts.length === 0 ? true : undefined,
+      categoryIds: filters.categoryIds.length === categories.length ? undefined : filters.categoryIds,
+    })
+  }, [isLoading, allTransactions, categories.length, filters, setFinancesFilters])
 
   if (isLoading) {
     return (

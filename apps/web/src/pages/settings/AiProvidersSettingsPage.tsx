@@ -1,7 +1,22 @@
 import { Link } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useState } from 'react'
-import { aiCredentials } from '../../lib/ai/credentials'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  type AskLokfiSettings,
+  askLokfiEfforts,
+  askLokfiModels,
+  getAskLokfiSettings,
+  recommendedAskLokfiSettings,
+  supportsAskLokfiEffort,
+  updateAskLokfiSettings,
+} from '../../lib/ai/askLokfiSettings'
+import { aiCredentials, getAiCredentialRevision } from '../../lib/ai/credentials'
+import {
+  getOpenAiModelStatus,
+  isOpenAiModelListFresh,
+  readOpenAiModelAvailability,
+  refreshOpenAiModelAvailability,
+} from '../../lib/ai/openAiModelAvailability'
 import { aiProvider } from '../../lib/ai/provider'
 
 type Action = 'save' | 'test' | 'remove'
@@ -10,6 +25,190 @@ const buttonClass =
   'rounded-md border px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 disabled:opacity-40'
 
 const helpLinkClass = 'font-medium text-amber-800 underline underline-offset-2 dark:text-amber-300'
+
+function AskLokfiSettingsSection() {
+  const settings = useLiveQuery(getAskLokfiSettings, [])
+  const revision = useLiveQuery(() => getAiCredentialRevision(aiProvider.id), [])
+  const cached = useLiveQuery(() => readOpenAiModelAvailability(revision ?? null), [revision])
+  const availability = cached?.revision === revision ? (cached ?? null) : null
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const [checkError, setCheckError] = useState(false)
+  const activeCheck = useRef<AbortController | null>(null)
+  const selected = settings && getOpenAiModelStatus(availability, settings.model)
+  const isRecommended =
+    settings?.model === recommendedAskLokfiSettings.model &&
+    settings.reasoningEffort === recommendedAskLokfiSettings.reasoningEffort
+  const controlClass = 'w-full rounded-md border bg-white px-3 py-2 text-sm dark:bg-gray-900 disabled:opacity-60'
+
+  const checkModels = useCallback(async (revision: string, force: boolean) => {
+    activeCheck.current?.abort()
+    const controller = new AbortController()
+    activeCheck.current = controller
+    setChecking(true)
+    setCheckError(false)
+    try {
+      const cached = await readOpenAiModelAvailability(revision)
+      if (force || !isOpenAiModelListFresh(cached)) {
+        await refreshOpenAiModelAvailability(revision, controller.signal)
+      }
+    } catch {
+      if (!controller.signal.aborted) setCheckError(true)
+    } finally {
+      if (activeCheck.current === controller) setChecking(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (revision) void checkModels(revision, false)
+    else {
+      setChecking(false)
+      setCheckError(false)
+    }
+    return () => activeCheck.current?.abort()
+  }, [revision, checkModels])
+
+  async function update(changes: Partial<AskLokfiSettings>) {
+    setSaving(true)
+    setSaveError(false)
+    try {
+      await updateAskLokfiSettings(changes)
+    } catch {
+      setSaveError(true)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section
+      id="ask-lokfi-settings"
+      aria-labelledby="ask-lokfi-settings-heading"
+      className="mt-4 scroll-mt-4 space-y-4 rounded-xl border p-5"
+      style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="ask-lokfi-settings-heading" className="font-serif text-lg">
+          Ask Lokfi
+        </h2>
+        {revision && (
+          <button
+            type="button"
+            disabled={checking}
+            onClick={() => void checkModels(revision, true)}
+            className={buttonClass}
+            style={{ borderColor: 'var(--border)' }}
+          >
+            {checking ? 'Checking models…' : 'Refresh models'}
+          </button>
+        )}
+      </div>
+      {checkError && (
+        <p role="status" className="text-sm text-gray-600 dark:text-gray-400">
+          {availability
+            ? 'Could not refresh models. Showing the last checked list.'
+            : 'Could not check model availability. Showing Lokfi’s compatible models.'}
+        </p>
+      )}
+      {settings ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1.5 text-sm">
+              <span className="block font-medium">Model</span>
+              <select
+                value={settings.model}
+                disabled={saving}
+                onChange={(event) => void update({ model: event.target.value as AskLokfiSettings['model'] })}
+                className={controlClass}
+                style={{ borderColor: 'var(--border)' }}
+              >
+                {Object.entries(askLokfiModels).map(([id, { label }]) => {
+                  const { available } = getOpenAiModelStatus(availability, id)
+                  if (!available && id !== settings.model) return null
+                  return (
+                    <option key={id} value={id} disabled={!available}>
+                      {label}
+                      {!available && ' (unavailable)'}
+                    </option>
+                  )
+                })}
+              </select>
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="block font-medium">Reasoning effort</span>
+              <select
+                value={settings.reasoningEffort}
+                disabled={saving || selected?.available === false}
+                onChange={(event) =>
+                  void update({ reasoningEffort: event.target.value as AskLokfiSettings['reasoningEffort'] })
+                }
+                className={controlClass}
+                style={{ borderColor: 'var(--border)' }}
+              >
+                {Object.entries(askLokfiEfforts)
+                  .filter(([effort]) => supportsAskLokfiEffort(settings.model, effort))
+                  .map(([effort, label]) => (
+                    <option key={effort} value={effort}>
+                      {label}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
+          {selected?.available === false ? (
+            <p role="status" className="text-sm text-amber-800 dark:text-amber-300">
+              {selected.shutdownDate
+                ? `Your selected model shut down on ${selected.shutdownDate}.`
+                : 'Your selected model is no longer listed for this OpenAI key.'}{' '}
+              {Object.keys(askLokfiModels).some((id) => getOpenAiModelStatus(availability, id).available)
+                ? 'Choose another model to continue.'
+                : 'No compatible models are listed for this key.'}
+            </p>
+          ) : (
+            selected?.shutdownDate && (
+              <p role="status" className="text-sm text-amber-800 dark:text-amber-300">
+                Your selected model is scheduled to shut down on {selected.shutdownDate}.
+              </p>
+            )
+          )}
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Saved in this browser and used for your next Ask Lokfi request. Higher reasoning effort can increase
+            response time and API usage.{' '}
+            <a
+              href="https://developers.openai.com/api/docs/models"
+              target="_blank"
+              rel="noreferrer"
+              className={helpLinkClass}
+            >
+              Compare model prices
+            </a>
+          </p>
+          {!isRecommended && getOpenAiModelStatus(availability, recommendedAskLokfiSettings.model).available && (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void update(recommendedAskLokfiSettings)}
+              className={buttonClass}
+              style={{ borderColor: 'var(--border)' }}
+            >
+              Use recommended Terra with low reasoning
+            </button>
+          )}
+          {saveError && (
+            <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+              Could not save Ask Lokfi settings. Try again.
+            </p>
+          )}
+        </>
+      ) : (
+        <p role="status" className="text-sm">
+          Loading preferences…
+        </p>
+      )}
+    </section>
+  )
+}
 
 export function AiProvidersSettingsPage() {
   const hasKey = useLiveQuery(() => aiCredentials.hasCredentials(aiProvider.id), [])
@@ -192,6 +391,7 @@ export function AiProvidersSettingsPage() {
           </p>
         )}
       </section>
+      <AskLokfiSettingsSection />
     </main>
   )
 }

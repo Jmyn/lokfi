@@ -3,6 +3,7 @@ import { fetchUnifiedRows } from '../brokerage/unifiedTransactions'
 import { type DbTransaction, db } from '../db/db'
 import { evaluateRules } from '../rules/evaluateRules'
 import type { AiCategorisationContext, AiCategoryDecision, AiTransactionInput } from './categorisationProvider'
+import { accountMask } from './privacy'
 
 interface AiRunRow {
   transaction: DbTransaction
@@ -25,28 +26,6 @@ export interface AppliedAiCategory {
 type AiCategoryApplyResult =
   | { id: string; status: 'stale' | 'missing-category' }
   | (AppliedAiCategory & { status: 'saved' })
-
-function accountMask(accountNumbers: string[]): (value: string) => string {
-  const separator = '[\\s./_\\p{Pd}]'
-  const separators = new RegExp(separator, 'gu')
-  const numbers = [...new Set(accountNumbers.map((number) => number.trim()).filter(Boolean))]
-  if (!numbers.length) return (value) => value
-
-  const patterns = numbers
-    .map((number) => ({ number, compact: number.replace(separators, '') }))
-    .sort((a, b) => b.compact.length - a.compact.length)
-    .map(({ number, compact }) => {
-      if (/^\d+$/.test(compact)) return `(?<!\\d)${compact.split('').join(`${separator}*`)}(?!\\d)`
-      const boundary = '[\\p{L}\\p{N}]'
-      if (/^(?=[a-z\d]*\d)[a-z\d]+$/i.test(compact)) {
-        return `(?<!${boundary})${compact.split('').join(`${separator}*`)}(?!${boundary})`
-      }
-      const exact = number.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      return `(?<!${boundary})${exact}(?!${boundary})`
-    })
-  const pattern = new RegExp(patterns.join('|'), 'giu')
-  return (value) => value.replace(pattern, '[account]')
-}
 
 export async function prepareAiRun(filters: Filters): Promise<{ context: AiCategorisationContext; rows: AiRunRow[] }> {
   return db.transaction('r', [db.transactions, db.rules, db.categories], async () => {

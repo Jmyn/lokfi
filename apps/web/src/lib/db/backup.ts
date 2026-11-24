@@ -2,6 +2,11 @@ import { createDefaultPortfolioBuckets } from '../investments/portfolioBuckets'
 import type { LokfiDatabase } from './db'
 
 export const BACKUP_VERSION = 6
+const restoreRevisionKey = 'backup-restore-revision'
+
+export async function getBackupRestoreRevision(db: LokfiDatabase): Promise<string | null> {
+  return (await db.settings.get(restoreRevisionKey))?.value ?? null
+}
 
 export interface LokfiBackup {
   version: 1 | 2 | 3 | 4 | 5 | 6
@@ -180,6 +185,7 @@ export async function importBackupPayload(db: LokfiDatabase, data: LokfiBackup):
   await db.transaction(
     'rw',
     [
+      db.settings,
       db.transactions,
       db.rules,
       db.categories,
@@ -238,6 +244,7 @@ export async function importBackupPayload(db: LokfiDatabase, data: LokfiBackup):
       }
       if (data.portfolioSnapshots.length) await db.portfolioSnapshots.bulkAdd(data.portfolioSnapshots as never[])
       if (data.costBasisOverrides.length) await db.costBasisOverrides.bulkAdd(data.costBasisOverrides as never[])
+      await db.settings.put({ key: restoreRevisionKey, value: crypto.randomUUID() })
     }
   )
 }

@@ -6,6 +6,7 @@ import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
 import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
 import { type RuleSuggestion, suggestRules } from '../../lib/rules/suggestRules'
+import { useAskLokfiWorkspace } from '../ask/AskLokfiContext'
 import { RuleEditorModal } from '../rules/RuleEditorModal'
 import { AiSuggestions } from './AiSuggestions'
 import { CategoryCombobox } from './CategoryCombobox'
@@ -13,7 +14,6 @@ import { RuleSuggestionBar } from './RuleSuggestionBar'
 import { SourceTypeTabs } from './SourceTypeTabs'
 import { TransactionFilters } from './TransactionFilters'
 import { TransactionTable } from './TransactionTable'
-import { type Filters, defaultFilters } from './filterTypes'
 
 type SuggestionState = {
   txnId: string
@@ -25,7 +25,7 @@ type SuggestionState = {
 const PAGE_SIZE = 100
 
 export function TransactionsPage() {
-  const [filters, setFilters] = useState<Filters>(defaultFilters)
+  const { transactionFilters: filters, setTransactionFilters: setFilters } = useAskLokfiWorkspace()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkCategoryId, setBulkCategoryId] = useState('')
   const [suggestionState, setSuggestionState] = useState<SuggestionState | null>(null)
@@ -101,8 +101,15 @@ export function TransactionsPage() {
     filters.dateTo !== '' ||
     filters.sources.length > 0 ||
     filters.accounts.length > 0 ||
+    !!filters.noAccounts ||
     filters.categoryId !== '' ||
-    filters.type !== ''
+    filters.type !== '' ||
+    !!filters.description ||
+    filters.categoryIds !== undefined ||
+    !!filters.excludedCategoryIds?.length ||
+    !!filters.excludeTransfers ||
+    !!filters.excludeInvestments ||
+    !!filters.resultRowIds
 
   function handleToggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -225,7 +232,20 @@ export function TransactionsPage() {
         <div className="flex items-center gap-3">
           <SourceTypeTabs
             value={filters.sourceType}
-            onChange={(sourceType) => setFilters((f) => ({ ...f, sourceType, categoryId: '', type: '' }))}
+            onChange={(sourceType) =>
+              setFilters((f) => ({
+                ...f,
+                sourceType,
+                noAccounts: undefined,
+                categoryId: '',
+                categoryIds: undefined,
+                excludedCategoryIds: undefined,
+                excludeTransfers: undefined,
+                excludeInvestments: undefined,
+                resultRowIds: undefined,
+                type: '',
+              }))
+            }
           />
           {uncategorisedCount !== undefined && uncategorisedCount > 0 && (
             <button
@@ -233,6 +253,7 @@ export function TransactionsPage() {
                 setFilters((f) => ({
                   ...f,
                   categoryId: f.categoryId === '__uncategorised__' ? '' : '__uncategorised__',
+                  categoryIds: undefined,
                 }))
               }
               className="text-xs font-medium px-3 py-1.5 rounded-full border transition-colors"
