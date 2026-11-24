@@ -1,15 +1,16 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Trash2, X } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { db } from '../../lib/db/db'
 import type { DbRule, RuleCondition } from '../../lib/db/db'
 import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
-import { matchesCondition } from '../../lib/rules/evaluateRules'
+import { evaluateRules, matchesCondition } from '../../lib/rules/evaluateRules'
 import { CategoryCombobox } from '../transactions/CategoryCombobox'
 
 type RuleEditorModalProps = {
   rule?: DbRule
+  draft?: Pick<DbRule, 'name' | 'category' | 'conditions' | 'priority'>
   onClose: () => void
   onSaved?: (matchCount: number) => void
 }
@@ -41,21 +42,36 @@ const NUMERIC_OPERATIONS = [
   { value: 'between', label: 'Between' },
 ]
 
-export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps) {
+function normalizeConditions(conditions: RuleCondition[]): RuleCondition[] {
+  return conditions.map((condition) => {
+    if (condition.field !== 'transactionValue') return condition
+    if (condition.operation !== 'between') return { ...condition, value: Number(condition.value) }
+    if (typeof condition.value !== 'string') return condition
+    const parts = condition.value.split(',').map((part) => Number(part.trim()))
+    return { ...condition, value: [parts[0] || 0, parts[1] || 0] }
+  })
+}
+
+export function RuleEditorModal({ rule, draft, onClose, onSaved }: RuleEditorModalProps) {
+  const initial = rule ?? draft
+  const [id] = useState(() => rule?.id || crypto.randomUUID())
+  const [saveError, setSaveError] = useState('')
+  const titleId = useId()
+  const formId = useId()
   const {
     register,
     control,
     handleSubmit,
     watch,
     setValue,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
-      name: rule?.name ?? '',
-      priority: rule?.priority ?? 100,
-      category: rule?.category ?? '',
-      conditions: rule?.conditions?.length
-        ? rule.conditions
+      name: initial?.name ?? '',
+      priority: initial?.priority ?? 100,
+      category: initial?.category ?? '',
+      conditions: initial?.conditions?.length
+        ? initial.conditions
         : [{ field: 'description', operation: 'contains', value: '' }],
     },
   })
@@ -67,8 +83,10 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
 
   const watchConditions = watch('conditions')
   const watchedCategory = watch('category')
+  const priority = watch('priority')
 
   const allTransactions = useLiveQuery(() => db.transactions.toArray(), [])
+  const existingRules = useLiveQuery(() => (draft ? db.rules.orderBy('priority').toArray() : []), [draft])
 
   // Serialize conditions to a stable string so useMemo recomputes when
   // any field/operation/value changes (watch may return the same array ref)
@@ -77,51 +95,51 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
   const preview = useMemo(() => {
     if (!allTransactions || watchConditions.length === 0) return null
     // Only match if every condition has a non-empty value
-    const validConditions = watchConditions.filter((c) => c.value !== '' && c.value !== undefined)
-    if (validConditions.length === 0) return null
+    if (watchConditions.some((condition) => condition.value === '' || condition.value === undefined)) return null
+    const validConditions = normalizeConditions(watchConditions)
 
     const matches: string[] = []
     let count = 0
+    let changes = 0
+    let manual = 0
+    const proposedRules =
+      draft && watchedCategory && existingRules
+        ? [
+            ...existingRules,
+            { id, category: watchedCategory, conditions: validConditions, priority, name: '', createdAt: '' },
+          ].sort((a, b) => a.priority - b.priority || (a.id < b.id ? -1 : 1))
+        : null
     for (const t of allTransactions) {
       if (validConditions.every((cond) => matchesCondition(t, cond))) {
         count++
         if (matches.length < 3) matches.push(t.description)
+        if (t.manualCategory) manual++
+        else if (proposedRules && t.category !== watchedCategory && evaluateRules(t, proposedRules) === watchedCategory)
+          changes++
       }
     }
-    return { count, descriptions: matches }
+    return { count, descriptions: matches, changes: proposedRules ? changes : null, manual }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allTransactions, conditionsKey])
+  }, [allTransactions, conditionsKey, draft, existingRules, id, priority, watchedCategory])
 
   // Close on Escape key
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const handleEsc = (e: KeyboardEvent) => e.key === 'Escape' && !isSubmitting && onClose()
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose])
+  }, [onClose, isSubmitting])
 
   const onSubmit = async (data: FormValues) => {
+    setSaveError('')
     if (data.conditions.length === 0) {
       alert('Please add at least one condition.')
       return
     }
 
-    const cleanedConditions = data.conditions.map((cond) => {
-      if (cond.field === 'transactionValue') {
-        if (cond.operation === 'between') {
-          // If it's stored as a string "a,b"
-          if (typeof cond.value === 'string') {
-            const parts = cond.value.split(',').map((n) => Number(n.trim()))
-            return { ...cond, value: [parts[0] || 0, parts[1] || 0] as [number, number] }
-          }
-        } else {
-          return { ...cond, value: Number(cond.value) }
-        }
-      }
-      return cond
-    }) as RuleCondition[]
+    const cleanedConditions = normalizeConditions(data.conditions)
 
     const record: DbRule = {
-      id: rule?.id || crypto.randomUUID(),
+      id,
       name: data.name,
       priority: Number(data.priority),
       category: data.category,
@@ -129,16 +147,20 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
       createdAt: rule?.createdAt || new Date().toISOString(),
     }
 
-    await db.rules.put(record)
-
-    // Re-evaluate all transactions against the updated rule set
-    const allTxns = await db.transactions.toArray()
-    await applyRulesToImport(allTxns.map((t) => t.id))
-
-    // Count how many transactions match this rule's conditions
-    const matchCount = allTxns.filter(
-      (t) => !t.manualCategory && cleanedConditions.every((cond) => matchesCondition(t, cond))
-    ).length
+    let matchCount: number
+    try {
+      matchCount = await db.transaction('rw', [db.rules, db.transactions, db.categories], async () => {
+        if (!(await db.categories.get(data.category))) throw new Error('Missing category')
+        await db.rules.put(record)
+        const allTxns = await db.transactions.toArray()
+        await applyRulesToImport(allTxns.map((t) => t.id))
+        return allTxns.filter((t) => !t.manualCategory && cleanedConditions.every((cond) => matchesCondition(t, cond)))
+          .length
+      })
+    } catch {
+      setSaveError('The rule could not be saved. Check that the category still exists and try again.')
+      return
+    }
 
     onClose()
     onSaved?.(matchCount)
@@ -146,12 +168,19 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
         <div className="flex justify-between items-center p-4 border-b dark:border-gray-800">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          <h2 id={titleId} className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             {rule ? 'Edit Rule' : 'Create Rule'}
           </h2>
           <button
+            aria-label="Close rule editor"
+            disabled={isSubmitting}
             onClick={onClose}
             className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md"
           >
@@ -160,7 +189,7 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
         </div>
 
         <div className="p-4 overflow-y-auto flex-1">
-          <form id="rule-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form id={formId} onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Rule Name</label>
@@ -280,6 +309,11 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
                     ? 'No matching transactions'
                     : `${preview.count} matching transaction${preview.count !== 1 ? 's' : ''}`}
                 </p>
+                {preview.changes !== null && (
+                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                    {preview.changes} categories would change · {preview.manual} manual categories kept
+                  </p>
+                )}
                 {preview.descriptions.length > 0 && (
                   <ul className="space-y-1">
                     {preview.descriptions.map((desc, i) => (
@@ -294,12 +328,18 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
                 )}
               </div>
             )}
+            {saveError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {saveError}
+              </p>
+            )}
           </form>
         </div>
 
         <div className="p-4 border-t dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-gray-800/20">
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
@@ -307,11 +347,12 @@ export function RuleEditorModal({ rule, onClose, onSaved }: RuleEditorModalProps
           </button>
           <button
             type="submit"
-            form="rule-form"
+            form={formId}
+            disabled={isSubmitting || (!!draft && !existingRules)}
             className="px-4 py-2 text-sm font-medium text-white rounded-md transition-opacity hover:opacity-90"
             style={{ backgroundColor: 'var(--accent)' }}
           >
-            Save Rule
+            {isSubmitting ? 'Saving…' : 'Save Rule'}
           </button>
         </div>
       </div>
