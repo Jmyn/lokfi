@@ -7,6 +7,7 @@ import {
   Moon,
   Pin,
   PinOff,
+  Sparkles,
   Sun,
   TrendingUp,
   Upload,
@@ -29,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Import', path: '/import', icon: Upload },
   { label: 'Transactions', path: '/transactions', icon: List },
   { label: 'Rules', path: '/rules', icon: Wand2 },
+  { label: 'AI Providers', path: '/settings/ai', icon: Sparkles },
 ]
 
 const BOTTOM_NAV: NavItem = { label: 'Profile', path: '/profile', icon: User }
@@ -106,6 +108,7 @@ export function AppShell({ children }: AppShellProps) {
               <Link
                 key={item.path}
                 to={item.path}
+                aria-label={item.label}
                 className={`relative flex items-center h-10 px-4 gap-3 transition-colors ${
                   isActive
                     ? 'text-gray-900 dark:text-white'
