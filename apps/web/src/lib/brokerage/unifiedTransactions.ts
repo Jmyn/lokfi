@@ -499,17 +499,26 @@ export async function fetchUnifiedRows(filters: Filters): Promise<{ rows: Unifie
  * @param filters - Current filter state (including `sourceType`)
  * @param pageOffset - Zero-based offset for pagination
  * @param pageSize - Number of rows per page
- * @returns Object with `rows`, `total`, `hasMore`, and `isLoading`
+ * @returns The page rows, total, and effective offset after clamping to the result set
  */
 export function useUnifiedTransactions(filters: Filters, pageOffset: number, pageSize: number) {
   return useLiveQuery(
     async () => {
       const { rows, total } = await fetchUnifiedRows(filters)
-      const paginated = rows.slice(pageOffset, pageOffset + pageSize)
-      const hasMore = pageOffset + paginated.length < total
-      return { rows: paginated, total, hasMore, isLoading: false }
+      const lastPageOffset = total ? Math.floor((total - 1) / pageSize) * pageSize : 0
+      const visibleOffset = Math.min(pageOffset, lastPageOffset)
+      const paginated = rows.slice(visibleOffset, visibleOffset + pageSize)
+      const hasMore = visibleOffset + paginated.length < total
+      return { rows: paginated, total, hasMore, visibleOffset, requestedOffset: pageOffset, isLoading: false }
     },
     [filters, pageOffset, pageSize],
-    { rows: [] as UnifiedTransactionRow[], total: 0, hasMore: false, isLoading: true }
+    {
+      rows: [] as UnifiedTransactionRow[],
+      total: 0,
+      hasMore: false,
+      visibleOffset: 0,
+      requestedOffset: 0,
+      isLoading: true,
+    }
   )
 }

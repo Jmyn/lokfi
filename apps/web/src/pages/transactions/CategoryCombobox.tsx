@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { db } from '../../lib/db/db'
 
 const CUSTOM_COLORS = ['#f43f5e', '#f97316', '#eab308', '#84cc16', '#06b6d4', '#6366f1', '#a855f7', '#ec4899']
@@ -11,6 +12,9 @@ interface CategoryComboboxProps {
   placeholder?: string
   allowClear?: boolean
   autoOpen?: boolean
+  inline?: boolean
+  disabled?: boolean
+  ariaLabel?: string
 }
 
 type ComboboxOption =
@@ -29,12 +33,17 @@ export function CategoryCombobox({
   placeholder = 'Pick a category…',
   allowClear = false,
   autoOpen = false,
+  inline = false,
+  disabled = false,
+  ariaLabel,
 }: CategoryComboboxProps) {
   const [open, setOpen] = useState(autoOpen)
   const [inputText, setInputText] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(0)
   const categories = useLiveQuery(() => db.categories.toArray(), []) ?? []
   const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const creatingRef = useRef(false)
 
@@ -65,7 +74,8 @@ export function CategoryCombobox({
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
         setOpen(false)
         onClose?.()
       }
@@ -76,10 +86,32 @@ export function CategoryCombobox({
     }
   }, [open, onClose])
 
+  useLayoutEffect(() => {
+    const trigger = triggerRef.current
+    const menu = menuRef.current
+    if (!inline || !open || !trigger || !menu) return
+
+    const placeMenu = () => {
+      const anchor = trigger.getBoundingClientRect()
+      const top = anchor.bottom + 4
+      const above = top + menu.offsetHeight > window.innerHeight && anchor.top > window.innerHeight - anchor.bottom
+      menu.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - menu.offsetWidth - 8))}px`
+      menu.style.top = above ? 'auto' : `${top}px`
+      menu.style.bottom = above ? `${window.innerHeight - anchor.top + 4}px` : 'auto'
+    }
+    placeMenu()
+    window.addEventListener('resize', placeMenu)
+    window.addEventListener('scroll', placeMenu, true)
+    return () => {
+      window.removeEventListener('resize', placeMenu)
+      window.removeEventListener('scroll', placeMenu, true)
+    }
+  }, [inline, open, options.length])
+
   useEffect(() => {
     if (open) {
-      const activeEl = containerRef.current?.querySelector('[data-highlighted="true"]')
-      activeEl?.scrollIntoView({ block: 'nearest' })
+      const activeEl = menuRef.current?.querySelector('[data-highlighted="true"]')
+      activeEl?.scrollIntoView?.({ block: 'nearest' })
     }
   }, [highlightedIndex, open])
 
@@ -98,9 +130,7 @@ export function CategoryCombobox({
         icon: undefined,
         isIncome: false,
       })
-      onChange(id)
-      setOpen(false)
-      onClose?.()
+      handleSelect(id)
     } finally {
       creatingRef.current = false
     }
@@ -110,6 +140,7 @@ export function CategoryCombobox({
     onChange(id)
     setOpen(false)
     onClose?.()
+    if (inline) triggerRef.current?.focus()
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -132,13 +163,18 @@ export function CategoryCombobox({
       e.stopPropagation()
       setOpen(false)
       onClose?.()
+      if (inline) triggerRef.current?.focus()
     }
   }
 
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
+        disabled={disabled}
+        aria-label={ariaLabel && `${ariaLabel} · ${selectedCategory?.name ?? placeholder}`}
+        aria-expanded={open}
         onClick={() => {
           setOpen((o) => {
             if (!o) {
@@ -148,8 +184,12 @@ export function CategoryCombobox({
             return !o
           })
         }}
-        className="flex items-center gap-1.5 text-sm border rounded-full px-3 py-1.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none min-w-[10rem] max-w-[16rem]"
-        style={{ borderColor: 'var(--border)' }}
+        className={
+          inline
+            ? 'flex min-w-28 max-w-40 items-center gap-1.5 rounded px-1.5 py-0.5 text-xs font-medium text-gray-800 hover:bg-amber-100 disabled:opacity-50 dark:text-gray-100 dark:hover:bg-amber-900'
+            : 'flex items-center gap-1.5 text-sm border rounded-full px-3 py-1.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none min-w-[10rem] max-w-[16rem]'
+        }
+        style={inline ? undefined : { borderColor: 'var(--border)' }}
       >
         {selectedCategory ? (
           <>
@@ -168,101 +208,109 @@ export function CategoryCombobox({
         </svg>
       </button>
 
-      {open && (
-        <div
-          className="absolute top-full left-0 mt-1 w-56 rounded-lg border shadow-lg py-1 bg-white dark:bg-gray-900 z-[1000]"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          <div className="px-2 pb-1">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputText}
-              onChange={(e) => {
-                setInputText(e.target.value)
-                setHighlightedIndex(0)
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Search or create…"
-              className="w-full rounded-md border px-2 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1"
-              style={
-                {
-                  borderColor: 'var(--border)',
-                  '--tw-ring-color': 'var(--accent)',
-                } as React.CSSProperties
-              }
-            />
-          </div>
+      {open &&
+        renderMenu(
+          <div
+            ref={menuRef}
+            className={`w-56 max-w-[calc(100vw-1rem)] rounded-lg border shadow-lg py-1 bg-white dark:bg-gray-900 z-[1000] ${inline ? 'fixed' : 'absolute top-full left-0 mt-1'}`}
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <div className="px-2 pb-1">
+              <input
+                ref={inputRef}
+                type="text"
+                aria-label="Search categories"
+                value={inputText}
+                onChange={(e) => {
+                  setInputText(e.target.value)
+                  setHighlightedIndex(0)
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Search or create…"
+                className="w-full rounded-md border px-2 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1"
+                style={
+                  {
+                    borderColor: 'var(--border)',
+                    '--tw-ring-color': 'var(--accent)',
+                  } as React.CSSProperties
+                }
+              />
+            </div>
 
-          <div className="max-h-28 overflow-y-auto">
-            {options.map((opt, index) => {
-              const isHighlighted = index === highlightedIndex
-              const baseClass = 'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-left '
-              const highlightClass = isHighlighted
-                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                : 'text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
+            <div className="max-h-28 overflow-y-auto">
+              {options.map((opt, index) => {
+                const isHighlighted = index === highlightedIndex
+                const baseClass = 'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-left '
+                const highlightClass = isHighlighted
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                  : 'text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
 
-              if (opt.type === 'clear') {
-                return (
-                  <button
-                    key="clear"
-                    type="button"
-                    onClick={() => handleSelect('')}
-                    data-highlighted={isHighlighted}
-                    className={
-                      baseClass +
-                      (isHighlighted
-                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800')
-                    }
-                  >
-                    Uncategorised
-                  </button>
-                )
-              }
+                if (opt.type === 'clear') {
+                  return (
+                    <button
+                      key="clear"
+                      type="button"
+                      onClick={() => handleSelect('')}
+                      data-highlighted={isHighlighted}
+                      className={
+                        baseClass +
+                        (isHighlighted
+                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800')
+                      }
+                    >
+                      Uncategorised
+                    </button>
+                  )
+                }
 
-              if (opt.type === 'category' && opt.category) {
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => handleSelect(opt.id)}
-                    data-highlighted={isHighlighted}
-                    className={baseClass + highlightClass}
-                  >
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: opt.category.color }} />
-                    <span className="truncate">{opt.category.name}</span>
-                  </button>
-                )
-              }
+                if (opt.type === 'category' && opt.category) {
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleSelect(opt.id)}
+                      data-highlighted={isHighlighted}
+                      className={baseClass + highlightClass}
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: opt.category.color }} />
+                      <span className="truncate">{opt.category.name}</span>
+                    </button>
+                  )
+                }
 
-              if (opt.type === 'create') {
-                return (
-                  <button
-                    key="create"
-                    type="button"
-                    onClick={handleCreateCategory}
-                    data-highlighted={isHighlighted}
-                    className={
-                      baseClass +
-                      'font-medium ' +
-                      (isHighlighted
-                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-800')
-                    }
-                    style={{ color: 'var(--accent)' }}
-                  >
-                    + Create &ldquo;{opt.name}&rdquo;
-                  </button>
-                )
-              }
-              return null
-            })}
+                if (opt.type === 'create') {
+                  return (
+                    <button
+                      key="create"
+                      type="button"
+                      onClick={handleCreateCategory}
+                      data-highlighted={isHighlighted}
+                      className={
+                        baseClass +
+                        'font-medium ' +
+                        (isHighlighted
+                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                          : 'hover:bg-gray-50 dark:hover:bg-gray-800')
+                      }
+                      style={{ color: 'var(--accent)' }}
+                    >
+                      + Create &ldquo;{opt.name}&rdquo;
+                    </button>
+                  )
+                }
+                return null
+              })}
 
-            {options.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No categories found.</p>}
-          </div>
-        </div>
-      )}
+              {options.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No categories found.</p>}
+            </div>
+          </div>,
+          inline
+        )}
     </div>
   )
+}
+
+function renderMenu(menu: React.ReactElement, inline: boolean) {
+  return inline ? createPortal(menu, document.body) : menu
 }

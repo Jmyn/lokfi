@@ -1,5 +1,5 @@
 import { Check, Copy } from 'lucide-react'
-import { useState } from 'react'
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { UnifiedTransactionRow } from '../../lib/brokerage/unifiedTransactions'
 import { BROKERAGE_TYPE_LABELS } from '../../lib/brokerage/unifiedTransactions'
 import type { DbTransaction } from '../../lib/db/db'
@@ -69,6 +69,8 @@ function formatSource(row: UnifiedTransactionRow): string {
   return `${icon} ${row.source}`
 }
 
+export type TransactionRowExit = 'saving' | 'ready'
+
 interface TransactionTableProps {
   rows: UnifiedTransactionRow[]
   sourceType: SourceType
@@ -76,6 +78,10 @@ interface TransactionTableProps {
   onToggleSelect: (id: string) => void
   onToggleAll: (ids: string[]) => void
   onCategoryChanged?: (txn: DbTransaction, categoryId: string | undefined) => void
+  renderCategorySuggestion?: (transaction: DbTransaction) => ReactNode
+  categoryHeaderAction?: ReactNode
+  rowExits?: ReadonlyMap<string, TransactionRowExit>
+  onRowExit?: (id: string) => void
   pageOffset: number
   total: number
   hasMore: boolean
@@ -89,6 +95,10 @@ export function TransactionTable({
   onToggleSelect,
   onToggleAll,
   onCategoryChanged,
+  renderCategorySuggestion,
+  categoryHeaderAction,
+  rowExits,
+  onRowExit,
   pageOffset,
   total,
   hasMore,
@@ -96,6 +106,44 @@ export function TransactionTable({
 }: TransactionTableProps) {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const previousPage = useRef({ rows, pageOffset })
+  const liveIds = useMemo(() => new Set(rows.map(({ id }) => id)), [rows])
+  const displayRows = useMemo(() => {
+    if (!rowExits?.size || previousPage.current.pageOffset < pageOffset) return rows
+
+    if (previousPage.current.pageOffset > pageOffset) {
+      // The last row on a later page can fade above the recovered page.
+      const departing = previousPage.current.rows.filter(({ id }) => !liveIds.has(id) && rowExits.has(id))
+      return [...departing, ...rows]
+    }
+
+    // Retain departing rows beside their previous neighbours until the fade completes.
+    const combined = [...rows]
+    const liveIndices = new Map(rows.map(({ id }, index) => [id, index]))
+    let nextIndex = rows.length
+    for (const row of [...previousPage.current.rows].reverse()) {
+      const index = liveIndices.get(row.id)
+      if (index !== undefined) nextIndex = index
+      else if (rowExits.has(row.id)) combined.splice(nextIndex, 0, row)
+    }
+    return combined
+  }, [rows, rowExits, pageOffset, liveIds])
+
+  useLayoutEffect(() => {
+    previousPage.current = { rows: displayRows, pageOffset }
+  }, [displayRows, pageOffset])
+
+  const fadingIds = useMemo(
+    () =>
+      new Set(displayRows.filter(({ id }) => !liveIds.has(id) && rowExits?.get(id) === 'ready').map(({ id }) => id)),
+    [displayRows, liveIds, rowExits]
+  )
+  useEffect(() => {
+    if (!fadingIds.size || !onRowExit) return
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const timeout = window.setTimeout(() => fadingIds.forEach(onRowExit), reducedMotion ? 0 : 220)
+    return () => window.clearTimeout(timeout)
+  }, [fadingIds, onRowExit])
 
   const selectableIds = rows.filter((t) => t.isBank).map((t) => t.id)
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id))
@@ -136,7 +184,10 @@ export function TransactionTable({
               Amount
             </th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Category
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>Category</span>
+                {categoryHeaderAction}
+              </div>
             </th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Source
@@ -147,17 +198,29 @@ export function TransactionTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((t, i) => {
+          {displayRows.map((t, i) => {
             const isSelected = selectedIds.has(t.id)
             const isEven = i % 2 === 0
             const isEditing = editingCategoryId === t.id
+            const isRetained = !liveIds.has(t.id)
+            const isFading = fadingIds.has(t.id)
 
             return (
               <tr
                 key={t.id}
-                className={`border-b transition-colors ${
+                inert={isRetained || undefined}
+                aria-hidden={isRetained || undefined}
+                className={`border-b transition-colors ${isFading ? 'motion-safe:animate-[transaction-row-exit_180ms_ease-out_forwards]' : ''} ${
                   isEditing ? 'relative z-50 ring-2 ring-amber-500 shadow-xl rounded-md bg-white dark:bg-gray-800' : ''
                 }`}
+                onAnimationEnd={
+                  isFading
+                    ? (event) => {
+                        if (event.target === event.currentTarget && event.animationName === 'transaction-row-exit')
+                          onRowExit?.(t.id)
+                      }
+                    : undefined
+                }
                 style={
                   isEditing
                     ? undefined
@@ -227,15 +290,18 @@ export function TransactionTable({
                 </td>
                 <td className={`px-3 py-2.5 ${isEditing ? 'relative z-50' : ''}`}>
                   {t.isBank && t.originalBank ? (
-                    <CategoryBadge
-                      transactionId={t.id}
-                      category={t.originalBank.category}
-                      manualCategory={t.originalBank.manualCategory}
-                      isEditing={isEditing}
-                      onStartEdit={() => setEditingCategoryId(t.id)}
-                      onStopEdit={() => setEditingCategoryId(null)}
-                      onCategoryChanged={onCategoryChanged}
-                    />
+                    <div className="flex flex-col items-start">
+                      <CategoryBadge
+                        transactionId={t.id}
+                        category={t.originalBank.category}
+                        manualCategory={t.originalBank.manualCategory}
+                        isEditing={isEditing}
+                        onStartEdit={() => setEditingCategoryId(t.id)}
+                        onStopEdit={() => setEditingCategoryId(null)}
+                        onCategoryChanged={onCategoryChanged}
+                      />
+                      {!isEditing && renderCategorySuggestion?.(t.originalBank)}
+                    </div>
                   ) : (
                     <span className="text-gray-400 dark:text-gray-500 text-xs">—</span>
                   )}

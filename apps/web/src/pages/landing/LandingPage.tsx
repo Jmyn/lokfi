@@ -37,7 +37,7 @@ export function LandingPage() {
           privately tracked.
         </h1>
         <p className="text-base text-gray-500 dark:text-gray-400 mb-8">
-          Import bank statements, categorise spending, and understand your money — all on your device.
+          Import bank statements, categorise spending, and understand your money. Lokfi runs in your browser.
         </p>
         <button
           onClick={() => navigate({ to: '/import' })}
@@ -47,7 +47,7 @@ export function LandingPage() {
           Import your first statement →
         </button>
         <p className="mt-6 text-xs text-gray-400 dark:text-gray-500">
-          No accounts, no cloud. Everything stays on your device.
+          Lokfi stores your data on your device. Optional AI suggestions send filtered statement context to OpenAI.
         </p>
         <a
           href="/docs"
