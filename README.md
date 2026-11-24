@@ -40,7 +40,7 @@ Lokfi follows a "Zero Telemetry" policy. We do not track you, we do not use cook
 | Bank | Debit | Credit | Notes |
 | ---- | ----- | ------ | ----- |
 | OCBC | — | ✅ | support PDF credit/debit statements and CSV transaction history |
-| Citibank | — | — | |
+| Citibank | — | ✅ | Singapore credit card statements in SGD (PDF) |
 | UOB | — | — | |
 | Crypto.com | ✅ | — | support CSV card transaction history |
 | **DBS / POSB** | Planned | Planned | Phase 2 |

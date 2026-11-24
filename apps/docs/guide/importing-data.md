@@ -13,6 +13,8 @@ Navigate to the **Import** page from the sidebar.
 | **CSV** | Transaction history exports | Clean machine-readable text, faster processing |
 | **PDF** | Monthly bank statements | Text extracted via `pdfjs-dist`; may have OCR artifacts |
 
+Citibank Singapore credit card statements in SGD are supported as PDFs. See [Supported Banks](../reference/supported-banks#citibank) for details.
+
 > **Tip:** Prefer CSV over PDF when available. CSV gives cleaner descriptions and faster processing. See [CSV vs PDF](../#prefer-csv-over-pdf) for details.
 
 ### How to Import
@@ -20,7 +22,7 @@ Navigate to the **Import** page from the sidebar.
 1. Go to **Import** in the sidebar
 2. Drag and drop files onto the upload zone, or click to select files
 3. Lokfi auto-detects the bank and parser — review the assignment if needed
-4. Click **Import** to process
+4. Click **Import All** to save the parsed transactions
 
 ### Auto-Detection
 

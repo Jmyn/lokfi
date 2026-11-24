@@ -1,5 +1,6 @@
 import {
   CdcDebitParser,
+  CitibankCreditPdfParser,
   CustomCsvParser,
   GenericCsvParser,
   GenericPdfParser,
@@ -45,6 +46,8 @@ export function ImportPage() {
       r.register(new CustomCsvParser(profile))
     }
     r.register(new CdcDebitParser())
+    // OCBC's detector can match an OCBC mention in an otherwise valid Citi statement.
+    r.register(new CitibankCreditPdfParser())
     r.register(new OcbcCreditPdfParser())
     r.register(new GenericPdfParser())
     r.registerFallback(new GenericCsvParser())
@@ -112,15 +115,12 @@ export function ImportPage() {
       updateItem(file, { status: 'parsing' })
 
       let parser: StatementParser | null = null
-      let pdfBuffer: ArrayBuffer | undefined
       try {
         const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
 
         if (isPdf) {
           // PDF: read as ArrayBuffer, extract text via worker, then parse
-          const buffer = await file.arrayBuffer()
-          pdfBuffer = buffer
-          const extractedText = await parsePdf(buffer)
+          const extractedText = await parsePdf(await file.arrayBuffer())
           parser = registry.getParser(extractedText)
           if (!parser) throw new ParseError('No parser found for this PDF')
           const statement = parser.parse(extractedText)
@@ -130,7 +130,6 @@ export function ImportPage() {
             transactionCount: statement.transactions.length,
             statement,
             rawText: extractedText,
-            rawBuffer: buffer,
             parserLabel: parser.label,
           })
         } else {
@@ -159,7 +158,6 @@ export function ImportPage() {
         updateItem(file, {
           status: 'error',
           error: message,
-          rawBuffer: pdfBuffer,
           parserLabel: parser?.label,
         })
       }
@@ -169,17 +167,9 @@ export function ImportPage() {
   async function handleChangeParser(item: FileParseResult, parser: StatementParser) {
     updateItem(item.file, { status: 'parsing' })
 
-    let buffer: ArrayBuffer | undefined
     try {
       const isPdf = item.file.type === 'application/pdf' || item.file.name.toLowerCase().endsWith('.pdf')
-      let text: string
-
-      if (isPdf) {
-        buffer = item.rawBuffer ?? (await item.file.arrayBuffer())
-        text = await parsePdf(buffer)
-      } else {
-        text = item.rawText ?? (await item.file.text())
-      }
+      const text = item.rawText ?? (isPdf ? await parsePdf(await item.file.arrayBuffer()) : await item.file.text())
 
       const statement = parser.parse(text)
 
@@ -197,7 +187,6 @@ export function ImportPage() {
         transactionCount: statement.transactions.length,
         statement,
         rawText: text,
-        rawBuffer: buffer,
         profileName: matchedProfileName,
         parserLabel: parser.label,
       })
@@ -206,7 +195,6 @@ export function ImportPage() {
       updateItem(item.file, {
         status: 'error',
         error: message,
-        rawBuffer: buffer,
         parserLabel: parser.label,
       })
     }
