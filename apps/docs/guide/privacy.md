@@ -16,7 +16,7 @@ The code is open-source specifically so you can verify this yourself.
 
 ## Local-First Architecture
 
-All processing happens on your device:
+Core processing happens on your device:
 
 | Operation | Where it runs |
 |-----------|--------------|
@@ -27,7 +27,9 @@ All processing happens on your device:
 | FX conversion | Your browser |
 | Data storage | IndexedDB in your browser |
 
-**No financial data is ever transmitted to a server.** The application has no backend.
+Lokfi has no backend. When you enable AI suggestions, your browser sends the filtered statement descriptions, bank or source, credit or debit direction, and category and rule context directly to your AI provider. Lokfi masks known source account numbers before sending this context. Other details in statement descriptions may still identify people or businesses. AI suggestions can be wrong. Review categories before applying them.
+
+Lokfi encrypts your provider key in IndexedDB and decrypts it for browser requests. You can remove the key in **AI Providers**. The key stays out of Lokfi backups.
 
 ## Data Storage
 
@@ -70,7 +72,7 @@ No. The web app is a static site hosted on a CDN. There is no backend, no databa
 Lokfi fetches exchange rates from the Frankfurter API (a free, public service). No financial data is sent in the request — only the currency pair and date. Rates are cached locally.
 
 **Can I use Lokfi offline?**
-Once the app is loaded, yes. All data and processing are local. Exchange rates will use cached data when offline.
+Once the app is loaded, yes. Statement parsing, rules, and manual categorisation work locally. AI suggestions need an internet connection, and exchange rates use cached data when offline.
 
 **What happens if I clear my browser data?**
 All Lokfi data will be removed. Make sure to export a backup first.

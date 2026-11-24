@@ -1,6 +1,6 @@
 # Getting Started
 
-Lokfi runs entirely in your browser. There is nothing to install, no account to create, and no data ever leaves your device.
+Lokfi runs in your browser without an installation or a Lokfi account. Statement parsing and data storage happen on your device.
 
 ## Using the Web App
 
@@ -37,7 +37,7 @@ Lokfi is a **local-first** application:
 3. **Categorize** — The rule engine automatically assigns categories to each transaction
 4. **Explore** — View your finances dashboard, transactions table, and investment portfolio
 
-All processing happens on your machine. No data is sent to any server.
+Core processing happens on your machine. [Optional AI suggestions](./privacy#local-first-architecture) send context for all matching statement transactions directly to OpenAI.
 
 ## Next Steps
 

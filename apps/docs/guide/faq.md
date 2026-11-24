@@ -4,7 +4,7 @@
 
 ### What is Lokfi?
 
-Lokfi is a privacy-first, local-first personal finance tracker. It parses bank statements (PDF/CSV) and syncs brokerage data entirely in your browser. Your data never leaves your device.
+Lokfi is a privacy-first, local-first personal finance tracker. It parses bank statements (PDF/CSV) and stores financial data in your browser. When you use [AI suggestions](./privacy#local-first-architecture), your browser sends transaction context directly to your provider.
 
 ### Is Lokfi free?
 
