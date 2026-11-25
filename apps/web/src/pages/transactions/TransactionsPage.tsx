@@ -6,13 +6,14 @@ import { db } from '../../lib/db/db'
 import type { DbTransaction } from '../../lib/db/db'
 import { applyRulesToImport } from '../../lib/rules/applyRulesToImport'
 import { type RuleSuggestion, suggestRules } from '../../lib/rules/suggestRules'
+import { useAskLokfiWorkspace } from '../ask/AskLokfiContext'
 import { RuleEditorModal } from '../rules/RuleEditorModal'
+import { AiSuggestions } from './AiSuggestions'
 import { CategoryCombobox } from './CategoryCombobox'
 import { RuleSuggestionBar } from './RuleSuggestionBar'
 import { SourceTypeTabs } from './SourceTypeTabs'
 import { TransactionFilters } from './TransactionFilters'
 import { TransactionTable } from './TransactionTable'
-import { type Filters, defaultFilters } from './filterTypes'
 
 type SuggestionState = {
   txnId: string
@@ -24,7 +25,7 @@ type SuggestionState = {
 const PAGE_SIZE = 100
 
 export function TransactionsPage() {
-  const [filters, setFilters] = useState<Filters>(defaultFilters)
+  const { transactionFilters: filters, setTransactionFilters: setFilters } = useAskLokfiWorkspace()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkCategoryId, setBulkCategoryId] = useState('')
   const [suggestionState, setSuggestionState] = useState<SuggestionState | null>(null)
@@ -36,7 +37,17 @@ export function TransactionsPage() {
   const [pageOffset, setPageOffset] = useState(0)
 
   // Unified data
-  const { rows, total, hasMore, isLoading } = useUnifiedTransactions(filters, pageOffset, PAGE_SIZE)
+  const { rows, total, hasMore, visibleOffset, requestedOffset, isLoading } = useUnifiedTransactions(
+    filters,
+    pageOffset,
+    PAGE_SIZE
+  )
+
+  useEffect(() => {
+    if (visibleOffset !== requestedOffset) {
+      setPageOffset((offset) => (offset === requestedOffset ? visibleOffset : offset))
+    }
+  }, [visibleOffset, requestedOffset])
 
   // Cache all transactions for suggestRules (only reload when categories/rules change)
   const allTxnsRef = useRef<DbTransaction[]>([])
@@ -90,8 +101,15 @@ export function TransactionsPage() {
     filters.dateTo !== '' ||
     filters.sources.length > 0 ||
     filters.accounts.length > 0 ||
+    !!filters.noAccounts ||
     filters.categoryId !== '' ||
-    filters.type !== ''
+    filters.type !== '' ||
+    !!filters.description ||
+    filters.categoryIds !== undefined ||
+    !!filters.excludedCategoryIds?.length ||
+    !!filters.excludeTransfers ||
+    !!filters.excludeInvestments ||
+    !!filters.resultRowIds
 
   function handleToggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -214,7 +232,20 @@ export function TransactionsPage() {
         <div className="flex items-center gap-3">
           <SourceTypeTabs
             value={filters.sourceType}
-            onChange={(sourceType) => setFilters((f) => ({ ...f, sourceType, categoryId: '', type: '' }))}
+            onChange={(sourceType) =>
+              setFilters((f) => ({
+                ...f,
+                sourceType,
+                noAccounts: undefined,
+                categoryId: '',
+                categoryIds: undefined,
+                excludedCategoryIds: undefined,
+                excludeTransfers: undefined,
+                excludeInvestments: undefined,
+                resultRowIds: undefined,
+                type: '',
+              }))
+            }
           />
           {uncategorisedCount !== undefined && uncategorisedCount > 0 && (
             <button
@@ -222,6 +253,7 @@ export function TransactionsPage() {
                 setFilters((f) => ({
                   ...f,
                   categoryId: f.categoryId === '__uncategorised__' ? '' : '__uncategorised__',
+                  categoryIds: undefined,
                 }))
               }
               className="text-xs font-medium px-3 py-1.5 rounded-full border transition-colors"
@@ -238,29 +270,38 @@ export function TransactionsPage() {
       </div>
 
       <TransactionFilters filters={filters} onChange={setFilters} />
-
-      <div className="flex-1 overflow-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">Loading…</div>
-        ) : hasAnyData && total === 0 && hasFilters ? (
-          <div className="flex items-center justify-center h-40">
-            <p className="text-gray-400 dark:text-gray-500 text-sm">No transactions match your filters.</p>
+      <AiSuggestions filters={filters} categories={categories ?? []}>
+        {(renderSuggestion, categoryHeaderAction, rowExits, onRowExit) => (
+          <div className="flex-1 overflow-auto">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">
+                Loading…
+              </div>
+            ) : hasAnyData && total === 0 && hasFilters && !rowExits?.size ? (
+              <div className="flex items-center justify-center h-40">
+                <p className="text-gray-400 dark:text-gray-500 text-sm">No transactions match your filters.</p>
+              </div>
+            ) : (
+              <TransactionTable
+                rows={rows}
+                sourceType={filters.sourceType}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+                onToggleAll={handleToggleAll}
+                onCategoryChanged={handleCategoryChanged}
+                renderCategorySuggestion={renderSuggestion}
+                categoryHeaderAction={categoryHeaderAction}
+                rowExits={rowExits}
+                onRowExit={onRowExit}
+                pageOffset={visibleOffset}
+                total={total}
+                hasMore={hasMore}
+                onLoadMore={() => setPageOffset(visibleOffset + PAGE_SIZE)}
+              />
+            )}
           </div>
-        ) : (
-          <TransactionTable
-            rows={rows}
-            sourceType={filters.sourceType}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-            onToggleAll={handleToggleAll}
-            onCategoryChanged={handleCategoryChanged}
-            pageOffset={pageOffset}
-            total={total}
-            hasMore={hasMore}
-            onLoadMore={() => setPageOffset((o) => o + PAGE_SIZE)}
-          />
         )}
-      </div>
+      </AiSuggestions>
 
       {/* Bottom bar: suggestion bar takes priority over bulk bar */}
       {suggestionState ? (

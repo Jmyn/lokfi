@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes transaction-row-exit {
+  to {
+    opacity: 0;
+  }
+}
+
 @layer base {
   :root {
     --bg: #fafaf8;

@@ -4,7 +4,7 @@ layout: home
 
 hero:
   name: "Lokfi"
-  text: "See where your money actually goes — without giving it to anyone."
+  text: "See where your money actually goes."
   tagline: Privacy-first personal finance tracker. Local-first, zero-telemetry, open-source.
   # image:
   #   src: /lokfi-logo.svg
@@ -18,9 +18,9 @@ hero:
       link: https://github.com/jmyn/lokfi
 
 features:
-  - title: "100% Private"
+  - title: "Private by Default"
     icon: 🛡️
-    details: Your data never leaves your device. All parsing and storage happen locally in your browser. No servers, no accounts, no cloud dependency.
+    details: Statement parsing and storage happen in your browser. Optional AI suggestions send filtered statement context to OpenAI.
   - title: "Smart Categorization"
     icon: ⚙️
     details: A powerful rule engine automatically categorizes transactions as you import them. Manual overrides are always respected.

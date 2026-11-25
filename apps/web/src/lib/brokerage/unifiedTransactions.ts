@@ -1,6 +1,7 @@
 import type { BrokerageFundDetail, BrokerageTransaction } from '@lokfi/brokerage-core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { Filters } from '../../pages/transactions/filterTypes'
+import { getBankSpendingExclusion } from '../bankSpendingExclusions'
 import { type DbTransaction, db } from '../db/db'
 import { toYYYYMMDD } from '../format'
 
@@ -376,6 +377,10 @@ export function mapFundDetail(d: BrokerageFundDetail): UnifiedTransactionRow[] {
 
 // ── Filtering ───────────────────────────────────────────────────────────────
 
+function matchesDescription(description: string, search: string | undefined): boolean {
+  return !search || description.toLowerCase().includes(search.toLowerCase())
+}
+
 function filterBankRow(row: UnifiedTransactionRow, filters: Filters): boolean {
   if (!row.isBank || !row.originalBank) return false
   const t = row.originalBank
@@ -383,8 +388,14 @@ function filterBankRow(row: UnifiedTransactionRow, filters: Filters): boolean {
   if (filters.dateFrom && t.date < filters.dateFrom) return false
   if (filters.dateTo && t.date > filters.dateTo) return false
   if (filters.sources.length > 0 && !filters.sources.includes(t.source)) return false
+  if (filters.noAccounts) return false
   if (filters.accounts.length > 0 && !filters.accounts.includes(t.accountNo)) return false
   if (filters.type && row.type !== filters.type) return false
+  if (!matchesDescription(t.description, filters.description)) return false
+  if (filters.resultRowIds && !filters.resultRowIds.has(t.id)) return false
+  if (filters.categoryIds && !filters.categoryIds.includes(t.manualCategory ?? t.category ?? '__uncategorised__')) {
+    return false
+  }
   if (filters.categoryId) {
     const resolved = t.manualCategory ?? t.category
     if (filters.categoryId === '__uncategorised__') {
@@ -403,6 +414,8 @@ function filterBrokerageRow(row: UnifiedTransactionRow, filters: Filters): boole
   if (filters.dateTo && dateOnly > filters.dateTo) return false
   if (filters.sources.length > 0 && !filters.sources.includes(row.source)) return false
   if (filters.type && row.type !== filters.type) return false
+  if (!matchesDescription(row.description, filters.description)) return false
+  if (filters.resultRowIds && !filters.resultRowIds.has(row.id)) return false
   // Bank-specific filters (accounts, categoryId) don't apply to brokerage rows
   // DIVIDEND_TAX, TRANSFER_IN, REBATE, FEE don't have symbol-specific filtering
   return true
@@ -439,8 +452,17 @@ export async function fetchUnifiedRows(filters: Filters): Promise<{ rows: Unifie
       query = query.and((t) => filters.accounts.includes(t.accountNo))
     }
 
+    const categoryNames =
+      filters.excludeTransfers || filters.excludeInvestments
+        ? new Map((await db.categories.toArray()).map(({ id, name }) => [id, name]))
+        : null
     const allBank = await query.toArray()
     for (const t of allBank) {
+      if (
+        (categoryNames || filters.excludedCategoryIds?.length) &&
+        getBankSpendingExclusion(t, categoryNames?.get(t.manualCategory ?? t.category ?? ''), filters)
+      )
+        continue
       const row = mapBankTransaction(t)
       if (filterBankRow(row, filters)) {
         bankRows.push(row)
@@ -499,17 +521,26 @@ export async function fetchUnifiedRows(filters: Filters): Promise<{ rows: Unifie
  * @param filters - Current filter state (including `sourceType`)
  * @param pageOffset - Zero-based offset for pagination
  * @param pageSize - Number of rows per page
- * @returns Object with `rows`, `total`, `hasMore`, and `isLoading`
+ * @returns The page rows, total, and effective offset after clamping to the result set
  */
 export function useUnifiedTransactions(filters: Filters, pageOffset: number, pageSize: number) {
   return useLiveQuery(
     async () => {
       const { rows, total } = await fetchUnifiedRows(filters)
-      const paginated = rows.slice(pageOffset, pageOffset + pageSize)
-      const hasMore = pageOffset + paginated.length < total
-      return { rows: paginated, total, hasMore, isLoading: false }
+      const lastPageOffset = total ? Math.floor((total - 1) / pageSize) * pageSize : 0
+      const visibleOffset = Math.min(pageOffset, lastPageOffset)
+      const paginated = rows.slice(visibleOffset, visibleOffset + pageSize)
+      const hasMore = visibleOffset + paginated.length < total
+      return { rows: paginated, total, hasMore, visibleOffset, requestedOffset: pageOffset, isLoading: false }
     },
     [filters, pageOffset, pageSize],
-    { rows: [] as UnifiedTransactionRow[], total: 0, hasMore: false, isLoading: true }
+    {
+      rows: [] as UnifiedTransactionRow[],
+      total: 0,
+      hasMore: false,
+      visibleOffset: 0,
+      requestedOffset: 0,
+      isLoading: true,
+    }
   )
 }

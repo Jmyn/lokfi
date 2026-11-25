@@ -7,6 +7,7 @@ import { InvestmentsPage } from './pages/investments/InvestmentsPage'
 import { LandingPage } from './pages/landing/LandingPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
 import { RulesPage } from './pages/rules/RulesPage'
+import { AiProvidersSettingsPage } from './pages/settings/AiProvidersSettingsPage'
 import { BrokerageSettingsPage } from './pages/settings/BrokerageSettingsPage'
 import { TransactionsPage } from './pages/transactions/TransactionsPage'
 
@@ -78,6 +79,12 @@ const brokerageSettingsRoute = createRoute({
   component: BrokerageSettingsPage,
 })
 
+const aiProvidersSettingsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/settings/ai',
+  component: AiProvidersSettingsPage,
+})
+
 const routeTree = rootRoute.addChildren([
   landingRoute,
   shellRoute.addChildren([
@@ -88,6 +95,7 @@ const routeTree = rootRoute.addChildren([
     profileRoute,
     rulesRoute,
     brokerageSettingsRoute,
+    aiProvidersSettingsRoute,
   ]),
 ])
 

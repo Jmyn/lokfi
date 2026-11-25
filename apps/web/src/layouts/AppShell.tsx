@@ -4,9 +4,11 @@ import {
   LayoutDashboard,
   List,
   type LucideIcon,
+  MessageCircle,
   Moon,
   Pin,
   PinOff,
+  Sparkles,
   Sun,
   TrendingUp,
   Upload,
@@ -16,6 +18,8 @@ import {
 import { useTheme } from 'next-themes'
 import { useState } from 'react'
 import { Toaster } from 'sonner'
+import { AskLokfiProvider } from '../pages/ask/AskLokfiContext'
+import { AskLokfiPanel } from '../pages/ask/AskLokfiPanel'
 
 interface NavItem {
   label: string
@@ -29,6 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Import', path: '/import', icon: Upload },
   { label: 'Transactions', path: '/transactions', icon: List },
   { label: 'Rules', path: '/rules', icon: Wand2 },
+  { label: 'AI Providers', path: '/settings/ai', icon: Sparkles },
 ]
 
 const BOTTOM_NAV: NavItem = { label: 'Profile', path: '/profile', icon: User }
@@ -37,9 +42,18 @@ interface AppShellProps {
   children: React.ReactNode
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell(props: AppShellProps) {
+  return (
+    <AskLokfiProvider>
+      <AppShellLayout {...props} />
+    </AskLokfiProvider>
+  )
+}
+
+function AppShellLayout({ children }: AppShellProps) {
   const [pinned, setPinned] = useState(() => localStorage.getItem('sidebar-pinned') === 'true')
   const [hovered, setHovered] = useState(false)
+  const [askOpen, setAskOpen] = useState(false)
   const routerState = useRouterState()
   const { theme, setTheme } = useTheme()
 
@@ -54,7 +68,7 @@ export function AppShell({ children }: AppShellProps) {
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'var(--bg)' }}>
       {/* Sidebar */}
       <aside
-        className={`flex flex-col border-r transition-all duration-200 ${expanded ? 'w-56' : 'w-16'}`}
+        className={`flex shrink-0 flex-col border-r transition-all duration-200 ${expanded ? 'w-56' : 'w-16'}`}
         style={{
           backgroundColor: 'var(--bg-sidebar)',
           borderColor: 'var(--border)',
@@ -99,6 +113,18 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* Top nav */}
         <nav className="flex-1 py-2 overflow-hidden">
+          <button
+            type="button"
+            aria-label="Ask Lokfi"
+            aria-expanded={askOpen}
+            title="Ask Lokfi"
+            onClick={() => setAskOpen((shown) => !shown)}
+            className="mx-2 mb-1 flex h-10 w-[calc(100%-1rem)] items-center gap-3 overflow-hidden rounded-md px-2.5 text-left text-sm font-semibold"
+            style={{ color: 'var(--accent-text)', backgroundColor: 'var(--accent-subtle)' }}
+          >
+            <MessageCircle size={18} className="shrink-0" />
+            {expanded && <span className="whitespace-nowrap">Ask Lokfi</span>}
+          </button>
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.path
@@ -106,6 +132,7 @@ export function AppShell({ children }: AppShellProps) {
               <Link
                 key={item.path}
                 to={item.path}
+                aria-label={item.label}
                 className={`relative flex items-center h-10 px-4 gap-3 transition-colors ${
                   isActive
                     ? 'text-gray-900 dark:text-white'
@@ -186,9 +213,10 @@ export function AppShell({ children }: AppShellProps) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--bg)' }}>
+      <main className="min-w-0 flex-1 overflow-auto" style={{ backgroundColor: 'var(--bg)' }}>
         {children}
       </main>
+      <AskLokfiPanel open={askOpen} onClose={() => setAskOpen(false)} />
       <Toaster position="bottom-right" richColors />
     </div>
   )

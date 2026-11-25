@@ -5,9 +5,16 @@ export interface Filters {
   dateTo: string
   sources: string[]
   accounts: string[]
+  noAccounts?: boolean
   categoryId: string
   sourceType: SourceType
   type: string
+  description?: string
+  categoryIds?: string[]
+  excludedCategoryIds?: string[]
+  excludeTransfers?: boolean
+  excludeInvestments?: boolean
+  resultRowIds?: ReadonlySet<string>
 }
 
 export const defaultFilters: Filters = {

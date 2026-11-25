@@ -45,7 +45,7 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
     const next = filters.accounts.includes(account)
       ? filters.accounts.filter((a) => a !== account)
       : [...filters.accounts, account]
-    onChange({ ...filters, accounts: next })
+    onChange({ ...filters, accounts: next, noAccounts: undefined })
   }
 
   const hasActiveFilters =
@@ -53,8 +53,15 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
     filters.dateTo !== '' ||
     filters.sources.length > 0 ||
     filters.accounts.length > 0 ||
+    !!filters.noAccounts ||
     filters.categoryId !== '' ||
-    filters.type !== ''
+    filters.type !== '' ||
+    !!filters.description ||
+    filters.categoryIds !== undefined ||
+    !!filters.excludedCategoryIds?.length ||
+    !!filters.excludeTransfers ||
+    !!filters.excludeInvestments ||
+    !!filters.resultRowIds
 
   const showCategory = filters.sourceType !== 'brokerage'
   const showType = filters.sourceType !== 'bank'
@@ -86,6 +93,70 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
           style={inputStyle}
         />
       </div>
+      <input
+        type="search"
+        aria-label="Filter by description"
+        placeholder="Description"
+        value={filters.description ?? ''}
+        onChange={(e) => onChange({ ...filters, description: e.target.value })}
+        className={`${inputCls} w-32`}
+        style={inputStyle}
+      />
+      {filters.resultRowIds && (
+        <button
+          type="button"
+          aria-label="Clear Ask Lokfi result filter"
+          onClick={() => onChange({ ...filters, resultRowIds: undefined })}
+          className={inputCls}
+          style={inputStyle}
+        >
+          Ask Lokfi results · {filters.resultRowIds.size} ×
+        </button>
+      )}
+      {filters.excludeTransfers && (
+        <button
+          type="button"
+          aria-label="Clear transfers and card repayments exclusion"
+          onClick={() => onChange({ ...filters, excludeTransfers: undefined })}
+          className={inputCls}
+          style={inputStyle}
+        >
+          Exclude transfers and card repayments ×
+        </button>
+      )}
+      {filters.excludeInvestments && (
+        <button
+          type="button"
+          aria-label="Clear investments and brokerage funding exclusion"
+          onClick={() => onChange({ ...filters, excludeInvestments: undefined })}
+          className={inputCls}
+          style={inputStyle}
+        >
+          Exclude investments and brokerage funding ×
+        </button>
+      )}
+      {filters.excludedCategoryIds?.map((id) => {
+        const name =
+          id === '__uncategorised__' ? 'Uncategorised' : categories?.find((category) => category.id === id)?.name
+        if (!name) return null
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-label={`Clear ${name} exclusion`}
+            onClick={() =>
+              onChange({
+                ...filters,
+                excludedCategoryIds: filters.excludedCategoryIds?.filter((value) => value !== id),
+              })
+            }
+            className={inputCls}
+            style={inputStyle}
+          >
+            Exclude {name} ×
+          </button>
+        )
+      })}
 
       {/* Source pills */}
       {allSources && allSources.length > 0 && (
@@ -128,6 +199,15 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
           <span className="text-gray-300 dark:text-gray-700 select-none">·</span>
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Account</span>
+            {filters.noAccounts && (
+              <button
+                type="button"
+                className={inputCls}
+                onClick={() => onChange({ ...filters, noAccounts: undefined })}
+              >
+                No accounts selected ×
+              </button>
+            )}
             {accounts.map((account) => {
               const active = filters.accounts.includes(account)
               return (
@@ -164,12 +244,18 @@ export function TransactionFilters({ filters, onChange }: TransactionFiltersProp
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Category</span>
             <select
-              value={filters.categoryId}
-              onChange={(e) => onChange({ ...filters, categoryId: e.target.value })}
+              aria-label="Transaction category filter"
+              value={filters.categoryIds ? '__multiple__' : filters.categoryId}
+              onChange={(e) => onChange({ ...filters, categoryId: e.target.value, categoryIds: undefined })}
               className={inputCls}
               style={inputStyle}
             >
               <option value="">All</option>
+              {filters.categoryIds && (
+                <option value="__multiple__" disabled>
+                  {filters.categoryIds.length ? `${filters.categoryIds.length} selected` : 'None selected'}
+                </option>
+              )}
               <option value="__uncategorised__">Uncategorised</option>
               {categories?.map((c) => (
                 <option key={c.id} value={c.id}>
